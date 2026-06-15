@@ -34,6 +34,105 @@ const BUS_FEE = 38000
 const SEORAK_FEE = 10000
 const ACCOUNT = '우리은행 1005803168121 주님의 교회'
 
+// ── 도움말 콘텐츠 (구글폼 안내문) ──────────────────────────────
+const HELP = {
+  general: `[일정]
+· 7월 21일(화)~23일(목) · 델피노 리조트 (원암리 403-1)
+· 등록기간: 6/7(주일)~6/28(주일), 3주간 (선착순)
+· 문의: 이흥배 목사 010-9584-7575
+
+[리트릿 등록 안내]
+1. 신청서 제출 및 등록비 입금이 확인된 순서대로 선착순 마감됩니다. 숙소 수용 인원이 한정되어 조기 마감될 수 있습니다.
+2. 가족/그룹으로 함께 등록하셔도, 인원 확인·숙소 배정을 위해 참여자별로 신청서를 개별 작성·제출해 주세요.
+3. 이동은 버스 또는 자차. 버스 이용 시 신청서 8번에서 별도 신청(왕복 38,000원, 등록비 미포함).
+4. 식사: 1일차 중식·석식 / 2일차 조식·석식 / 3일차 조식·중식 제공. 2일차(22일) 중식은 자유시간(자유식).
+5. 입금자명(등록자 또는 가족 대표자 이름)을 정확히 적어주세요. (예: 등록비 김바울 / 버스비 김바울 / 가족 김바울 / 객실선택 김바울)
+6. 자세한 사항은 주일예배(1~3부) 후 1층 안내데스크에서 문의·도움 받으실 수 있습니다.
+
+* 이번 리트릿은 새가족 과정을 수료하신 성도님에 한해 등록하실 수 있습니다.
+
+[가족 및 그룹 신청 안내]
+1. 가족 및 원하는 성도분들과 함께 숙박을 신청하실 수 있습니다.
+2. 추가 신청 항목은 가족/그룹 대표자분이 신청해 주세요.
+3. 가족/그룹은 한정 수량이며, 선착순 신청·입금 순으로 마감됩니다.
+4. 룸 투숙 인원 옵션당 객실당 추가비용을 기본 등록비 외에 납부해 주세요. 룸 인원이 7~8명이면 추가비용이 없습니다.
+
+[입금 계좌]
+· 우리은행 1005803168121 주님의 교회
+· 리트릿 등록비·버스비·가족(그룹)룸 비용 모두 동일 계좌로 입금해 주세요.
+· 환불은 등록기간 이후 숙소·버스가 확정되어 어렵습니다.
+
+[숙소 안내]
+델피노 홈페이지에서 숙소를 미리 둘러보실 수 있습니다.`,
+
+  dept: `등록자 본인의 소속부서를 선택해 주세요. 부서(출생연도)에 따라 1인 기본 등록비가 다릅니다. [개인 비용]
+
+· 장년부 278,000원
+· 청년부 278,000원
+· 중고등부 268,000원 (08~13년생)
+· 소년부 258,000원 (14~15년생)
+· 초등부 248,000원 (16~17년생)
+· 유년부 228,000원 (18~19년생)
+· 유치부 208,000원 (20~21년생)
+· 영유아부 198,000원 (22~24년생)
+· 영아부(돌전) 178,000원 (25~26년생)`,
+
+  room: `객실당 추가비용이 드는 룸을 선택하실 경우, [그룹 비용]은 대표자 이름으로 한 번에 추가 입금해 주세요. (예: 객실선택 김바울)
+
+· 소노벨 패밀리 (최대 6인, 원룸·더블침대 2개)
+  → 객실당 추가비용 없음 (투숙 인원에 따른 추가비용은 별도)
+· 소노벨 스위트 (최대 8인, 투룸 / 침실A 온돌, 침실B 더블1 또는 싱글2)
+  → 객실당 추가 [그룹] 6만원 · [개인] 1만원
+· 소노캄 스위트 (최대 8인, 투룸 / 침실A 싱글2, 침실B 더블1)
+  → 객실당 추가 [그룹] 24만원 · [개인] 4만원
+
+[위치]
+· 소노벨 패밀리·스위트: 예배실·식사장소와 도보 3~5분 거리 건물동 (지하 연결통로 있음)
+· 소노캄 스위트: 예배실·식사장소와 붙어있는 옆 건물동`,
+
+  occupancy: `가족/그룹을 따로 신청하지 않는 성도님은 교회에서 방배정을 해드립니다. (추가비용 없음)
+
+한 객실에 몇 명이 투숙하는지에 따라 객실당 추가비용이 발생합니다. 룸 인원이 7~8명이면 추가비용이 없습니다. [그룹 비용]
+
+· 7~8인: 추가비용 없음
+· 6인: 5만원
+· 5인: 10만원
+· 4인: 20만원
+· 3인: 30만원
+· 2인: 40만원
+· 1인: 50만원
+
+* 소노벨 패밀리는 최대 6인이므로, 7~8인 투숙을 원하시는 가족/그룹은 소노벨 스위트 / 소노캄 스위트를 선택해 주세요.
+* 부분적으로 그룹을 원하시는 경우 신청서 7번에 상세 내용을 적어주세요. (예: 저 김바울과 김노아 2명은 다른 성도님들과 함께 (   )명 방으로 배정 / 또는 방 인원 무관) 추가비용은 추후 결정됩니다.`,
+
+  members: `가족 및 원하는 성도분들과 함께 숙박하실 수 있습니다. 가족/그룹 대표자분이 추가 항목을 신청해 주세요.
+
+* 가족/그룹으로 등록하셔도, 인원 확인과 숙소 배정을 위해 참여자별로 공식 신청서를 각각 따로 제출해야 합니다. (본 계산기는 금액 산정·입금 안내용)
+* 가족/그룹은 한정 수량이며 선착순 신청·입금 순으로 마감됩니다.
+
+[구성원별 버스·설악산뷰]
+버스(왕복 38,000원)와 설악산뷰(1만원)는 개인 비용이라, 신청한 구성원만큼만 합산됩니다. 각 구성원의 버튼으로 선택해 주세요.`,
+
+  move: `[버스] 이동은 버스 또는 자차를 이용하실 수 있습니다. 버스 이용을 원하시면 신청해 주세요. 버스 비용은 등록비에 포함되지 않습니다. [개인 비용]
+· 왕복 버스비용: 1인 38,000원
+
+[설악산뷰] 1인당 등록비에 1만원을 추가하여 입금하시면, 선착순으로 설악산뷰를 배정해 드립니다. [개인 비용]`,
+
+  deposit: `원활한 확인·진행을 위해 항목별로 구분하여 따로 입금해 주세요.
+가족(그룹)으로 등록하실 분은 대표자분 이름을, 개인 등록자는 본인 이름을 입금자명으로 적어 주세요.
+
+[입금 예시] (입금내역 + 등록자/대표자 성함)
+· 등록비 김바울 — 부서별 금액 (4번, 개인)
+· 객실선택 김바울 — 객실별·그룹/개인 (5번)
+· 가족 김바울 / 그룹 김바울 — 투숙 인원별 (6번, 그룹)
+· 버스비 김바울 — 38,000원 (8번, 개인)
+· 설악산 김바울 — 10,000원 (9번, 개인)
+
+[입금 계좌]
+· 우리은행 1005803168121 주님의 교회
+* 환불은 등록기간 이후 숙소·버스가 확정되어 어렵습니다.`,
+}
+
 const won = (n) => n.toLocaleString('ko-KR') + '원'
 
 function deriveOcc(count) {
@@ -41,8 +140,51 @@ function deriveOcc(count) {
   return OCCUPANCY.find((o) => o.people === count) || OCCUPANCY[0]
 }
 
+// ── 도움말 (탭 → 하단 시트) ────────────────────────────────────
+function HelpModal({ open, title, body, onClose }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 animate-backdrop" />
+      <div
+        className="relative w-full max-w-[480px] bg-white rounded-t-[26px] max-h-[82vh] overflow-y-auto p-6 pb-8 animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 bg-[#e5e8eb] rounded-full mx-auto mb-4" />
+        <div className="flex justify-between items-start mb-3 gap-3">
+          <h3 className="text-[16px] font-bold text-[#191f28] leading-snug">{title}</h3>
+          <button onClick={onClose} className="text-[#b0b8c1] text-[20px] leading-none shrink-0 -mt-1">✕</button>
+        </div>
+        <div className="text-[13px] text-[#4e5968] leading-relaxed whitespace-pre-wrap">{body}</div>
+        <button onClick={onClose} className="w-full mt-5 py-3 rounded-2xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function HelpIcon({ title, body }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true) }}
+        aria-label="도움말"
+        className="inline-flex items-center justify-center w-5 h-5 shrink-0 text-[#b0c4e8] hover:text-[#3182f6] transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+      <HelpModal open={open} title={title} body={body} onClose={() => setOpen(false)} />
+    </>
+  )
+}
+
 // ── 공통 UI ────────────────────────────────────────────────────
-function Card({ title, badge, children }) {
+function Card({ title, badge, help, helpTitle, children }) {
   return (
     <section className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-5 mb-4">
       {title && (
@@ -51,6 +193,7 @@ function Card({ title, badge, children }) {
           {badge != null && (
             <span className="bg-[#3182f6] text-white text-[11px] px-2 py-0.5 rounded-full font-bold">{badge}</span>
           )}
+          {help && <HelpIcon title={helpTitle || title} body={help} />}
         </div>
       )}
       {children}
@@ -143,11 +286,11 @@ function IndividualMode() {
 
   return (
     <>
-      <Card title="소속부서 (개인 등록비)">
+      <Card title="소속부서 (개인 등록비)" help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
         <DeptSelect value={dept} onChange={setDept} />
       </Card>
 
-      <Card title="객실 종류 (개인 추가비용)">
+      <Card title="객실 종류 (개인 추가비용)" help={HELP.room} helpTitle="객실 종류 안내">
         <div className="space-y-2">
           {ROOMS.map((r, i) => (
             <OptionRow
@@ -165,7 +308,7 @@ function IndividualMode() {
         </p>
       </Card>
 
-      <Card title="이동 / 뷰 (개인 추가비용)">
+      <Card title="이동 / 뷰 (개인 추가비용)" help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
         <div className="space-y-2">
           <Toggle on={bus} onChange={setBus} label="버스 신청 (왕복)" sub="자차 이용 시 선택 안 함" price={`+${won(BUS_FEE)}`} />
           <Toggle on={seorak} onChange={setSeorak} label="설악산 뷰 신청" sub="선착순 배정" price={`+${won(SEORAK_FEE)}`} />
@@ -238,7 +381,7 @@ function GroupMode() {
         />
       </Card>
 
-      <Card title="구성원" badge={count}>
+      <Card title="구성원" badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
         <div className="space-y-3">
           {members.map((m, i) => (
             <div key={i} className="bg-[#f9fafb] rounded-2xl p-3 border border-[#f2f4f6]">
@@ -278,7 +421,7 @@ function GroupMode() {
         </button>
       </Card>
 
-      <Card title="객실 종류 (그룹 추가비용)">
+      <Card title="객실 종류 (그룹 추가비용)" help={HELP.room} helpTitle="객실 종류 안내">
         <div className="space-y-2">
           {ROOMS.map((r, i) => (
             <OptionRow
@@ -298,7 +441,7 @@ function GroupMode() {
         )}
       </Card>
 
-      <Card title="투숙 인원 (그룹 추가비용)">
+      <Card title="투숙 인원 (그룹 추가비용)" help={HELP.occupancy} helpTitle="투숙 인원 / 방배정 안내">
         <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">
           한 객실에 몇 명이 투숙하는지에 따른 추가비용입니다. 기본값은 구성원 수 기준이며, 다르면 직접 선택하세요.
           <br />7~8인 투숙 시 추가비용 없음.
@@ -376,7 +519,7 @@ function ResultPanel({ calc, name, mode }) {
       </div>
 
       {/* 입금 분할 */}
-      <Card title="입금 안내 (항목별 따로 입금)">
+      <Card title="입금 안내 (항목별 따로 입금)" help={HELP.deposit} helpTitle="입금 방법 안내">
         <div className="space-y-2.5">
           {calc.lines.map((l, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-[#f2f4f6] last:border-0">
@@ -407,6 +550,25 @@ function ResultPanel({ calc, name, mode }) {
   )
 }
 
+// 헤더 "등록 안내 전체보기" 버튼
+function GuideButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#f2f8ff] text-[#3182f6] font-bold text-[12px] hover:bg-[#e8f3ff] transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        등록 안내 전체보기
+      </button>
+      <HelpModal open={open} title="2026 전교인 리트릿 등록 안내" body={HELP.general} onClose={() => setOpen(false)} />
+    </>
+  )
+}
+
 // ── 메인 ───────────────────────────────────────────────────────
 export default function App() {
   const [mode, setMode] = useState('개인')
@@ -424,6 +586,7 @@ export default function App() {
             📅 7/21(화)~23(목) · 델피노 리조트<br />
             📝 등록기간 6/7~6/28 (선착순) · 문의 이흥배 목사 010-9584-7575<br />
             <span className="text-[#8b95a1]">* 새가족 과정 수료자에 한해 등록 가능</span>
+            <GuideButton />
           </div>
         </header>
 

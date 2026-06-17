@@ -58,6 +58,15 @@ function listCount_(t) {
   return n.length;
 }
 
+// 전화번호 하이픈 정규화 (010-1234-5678). 앞자리 0 누락도 보정.
+function _fmtPhone_(v) {
+  var d = String(v || '').replace(/[^0-9]/g, '');
+  if (d.length < 9) return String(v || '').trim(); // 전화번호 형태가 아니면(이름 오기입 등) 원본 보존
+  if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; // 1012345678 → 01012345678
+  d = d.slice(0, 11);
+  return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7);
+}
+
 // 명단 텍스트에서 한글 이름 토큰 추출 (Submit.gs의 _nameTokens_와 동일 규칙, 이름만 다름)
 function _listNames_(t) {
   return String(t || '').split(/[^가-힣A-Za-z]+/).filter(function (x) {
@@ -221,6 +230,13 @@ function enrichSheet() {
     body.push(line);
   }
   sheet.getRange(2, minCol + 1, body.length, width).setValues(body);
+
+  // 연락처(F열) 하이픈 일괄 정규화 (010-1234-5678)
+  if (C.contact >= 0) {
+    var phoneCol = [];
+    for (var pr = 1; pr < data.length; pr++) phoneCol.push([_fmtPhone_(get(pr, 'contact'))]);
+    sheet.getRange(2, C.contact + 1, phoneCol.length, 1).setValues(phoneCol);
+  }
 
   SpreadsheetApp.getActiveSpreadsheet().toast('정리 완료: ' + gid + '개 그룹 / 총 ' + grandTotal.toLocaleString() + '원', '리트릿', 6);
 }

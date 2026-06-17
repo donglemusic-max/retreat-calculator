@@ -254,7 +254,7 @@ function _admin_(sheet, H, col, width) {
       email: _gv_(row, col.email), campus: _gv_(row, col.campus), deptLabel: _gv_(row, col.dept),
       roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
       bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
-      gid: _gv_(row, col.gid), rep: _gv_(row, col.grep), route: _gv_(row, col.route),
+      gid: _gv_(row, col.gid), rep: _gv_(row, col.grep), repInput: _gv_(row, col.rep), route: _gv_(row, col.route),
       list: _gv_(row, col.list), inquiry: _gv_(row, col.inquiry),
       ifee: Number(row[col.ifee] || 0), iroom: Number(row[col.iroom] || 0),
       mbus: Number(row[col.mbus] || 0), mseo: Number(row[col.mseo] || 0),

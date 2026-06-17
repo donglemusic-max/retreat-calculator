@@ -23,17 +23,20 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v9-findsheet'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v10-type'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
 // 앱이 추가하는 컬럼 (헤더 텍스트 = 식별자, 멱등 재계산)
 var APP_COLS = [
-  '제출경로', '그룹ID', '그룹대표(추정)', '그룹인원(제출)',
+  '제출경로', '그룹ID', '그룹대표(추정)', '그룹인원(제출)', '신청유형',
   '1인등록비', '본인객실', '본인버스', '본인설악산',
-  '그룹공동비용(객실+투숙)', '그룹총액',
+  '그룹공동비용(객실+투숙)', '그룹총액', '침구추가',
   '확인필요', '비고',
 ];
+// 객실 기본 정원 (초과분이 침구추가)
+function roomBase_(t) { return t.indexOf('소노캄') >= 0 ? 5 : (t.indexOf('소노벨 스위트') >= 0 ? 5 : 4); }
+function occPeople_(t) { var m = String(t || '').match(/(\d)인/); if (!m) return 0; var p = +m[1]; return (p >= 7 || /7~8/.test(t)) ? 8 : p; }
 
 function deptFee_(t) { for (var k in DEPT_FEE) if (t.indexOf(k) >= 0) return DEPT_FEE[k]; return 0; }
 function roomAdd_(t) { return t.indexOf('소노캄') >= 0 ? 240000 : (t.indexOf('소노벨 스위트') >= 0 ? 60000 : 0); }   // 그룹가
@@ -175,6 +178,11 @@ function enrichSheet() {
     var isGrp = grpRow >= 0;
     var commonFee = isGrp ? (roomAdd_(get(grpRow, 'room')) + occAdd_(get(grpRow, 'occ'))) : 0;
     var pRoom = function (r) { return isGrp ? 0 : roomIndiv_(get(r, 'room')); };
+    // 신청유형: 그룹(N인투숙) / 부분(부분적으로) / 개인
+    var isPartial = members.some(function (r) { return /부분적으로/.test(get(r, 'occ')); });
+    var appType = isGrp ? '그룹' : (isPartial ? '부분' : '개인');
+    // 침구추가: 그룹 확정 객실만 max(0, 투숙인원 - 기본정원)
+    var bedding = isGrp ? Math.max(0, occPeople_(get(grpRow, 'occ')) - roomBase_(get(grpRow, 'room'))) : '';
 
     // 중복 재제출 제거: 같은 이름은 1명만 집계 (구버전 행은 후순위로 밀어 비집계)
     var ordered = members.slice().sort(function (a, b) { return (get(a, 'ver') === '구' ? 1 : 0) - (get(b, 'ver') === '구' ? 1 : 0); });
@@ -221,12 +229,14 @@ function enrichSheet() {
         '그룹ID': gidStr,
         '그룹대표(추정)': rep,
         '그룹인원(제출)': memberCount,
+        '신청유형': appType,
         '1인등록비': dup ? 0 : deptFee_(get(r, 'dept')),
         '본인객실': dup ? 0 : pRoom(r),
         '본인버스': dup ? 0 : (get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0),
         '본인설악산': dup ? 0 : (get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0),
         '그룹공동비용(객실+투숙)': r === repRow ? commonFee : 0,
         '그룹총액': r === repRow ? groupTotal : 0,
+        '침구추가': (isGrp && r === repRow) ? bedding : '',
         '확인필요': dup ? '' : (needCheck ? 'Y' : ''),
         '비고': dup ? '중복 재제출(집계 제외)' : (needCheck ? ('명단 ' + listN + '명 / 집계 ' + memberCount + '명 — 명단: ' + listRaw) : ''),
       };

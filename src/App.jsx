@@ -810,6 +810,115 @@ function SubmitSection({ payload, valid, missing }) {
   )
 }
 
+// ── 내 신청 조회 / 수정 ────────────────────────────────────────
+function EditCard({ data }) {
+  const [gender, setGender] = useState(data.gender || '')
+  const [contact, setContact] = useState(data.contact || '')
+  const [email, setEmail] = useState(data.email || '')
+  const [campus, setCampus] = useState(data.campus || '')
+  const [deptName, setDeptName] = useState(DEPTS.find((d) => d.label === data.deptLabel)?.name || DEPTS[0].name)
+  const [bus, setBus] = useState(!!data.bus)
+  const [seorak, setSeorak] = useState(!!data.seorak)
+  const [inquiry, setInquiry] = useState(data.inquiry || '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState('')
+
+  const save = async () => {
+    setSaving(true); setErr('')
+    const deptLabel = DEPTS.find((d) => d.name === deptName)?.label
+    try {
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'update', row: data.row, name: data.name, contact: data.contact,
+          fields: { gender, contact, email, campus, deptLabel, bus, seorak, inquiry },
+        }),
+      })
+      const j = await res.json()
+      if (j.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
+      else setErr(j.error || '수정 실패')
+    } catch (e) { setErr(String(e)) } finally { setSaving(false) }
+  }
+
+  const roomShort = (data.roomLabel || '').split(' (')[0]
+  return (
+    <div className="bg-[#f9fafb] rounded-2xl p-4 border border-[#f2f4f6] mb-3">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[14px] font-bold text-[#191f28]">{data.name}</span>
+        <span className="text-[11px] text-[#8b95a1]">접수 {data.groupId} · 대표 {data.rep || '-'}</span>
+      </div>
+      <Field label="성별"><SegPicker value={gender} onChange={setGender} options={['남', '여']} /></Field>
+      <Field label="연락처"><input value={contact} onChange={(e) => setContact(e.target.value)} inputMode="tel" className={inputCls} /></Field>
+      <Field label="이메일"><input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" className={inputCls} /></Field>
+      <Field label="캠퍼스"><SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} /></Field>
+      <Field label="소속부서"><DeptSelect value={deptName} onChange={setDeptName} /></Field>
+      <Field label="버스 / 설악산뷰">
+        <div className="flex gap-2">
+          <button onClick={() => setBus(!bus)} className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border ${bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>버스 {bus ? '✓' : ''}</button>
+          <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>설악산뷰 {seorak ? '✓' : ''}</button>
+        </div>
+      </Field>
+      <Field label="문의사항"><textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} /></Field>
+      <div className="text-[11px] text-[#8b95a1] bg-white rounded-xl p-3 mb-3 leading-relaxed">
+        객실: {roomShort || '-'} · 투숙/그룹/입금자명 변경은 안내데스크로 문의해 주세요.
+      </div>
+      {err && <p className="text-[12px] text-[#f04452] mb-2">{err}</p>}
+      <button onClick={save} disabled={saving} className={`w-full py-3 rounded-2xl font-bold text-[14px] ${saved ? 'bg-[#15803d] text-white' : 'bg-[#3182f6] text-white hover:bg-[#1b64da]'}`}>
+        {saving ? '저장 중…' : saved ? '✓ 저장됨' : '이 내용으로 수정 저장'}
+      </button>
+    </div>
+  )
+}
+
+function LookupMode() {
+  const [name, setName] = useState('')
+  const [contact, setContact] = useState('')
+  const [status, setStatus] = useState('idle') // idle | loading | loaded | error
+  const [results, setResults] = useState([])
+  const [err, setErr] = useState('')
+
+  const lookup = async () => {
+    setStatus('loading'); setErr('')
+    try {
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'lookup', name: name.trim(), contact: contact.trim() }),
+      })
+      const j = await res.json()
+      if (j.ok) { setResults(j.results || []); setStatus('loaded') }
+      else { setErr(j.error || '조회 실패'); setStatus('error') }
+    } catch (e) { setErr(String(e)); setStatus('error') }
+  }
+
+  return (
+    <>
+      <Card title="내 신청 조회">
+        <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">제출하신 이름과 연락처로 조회합니다. 가족 대표자는 본인 이름으로 조회하세요.</p>
+        <Field label="이름" required><input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} /></Field>
+        <Field label="연락처" required><input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="010-0000-0000" inputMode="tel" className={inputCls} /></Field>
+        <button onClick={lookup} disabled={!name.trim() || !contact.trim() || status === 'loading'}
+          className={`w-full py-3.5 rounded-2xl font-bold text-[15px] ${name.trim() && contact.trim() && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>
+          {status === 'loading' ? '조회 중…' : '조회하기'}
+        </button>
+        {status === 'error' && <p className="text-[12px] text-[#f04452] mt-3">{err}</p>}
+      </Card>
+
+      {status === 'loaded' && (
+        results.length === 0 ? (
+          <Card title="조회 결과 없음">
+            <p className="text-[12px] text-[#8b95a1] leading-relaxed">해당 이름·연락처로 제출된 신청이 없습니다. 입력을 확인하시거나 안내데스크로 문의해 주세요.</p>
+          </Card>
+        ) : (
+          <Card title={`조회 결과 (${results.length}건)`}>
+            {results.map((r) => <EditCard key={r.row} data={r} />)}
+          </Card>
+        )
+      )}
+    </>
+  )
+}
+
 // 헤더 "등록 안내 전체보기" 버튼
 function GuideButton() {
   const [open, setOpen] = useState(false)
@@ -852,20 +961,24 @@ export default function App() {
 
         {/* 모드 탭 */}
         <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[16px] mb-4 sticky top-2 z-10">
-          {['개인', '그룹'].map((m) => (
+          {[
+            { k: '개인', t: '개인 등록' },
+            { k: '그룹', t: '가족·그룹' },
+            { k: '조회', t: '조회·수정' },
+          ].map(({ k, t }) => (
             <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`flex-1 py-3 text-[14px] font-bold rounded-[12px] transition-all ${
-                mode === m ? 'bg-white text-[#3182f6] shadow-md' : 'text-[#8b95a1]'
+              key={k}
+              onClick={() => setMode(k)}
+              className={`flex-1 py-3 text-[13px] font-bold rounded-[12px] transition-all ${
+                mode === k ? 'bg-white text-[#3182f6] shadow-md' : 'text-[#8b95a1]'
               }`}
             >
-              {m === '개인' ? '개인 등록' : '가족 · 그룹 등록'}
+              {t}
             </button>
           ))}
         </div>
 
-        {mode === '개인' ? <IndividualMode /> : <GroupMode />}
+        {mode === '개인' ? <IndividualMode /> : mode === '그룹' ? <GroupMode /> : <LookupMode />}
 
         <p className="text-[11px] text-[#b0b8c1] text-center mt-6 leading-relaxed">
           본 계산기는 입금 편의를 위한 참고용입니다.<br />

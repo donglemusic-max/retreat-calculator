@@ -880,20 +880,20 @@ function EditCard({ data, onDelete }) {
         const selfRoom = isGroupRoom ? 0 : roomIndivFee(data.roomLabel)
         const selfFee = (DEPTS.find((d) => d.name === deptName)?.fee || 0) + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0)
         return (
-          <div className="bg-[#f2f8ff] rounded-xl p-3 mb-3">
-            <div className="flex justify-between items-center">
-              <span className="text-[12px] font-semibold text-[#1b64da]">본인 부담 금액</span>
-              <span className="text-[15px] font-extrabold text-[#191f28]">{won(selfFee)}</span>
+          <div className="bg-[#f2f8ff] rounded-2xl p-4 mb-3 border border-[#d8e8ff]">
+            <div className="flex justify-between items-baseline">
+              <span className="text-[13px] font-bold text-[#1b64da]">본인 부담 금액</span>
+              <span className="text-[24px] font-extrabold text-[#191f28] leading-none">{won(selfFee)}</span>
             </div>
-            <div className="text-[11px] text-[#8b95a1] mt-1 leading-snug">
+            <div className="text-[12px] text-[#4e5968] mt-2 leading-snug">
               등록비 {won(DEPTS.find((d) => d.name === deptName)?.fee || 0)}{selfRoom > 0 ? ` · 객실 ${won(selfRoom)}` : ''}{bus ? ` · 버스 ${won(BUS_FEE)}` : ''}{seorak ? ` · 설악산 ${won(SEORAK_FEE)}` : ''}
-              {isGroupRoom && <><br />* 객실·투숙 그룹비용은 대표자({data.rep || '-'})가 납부{data.groupTotal > 0 ? ` · 그룹 총액 ${won(data.groupTotal)}` : ''}</>}
+              {isGroupRoom && <><br /><span className="text-[#8b95a1]">* 객실·투숙 그룹비용은 대표자({data.rep || '-'})가 납부{data.groupTotal > 0 ? ` · 그룹 총액 ${won(data.groupTotal)}` : ''}</span></>}
             </div>
           </div>
         )
       })()}
       <div className="text-[11px] text-[#8b95a1] bg-white rounded-xl p-3 mb-3 leading-relaxed">
-        객실: {roomShort || '-'} · 투숙/그룹/입금자명 변경은 안내데스크로 문의해 주세요.
+        객실: {roomShort || '-'} · 투숙/그룹/입금자명 변경은 별도로 문의 부탁드립니다.
       </div>
       {err && <p className="text-[12px] text-[#f04452] mb-2">{err}</p>}
       <button onClick={save} disabled={saving} className={`w-full py-3 rounded-2xl font-bold text-[14px] ${saved ? 'bg-[#15803d] text-white' : 'bg-[#3182f6] text-white hover:bg-[#1b64da]'}`}>
@@ -1129,6 +1129,8 @@ function AdminApp() {
   const [sel, setSel] = useState({}) // 리마인드 다중선택 row→bool
   const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨
   const [editGid, setEditGid] = useState(null) // 관리자 그룹 편집 대상
+  const [mergeSel, setMergeSel] = useState({}) // 합치기 선택 gid→bool
+  const [mergeMsg, setMergeMsg] = useState('')
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1228,6 +1230,16 @@ function AdminApp() {
   }
   const toggleSel = (row) => setSel((s) => ({ ...s, [row]: !s[row] }))
 
+  const mergeSelected = async () => {
+    const gids = Object.keys(mergeSel).filter((g) => mergeSel[g])
+    if (gids.length < 2) { setMergeMsg('2개 이상 선택하세요'); return }
+    setMergeMsg('합치는 중… (재계산 포함, 수 초 소요)')
+    const j = await post({ action: 'mergeGroups', pin, gids })
+    if (j.ok) { setMergeMsg(`✓ ${j.merged}명을 한 그룹으로 합침`); setMergeSel({}); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setMergeMsg(''), 4000)
+  }
+  const toggleMerge = (gid) => setMergeSel((s) => ({ ...s, [gid]: !s[gid] }))
+
   if (!auth) {
     return (
       <div className="min-h-screen bg-[#f2f4f6] flex items-center justify-center p-4">
@@ -1314,13 +1326,23 @@ function AdminApp() {
               )}
 
               {bookedList.length > 0 && (
-                <Collapsible title="이미 구성된 그룹 (편집 가능)" count={`${bookedList.length}방`}>
+                <Collapsible title="이미 구성된 그룹 (편집·합치기)" count={`${bookedList.length}방`}>
+                  {(() => { const selN = Object.keys(mergeSel).filter((g) => mergeSel[g]).length; return (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[11px] text-[#8b95a1]">떨어진 그룹 체크 → 합치기</span>
+                      <button onClick={mergeSelected} disabled={selN < 2} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN >= 2 ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}그룹 합치기</button>
+                    </div>
+                  ) })()}
+                  {mergeMsg && <p className="text-[12px] text-[#1b64da] font-semibold mb-2">{mergeMsg}</p>}
                   {bookedList.map(([gid, mem, rep]) => {
                     const type = roomTypeOfMembers(mem); const cap = ROOM_CAP[type]
                     return (
                       <div key={gid} className="mb-2 pb-2 border-b border-[#f7f8fa] last:border-0">
                         <div className="flex items-center justify-between mb-1">
-                          <div className="text-[12px] font-bold text-[#191f28]">{rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#8b95a1]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></div>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" checked={!!mergeSel[gid]} onChange={() => toggleMerge(gid)} className="w-4 h-4" />
+                            <span className="text-[12px] font-bold text-[#191f28]">{rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#8b95a1]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></span>
+                          </label>
                           <button onClick={() => setEditGid(gid)} className="text-[11px] font-bold text-[#3182f6]">편집</button>
                         </div>
                         <div className="flex flex-wrap gap-1.5">{mem.map((p) => <ReadChip key={p.row} p={p} />)}</div>

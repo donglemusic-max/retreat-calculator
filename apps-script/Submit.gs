@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv3-groupedit'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv4-merge'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -96,6 +96,7 @@ function doPost(e) {
       if (action === 'admin') return _admin_(sheet, H, acol, width);
       if (action === 'adminSet') return _adminSet_(body, sheet, acol, width);
       if (action === 'adminBatch') return _adminBatch_(body, sheet, acol, width);
+      if (action === 'mergeGroups') return _mergeGroups_(body, sheet, H, acol, width);
     }
     var col = _colMap_(H);
     if (action === 'lookup') return _lookup_(body, sheet, H, col, width);
@@ -378,6 +379,36 @@ function _groupSet_(body, sheet, H, col, width) {
   if (body.occLabel != null) override.occLabel = body.occLabel;
   var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
   return _json_({ ok: true, groupTotal: total });
+}
+
+// 관리자: 여러 그룹을 한 그룹으로 합치기 — 오버라이드 '강제그룹'에 기록 후 enrich 재계산
+function _mergeGroups_(body, sheet, H, col, width) {
+  var gids = body.gids || [];
+  if (gids.length < 2) return _json_({ ok: false, error: '두 개 이상의 그룹을 선택하세요.' });
+  var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+  var names = [], key = '';
+  for (var r = 1; r < n; r++) {
+    var g = _gv_(vals[r], col.gid);
+    if (gids.indexOf(g) >= 0) { var nm = _gv_(vals[r], col.name); if (nm) names.push(nm); if (!key) key = _gv_(vals[r], col.grep) || nm; }
+  }
+  if (!names.length) return _json_({ ok: false, error: '해당 그룹 멤버를 찾지 못했습니다.' });
+  key = key + ' 합방';
+  // 오버라이드 탭에 강제그룹 기록 (ensureOverrideTab/enrichSheet 는 Migrate.gs)
+  ensureOverrideTab();
+  var osh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('오버라이드');
+  var ov = osh.getDataRange().getValues(); var oh = ov[0];
+  var ix = function (re) { for (var i = 0; i < oh.length; i++) if (re.test(String(oh[i]))) return i; return -1; };
+  var cN = ix(/대상 ?이름|원본/); var cF = ix(/강제그룹/);
+  if (cN < 0) { cN = 0; }
+  if (cF < 0) { cF = oh.length; osh.getRange(1, cF + 1).setValue('강제그룹(같은 값=한 그룹)'); }
+  var nameRow = {}; for (var i = 1; i < ov.length; i++) { var k = String(ov[i][cN] || '').trim(); if (k) nameRow[k] = i + 1; }
+  names.forEach(function (nm) {
+    var rr = nameRow[nm] || (osh.getLastRow() + 1);
+    if (!nameRow[nm]) { osh.getRange(rr, cN + 1).setValue(nm); nameRow[nm] = rr; }
+    osh.getRange(rr, cF + 1).setValue(key);
+  });
+  enrichSheet(); // 재계산 → 강제그룹 반영
+  return _json_({ ok: true, merged: names.length, key: key });
 }
 
 // 관리자: 일괄 저장. field='assigned'|'paid'|'amemo', updates=[{row, value}]

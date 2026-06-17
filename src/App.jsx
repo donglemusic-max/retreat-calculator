@@ -1305,9 +1305,11 @@ function AdminApp() {
               </div>
 
               {editGid && (
-                <div className="mb-3">
-                  <button onClick={() => setEditGid(null)} className="text-[12px] font-bold text-[#8b95a1] mb-1">✕ 편집 닫기</button>
-                  <GroupEditor members={rows.filter((r) => r.gid === editGid)} auth={{ pin }} onRefresh={reload} title="그룹 편집 (관리자)" />
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" onClick={() => setEditGid(null)}>
+                  <div className="w-full max-w-[480px] mx-auto mt-4" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => setEditGid(null)} className="text-white text-[13px] font-bold mb-2">✕ 닫기</button>
+                    <GroupEditor members={rows.filter((r) => r.gid === editGid)} auth={{ pin }} onRefresh={reload} title={`그룹 편집 — ${editGid}`} />
+                  </div>
                 </div>
               )}
 

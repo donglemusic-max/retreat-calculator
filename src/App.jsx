@@ -123,7 +123,7 @@ const HELP = {
 
   members: `가족 및 원하는 성도분들과 함께 숙박하실 수 있습니다. 가족/그룹 대표자분이 추가 항목을 신청해 주세요.
 
-* 가족/그룹으로 등록하셔도, 인원 확인과 숙소 배정을 위해 참여자별로 공식 신청서를 각각 따로 제출해야 합니다. (본 계산기는 금액 산정·입금 안내용)
+* 가족/그룹은 대표자가 구성원을 모두 입력해 한 번에 제출합니다. 제출 후 입금까지 완료해야 등록이 확정됩니다.
 * 가족/그룹은 한정 수량이며 선착순 신청·입금 순으로 마감됩니다.
 
 [구성원별 입력]
@@ -948,28 +948,48 @@ function GuideButton() {
 const deptName = (label) => DEPTS.find((d) => d.label === label)?.name || (label || '').split(' ')[0]
 const isChurchAssigned = (occLabel) => !/인이 투숙/.test(occLabel || '')
 
-// 드래그 가능한 사람 칩
-function PersonChip({ p }) {
+// 객실 옵션별 정원
+const ROOM_CAP = { '소노벨 패밀리': 6, '소노벨 스위트': 8, '소노캄 스위트': 8 }
+const reqRoomType = (label) => (label || '').indexOf('소노캄') >= 0 ? '소노캄 스위트' : (label || '').indexOf('소노벨 스위트') >= 0 ? '소노벨 스위트' : '소노벨 패밀리'
+const roomTypeShort = (t) => (t === '소노캄 스위트' ? '소노캄' : t === '소노벨 스위트' ? '스위트' : '패밀리')
+const roomTypeOfMembers = (members) => {
+  const cnt = {}; members.forEach((p) => { const t = reqRoomType(p.roomLabel); cnt[t] = (cnt[t] || 0) + 1 })
+  let best = '소노벨 패밀리', bn = -1; Object.keys(cnt).forEach((t) => { if (cnt[t] > bn) { bn = cnt[t]; best = t } }); return best
+}
+
+// 드래그 가능한 사람 칩 (warn=신청 옵션과 방 옵션 불일치)
+function PersonChip({ p, warn }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: 'p' + p.row })
   const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 50 } : undefined
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
-      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : 'border-[#e5e8eb] bg-white'}`}>
+      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : warn ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
+      {warn && <span title="신청한 객실 옵션과 다른 방">⚠️</span>}
       {p.name}
       <span className="text-[10px] text-[#8b95a1] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
+      <span className="text-[10px] text-[#1b64da] font-normal">{roomTypeShort(reqRoomType(p.roomLabel))}</span>
       {p.list && <span title={p.list}>📝</span>}
     </div>
   )
 }
 
+// 읽기 전용 사람 칩
+function ReadChip({ p }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border border-[#e5e8eb] bg-[#f9fafb] text-[#4e5968]">
+      {p.name}<span className="text-[10px] text-[#8b95a1] font-normal">{p.gender}·{deptName(p.deptLabel)}</span>
+    </span>
+  )
+}
+
 // 드롭 가능한 방 박스
-function RoomDrop({ id, title, count, cap, danger, children, onRemove }) {
+function RoomDrop({ id, title, sub, count, cap, danger, children }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
     <div ref={setNodeRef} className={`rounded-2xl border p-3 mb-2 transition-colors ${isOver ? 'border-2 border-[#3182f6] bg-[#eaf3ff]' : danger ? 'border-[#f04452] bg-[#fff5f5]' : 'border-[#e5e8eb] bg-white'}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-bold text-[#191f28]">{title} <span className={`text-[11px] font-normal ${danger ? 'text-[#f04452]' : 'text-[#8b95a1]'}`}>{count}{cap ? `/${cap}` : ''}명</span></span>
-        {onRemove && <button onClick={onRemove} className="text-[11px] text-[#8b95a1]">비우기</button>}
+        <span className="text-[13px] font-bold text-[#191f28]">{title}{sub && <span className="text-[11px] text-[#8b95a1] font-normal ml-1">{sub}</span>}</span>
+        {cap != null && <span className={`text-[12px] font-bold ${danger ? 'text-[#f04452]' : 'text-[#8b95a1]'}`}>{count}/{cap}명</span>}
       </div>
       <div className="flex flex-wrap gap-1.5 min-h-[34px]">{children}</div>
     </div>
@@ -1035,38 +1055,29 @@ function AdminApp() {
 
   const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
 
-  // 명단에 적힌 짝을 같은 방으로 묶어 자동 배치 (캠퍼스별 8인 FFD)
+  // 자동 배치: 메모 없는 교회배정자만, 캠퍼스+신청 객실옵션별로 옵션 정원만큼 채움
   const autoAssign = () => {
-    const pool = m.pool
-    const byName = {}; pool.forEach((p) => { byName[p.name] = p })
-    const parent = {}; pool.forEach((p) => { parent[p.row] = p.row })
-    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
-    const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
-    const stop = /투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|방으로|명방/
-    const toks = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stop.test(x))
-    pool.forEach((p) => { toks(p.list).forEach((t) => { if (byName[t] && byName[t].row !== p.row) union(p.row, byName[t].row) }) })
-    const cl = {}; pool.forEach((p) => { const r = find(p.row); (cl[r] = cl[r] || []).push(p) })
-    const clusters = Object.values(cl)
+    const pool = m.pool.filter((p) => !p.list) // 배정 요청 메모 있는 사람은 제외
     const order = DEPTS.map((d) => d.name)
-    const byCampus = {}; clusters.forEach((c) => { const k = c[0].campus || '기타'; (byCampus[k] = byCampus[k] || []).push(c) })
+    const byKey = {}
+    pool.forEach((p) => { const t = reqRoomType(p.roomLabel); const k = (p.campus || '기타') + '|' + t; (byKey[k] = byKey[k] || []).push(p) })
     const draft = {}
-    Object.entries(byCampus).forEach(([campus, cls]) => {
-      cls.sort((a, b) => b.length - a.length || (a[0].gender || '').localeCompare(b[0].gender || '') || order.indexOf(deptName(a[0].deptLabel)) - order.indexOf(deptName(b[0].deptLabel)))
+    Object.entries(byKey).forEach(([k, ppl]) => {
+      const sep = k.lastIndexOf('|'); const campus = k.slice(0, sep), type = k.slice(sep + 1)
+      const cap = ROOM_CAP[type] || 8
+      ppl.sort((a, b) => (a.gender || '').localeCompare(b.gender || '') || order.indexOf(deptName(a.deptLabel)) - order.indexOf(deptName(b.deptLabel)))
       const cs = campus.replace(' 캠퍼스', '')
-      const rooms = []
-      cls.forEach((c) => {
-        let placed = false
-        for (const room of rooms) { if (room.n + c.length <= 8) { c.forEach((p) => { draft[p.row] = `${cs}-${room.no}` }); room.n += c.length; placed = true; break } }
-        if (!placed) { const no = rooms.length + 1; c.forEach((p) => { draft[p.row] = `${cs}-${no}` }); rooms.push({ n: c.length, no }) }
-      })
+      let no = 1
+      for (let i = 0; i < ppl.length; i += cap) { const label = `${cs}-${roomTypeShort(type)}-${no++}`; ppl.slice(i, i + cap).forEach((p) => { draft[p.row] = label }) }
     })
-    setAssignDraft(draft); setExtraRooms([])
+    setAssignDraft(draft); setExtraRooms([]) // 메모 있는 사람은 draft에 없음 → 기존 배정/미배정 유지
   }
 
   const onDragEnd = ({ active, over }) => {
     if (!over) return
     const row = Number(String(active.id).slice(1))
-    setAssignDraft((d) => ({ ...d, [row]: over.id === '__pool__' ? '' : String(over.id) }))
+    const isPool = over.id === '__pool__' || over.id === '__reqcheck__'
+    setAssignDraft((d) => ({ ...d, [row]: isPool ? '' : String(over.id) }))
   }
   const addRoom = () => {
     let i = 1; const exist = new Set([...m.pool.map((p) => eff(p)).filter(Boolean), ...extraRooms])
@@ -1153,12 +1164,16 @@ function AdminApp() {
           extraRooms.forEach((l) => { if (!roomMap[l]) roomMap[l] = [] })
           const roomLabels = Object.keys(roomMap).sort()
           const unassigned = m.pool.filter((p) => !eff(p))
-          const memoPeople = m.pool.filter((p) => p.list)
+          const reqCheck = unassigned.filter((p) => p.list)   // 메모 있는 사람(수동 확인)
+          const plain = unassigned.filter((p) => !p.list)
+          // 이미 구성된 그룹(N인 투숙) = 읽기 전용
+          const bookedGroups = {}; rows.forEach((r) => { if (!isChurchAssigned(r.occLabel)) (bookedGroups[r.gid] = bookedGroups[r.gid] || []).push(r) })
+          const bookedList = Object.entries(bookedGroups)
           return (
             <div>
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                 <p className="text-[12px] text-[#4e5968] leading-relaxed mb-3">
-                  교회 배정 대상 <b>{m.pool.length}명</b>. <b>자동 배치</b>는 명단(📝)에 적힌 짝을 같은 방으로 묶고 캠퍼스별 8인으로 채웁니다. 이후 칩을 <b>드래그</b>해 방을 옮기세요.
+                  교회 배정 대상 <b>{m.pool.length}명</b>. <b>자동 배치</b>는 <u>메모 없는</u> 사람만 캠퍼스·신청 객실옵션별 정원(패밀리 6 / 스위트·소노캄 8)에 맞춰 채웁니다. 메모 있는 사람은 아래 "배정 요청 확인"에 따로 두니 직접 드래그하세요.
                 </p>
                 <div className="flex gap-2">
                   <button onClick={autoAssign} className="flex-1 py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[13px]">자동 배치</button>
@@ -1168,28 +1183,44 @@ function AdminApp() {
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
               </div>
 
-              {memoPeople.length > 0 && (
-                <Collapsible title="배정 요청 메모" count={`${memoPeople.length}건`}>
-                  {memoPeople.map((p) => (
-                    <div key={p.row} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
-                      <span className="text-[12px] font-bold text-[#191f28]">{p.name}</span>
-                      <span className="text-[11px] text-[#1b64da] ml-1">{p.list}</span>
-                    </div>
-                  ))}
+              {bookedList.length > 0 && (
+                <Collapsible title="이미 구성된 그룹 (변경 불가)" count={`${bookedList.length}방`}>
+                  {bookedList.map(([gid, mem]) => {
+                    const type = roomTypeOfMembers(mem); const cap = ROOM_CAP[type]
+                    return (
+                      <div key={gid} className="mb-2 pb-2 border-b border-[#f7f8fa] last:border-0">
+                        <div className="text-[12px] font-bold text-[#191f28] mb-1">{mem[0].rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#8b95a1]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></div>
+                        <div className="flex flex-wrap gap-1.5">{mem.map((p) => <ReadChip key={p.row} p={p} />)}</div>
+                      </div>
+                    )
+                  })}
                 </Collapsible>
               )}
 
               <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-                <RoomDrop id="__pool__" title="미배정" count={unassigned.length}>
-                  {unassigned.map((p) => <PersonChip key={p.row} p={p} />)}
-                </RoomDrop>
-                {roomLabels.map((lab) => (
-                  <RoomDrop key={lab} id={lab} title={lab} count={roomMap[lab].length} cap={8} danger={roomMap[lab].length > 8}>
-                    {roomMap[lab].map((p) => <PersonChip key={p.row} p={p} />)}
+                {reqCheck.length > 0 && (
+                  <RoomDrop id="__reqcheck__" title="🔎 배정 요청 확인" sub="메모 있는 사람 (자동배치 제외)" count={reqCheck.length}>
+                    {reqCheck.map((p) => (
+                      <div key={p.row} className="w-full">
+                        <PersonChip p={p} />
+                        <div className="text-[11px] text-[#1b64da] mt-0.5 ml-1 leading-snug">📝 {p.list}</div>
+                      </div>
+                    ))}
                   </RoomDrop>
-                ))}
+                )}
+                <RoomDrop id="__pool__" title="미배정" count={plain.length}>
+                  {plain.map((p) => <PersonChip key={p.row} p={p} />)}
+                </RoomDrop>
+                {roomLabels.map((lab) => {
+                  const mem = roomMap[lab]; const type = roomTypeOfMembers(mem); const cap = ROOM_CAP[type]
+                  return (
+                    <RoomDrop key={lab} id={lab} title={lab} sub={roomTypeShort(type)} count={mem.length} cap={cap} danger={mem.length > cap}>
+                      {mem.map((p) => <PersonChip key={p.row} p={p} warn={reqRoomType(p.roomLabel) !== type} />)}
+                    </RoomDrop>
+                  )
+                })}
               </DndContext>
-              <p className="text-[11px] text-[#b0b8c1] text-center mt-1">칩을 길게 눌러 방으로 끌어다 놓으세요. "저장"을 눌러야 시트에 반영됩니다.</p>
+              <p className="text-[11px] text-[#b0b8c1] text-center mt-1">칩을 길게 눌러 방으로 끌어다 놓으세요. ⚠️=신청 옵션과 다른 방. "저장"을 눌러야 반영됩니다.</p>
             </div>
           )
         })()}
@@ -1276,7 +1307,7 @@ export default function App() {
         <header className="mb-5">
           <div className="text-[12px] font-bold text-[#3182f6] mb-1">BUILD HIS CHURCH</div>
           <h1 className="text-[22px] font-extrabold text-[#191f28] tracking-tight leading-tight">
-            2026 전교인 리트릿<br />등록비 계산기
+            2026 전교인 리트릿<br />등록 및 조회·수정
           </h1>
           <div className="mt-3 bg-white rounded-2xl border border-[#f2f4f6] p-4 text-[12px] text-[#4e5968] leading-relaxed">
             📅 7/21(화)~23(목) · 델피노 리조트<br />
@@ -1308,9 +1339,9 @@ export default function App() {
         {mode === '개인' ? <IndividualMode /> : mode === '그룹' ? <GroupMode /> : <LookupMode />}
 
         <p className="text-[11px] text-[#b0b8c1] text-center mt-6 leading-relaxed">
-          본 계산기는 입금 편의를 위한 참고용입니다.<br />
-          정확한 등록은 공식 신청서 제출 기준이며, 환불은 등록기간 이후 어렵습니다.<br />
-          가족/그룹은 구성원별로 신청서를 각각 제출해야 합니다.
+          본 페이지에서 등록 신청과 조회·수정을 하실 수 있습니다.<br />
+          제출 후 <b>입금까지 완료</b>해야 등록이 확정되며, 환불은 등록기간 이후 어렵습니다.<br />
+          가족/그룹은 대표자가 구성원을 모두 입력해 한 번에 제출합니다.
         </p>
       </div>
     </div>

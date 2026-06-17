@@ -38,6 +38,43 @@ var APP_COLS = [
 function roomBase_(t) { return t.indexOf('소노캄') >= 0 ? 5 : (t.indexOf('소노벨 스위트') >= 0 ? 5 : 4); }
 function occPeople_(t) { var m = String(t || '').match(/(\d)인/); if (!m) return 0; var p = +m[1]; return (p >= 7 || /7~8/.test(t)) ? 8 : p; }
 
+// 오버라이드 탭 생성 (없으면). 운영자가 수기 보정값을 넣는 곳 — 원본 시트는 안 건드림.
+function ensureOverrideTab() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('오버라이드');
+  if (sh) return sh;
+  sh = ss.insertSheet('오버라이드');
+  var head = ['대상 이름(원본)', '표시이름', '부서', '캠퍼스', '교통(버스/자차)', '신청유형(그룹/개인/부분)', '배정방', '비고'];
+  sh.getRange(1, 1, 1, head.length).setValues([head]);
+  sh.getRange(2, 1, 2, head.length).setValues([
+    ['첼로09', '박윤정', '', '', '', '', '', '예시: 표시이름만 보정'],
+    ['이한나', '이한나A', '청년부', '', '', '', '', '예시: 동명이인 — 청년부 이한나'],
+  ]);
+  sh.setFrozenRows(1);
+  SpreadsheetApp.getActiveSpreadsheet().toast('오버라이드 탭 생성됨 — 필요한 칸만 채우고 enrichSheet 재실행', '리트릿', 6);
+  return sh;
+}
+
+// 오버라이드 탭 읽기 → { 원본이름(trim): {disp,dept,campus,bus,type,room,memo} }
+function _loadOverrides_() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('오버라이드');
+  if (!sh || sh.getLastRow() < 2) return {};
+  var v = sh.getDataRange().getValues(); var hd = v[0];
+  var ix = function (re) { for (var i = 0; i < hd.length; i++) if (re.test(String(hd[i]))) return i; return -1; };
+  var cN = ix(/대상 ?이름|원본/), cD = ix(/표시이름/), cDept = ix(/부서/), cC = ix(/캠퍼스/), cB = ix(/교통/), cT = ix(/유형/), cR = ix(/배정방/), cM = ix(/비고/);
+  var m = {};
+  for (var r = 1; r < v.length; r++) {
+    var nm = String(v[r][cN] || '').trim(); if (!nm) continue;
+    m[nm] = {
+      disp: cD >= 0 ? String(v[r][cD] || '').trim() : '', dept: cDept >= 0 ? String(v[r][cDept] || '').trim() : '',
+      campus: cC >= 0 ? String(v[r][cC] || '').trim() : '', bus: cB >= 0 ? String(v[r][cB] || '').trim() : '',
+      type: cT >= 0 ? String(v[r][cT] || '').trim() : '', room: cR >= 0 ? String(v[r][cR] || '').trim() : '',
+      memo: cM >= 0 ? String(v[r][cM] || '').trim() : '',
+    };
+  }
+  return m;
+}
+
 function deptFee_(t) { for (var k in DEPT_FEE) if (t.indexOf(k) >= 0) return DEPT_FEE[k]; return 0; }
 function roomAdd_(t) { return t.indexOf('소노캄') >= 0 ? 240000 : (t.indexOf('소노벨 스위트') >= 0 ? 60000 : 0); }   // 그룹가
 function roomIndiv_(t) { return t.indexOf('소노캄') >= 0 ? 40000 : (t.indexOf('소노벨 스위트') >= 0 ? 10000 : 0); } // 개인가
@@ -132,6 +169,19 @@ function enrichSheet() {
   var totalCols = headers.length;
 
   var get = function (row, key) { return C[key] >= 0 ? String(data[row][C[key]] || '').trim() : ''; };
+
+  // 0) 오버라이드 적용 (메모리 복사본만 수정 — 원본 시트 보존). 표시이름/부서/캠퍼스/교통은 즉시 반영.
+  var OVR = _loadOverrides_();
+  var ovByRow = {};
+  for (var orr = 1; orr < data.length; orr++) {
+    var onm = (C.name >= 0 ? String(data[orr][C.name] || '') : '').trim();
+    var o = OVR[onm]; if (!o) continue;
+    ovByRow[orr] = o;
+    if (o.disp && C.name >= 0) data[orr][C.name] = o.disp;
+    if (o.dept && C.dept >= 0) data[orr][C.dept] = o.dept;
+    if (o.campus && C.campus >= 0) data[orr][C.campus] = o.campus;
+    if (o.bus && C.bus >= 0) data[orr][C.bus] = (o.bus.indexOf('버스') >= 0 ? '버스 신청합니다' : '자차를 이용합니다');
+  }
 
   // 1) union-find 그룹핑 (이메일 ∪ 전화 ∪ 입금자명rep ∪ 명단 상호언급)
   //    그룹원이 서로 다른 이메일로 제출해도 하나로 묶어 공동비용 중복 계상을 방지
@@ -229,7 +279,7 @@ function enrichSheet() {
         '그룹ID': gidStr,
         '그룹대표(추정)': rep,
         '그룹인원(제출)': memberCount,
-        '신청유형': appType,
+        '신청유형': (ovByRow[r] && ovByRow[r].type) ? ovByRow[r].type : appType,
         '1인등록비': dup ? 0 : deptFee_(get(r, 'dept')),
         '본인객실': dup ? 0 : pRoom(r),
         '본인버스': dup ? 0 : (get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0),
@@ -238,7 +288,11 @@ function enrichSheet() {
         '그룹총액': r === repRow ? groupTotal : 0,
         '침구추가': (isGrp && r === repRow) ? bedding : '',
         '확인필요': dup ? '' : (needCheck ? 'Y' : ''),
-        '비고': dup ? '중복 재제출(집계 제외)' : (needCheck ? ('명단 ' + listN + '명 / 집계 ' + memberCount + '명 — 명단: ' + listRaw) : ''),
+        '비고': (function () {
+          var base = dup ? '중복 재제출(집계 제외)' : (needCheck ? ('명단 ' + listN + '명 / 집계 ' + memberCount + '명 — 명단: ' + listRaw) : '');
+          var mo = ovByRow[r] && ovByRow[r].memo;
+          return mo ? (base ? base + ' / ' + mo : mo) : base;
+        })(),
       };
     });
   });
@@ -264,6 +318,15 @@ function enrichSheet() {
   }
   sheet.getRange(2, minCol + 1, body.length, width).setValues(body);
 
+  // 오버라이드 배정방 기록 (해당 행의 배정방 컬럼에)
+  var roomOvr = [];
+  for (var rr2 = 1; rr2 < data.length; rr2++) { var oo = ovByRow[rr2]; if (oo && oo.room) roomOvr.push([rr2, oo.room]); }
+  if (roomOvr.length) {
+    var aIdx = headers.indexOf('배정방');
+    if (aIdx < 0) { aIdx = headers.length; sheet.getRange(1, aIdx + 1).setValue('배정방'); }
+    roomOvr.forEach(function (pair) { sheet.getRange(pair[0] + 1, aIdx + 1).setValue(pair[1]); });
+  }
+
   // 연락처(F열) 하이픈 일괄 정규화 (010-1234-5678)
   if (C.contact >= 0) {
     var phoneCol = [];
@@ -272,6 +335,52 @@ function enrichSheet() {
   }
 
   SpreadsheetApp.getActiveSpreadsheet().toast('[' + ENRICH_VERSION + '] ' + gid + '개 그룹 / 총 ' + grandTotal.toLocaleString() + '원', '리트릿 정리완료', 8);
+}
+
+/**
+ * GPT 방배정 탭의 방 구성을 응답시트의 '배정방' 컬럼으로 1회 싱크.
+ * - GPT 탭에서 '방대표' 헤더 행을 찾고, 그 아래 각 방의 [방대표 + 인원2~8] 이름을 읽어
+ *   응답시트의 같은 이름 행 '배정방'에 "{방대표} 방"을 기록.
+ * - 이름은 공백/"가족/" 제거 후 매칭. 미매칭은 건너뛰고 토스트로 보고.
+ * - 원본 응답 컬럼은 안 건드리고 '배정방'(앱 컬럼)만 채움.
+ */
+function syncAssignFromGpt() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var gpt = null;
+  ss.getSheets().forEach(function (s) {
+    var lc = s.getLastColumn(); if (lc < 1) return;
+    var vals = s.getRange(1, 1, Math.min(s.getLastRow(), 60), lc).getValues();
+    for (var i = 0; i < vals.length; i++) if (vals[i].some(function (x) { return String(x).indexOf('방대표') >= 0; })) { gpt = { sheet: s, hdrRow: i }; return; }
+  });
+  if (!gpt) { SpreadsheetApp.getUi().alert("'방대표' 헤더가 있는 GPT 탭을 찾지 못했습니다."); return; }
+  var gv = gpt.sheet.getDataRange().getValues();
+  var gh = gv[gpt.hdrRow];
+  var repC = -1, memCols = [];
+  for (var i = 0; i < gh.length; i++) { var t = String(gh[i]); if (repC < 0 && t.indexOf('방대표') >= 0) repC = i; if (/인원\s*\d/.test(t) || /^인원[2-8]/.test(t)) memCols.push(i); }
+  if (repC < 0) { SpreadsheetApp.getUi().alert('방대표 열을 못 찾았습니다.'); return; }
+
+  var resp = _findRespSheet_();
+  var rv = resp.getDataRange().getValues(); var rh = rv[0];
+  var nameC = findCol_(rh, /등록자 이름/, 0);
+  var aIdx = rh.indexOf('배정방'); if (aIdx < 0) { aIdx = rh.length; resp.getRange(1, aIdx + 1).setValue('배정방'); }
+  var norm = function (x) { return String(x || '').replace(/\s+/g, '').replace(/^가족\//, ''); };
+  var nameToRows = {};
+  for (var r = 1; r < rv.length; r++) { var k = norm(rv[r][nameC]); if (k) (nameToRows[k] = nameToRows[k] || []).push(r); }
+
+  var matched = 0; var miss = []; var writes = [];
+  for (var g = gpt.hdrRow + 1; g < gv.length; g++) {
+    var rep = String(gv[g][repC] || '').trim(); if (!rep) continue;
+    if (rep.indexOf('대표') >= 0 || rep.indexOf('통계') >= 0 || rep.indexOf('합계') >= 0) continue; // 다른 표 헤더 방어
+    var label = rep + ' 방';
+    var names = [rep]; memCols.forEach(function (c) { var nm = String(gv[g][c] || '').trim(); if (nm) names.push(nm); });
+    names.forEach(function (nm) {
+      var rows = nameToRows[norm(nm)];
+      if (rows && rows.length) { rows.forEach(function (rr) { writes.push([rr, label]); }); matched++; }
+      else miss.push(nm);
+    });
+  }
+  writes.forEach(function (p) { resp.getRange(p[0] + 1, aIdx + 1).setValue(p[1]); });
+  SpreadsheetApp.getActiveSpreadsheet().toast('GPT 싱크 완료: 배정 ' + matched + '명 / 미매칭 ' + miss.length + '명' + (miss.length ? ' (' + miss.slice(0, 8).join(',') + '…)' : ''), '리트릿', 10);
 }
 
 /** 폼 제출 시 자동 갱신하려면, 이 함수로 설치형 트리거를 1회 등록 */

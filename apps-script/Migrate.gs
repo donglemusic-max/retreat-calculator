@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v8-dedup'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v9-findsheet'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -84,8 +84,20 @@ function findCol_(headers, re, occurrence) {
   return -1;
 }
 
+// 응답 탭 자동 탐색 (헤더에 '타임스탬프'가 있는 시트). 여러 탭이어도 안전.
+function _findRespSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var lc = sheets[i].getLastColumn(); if (lc < 1) continue;
+    var h = sheets[i].getRange(1, 1, 1, lc).getValues()[0];
+    for (var j = 0; j < h.length; j++) if (String(h[j]).indexOf('타임스탬프') >= 0) return sheets[i];
+  }
+  return ss.getSheets()[0];
+}
+
 function enrichSheet() {
-  var sheet = SpreadsheetApp.getActiveSheet();
+  var sheet = _findRespSheet_();
   var rng = sheet.getDataRange();
   var data = rng.getValues();
   if (data.length < 2) { SpreadsheetApp.getUi().alert('데이터가 없습니다.'); return; }

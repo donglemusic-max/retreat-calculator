@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 
 // ── 요금 데이터 (2026 전교인 리트릿) ───────────────────────────
 // label = 구글폼/시트에 기록되는 정본 문자열 (제출 시 그대로 적재 → 폼 응답과 동일)
@@ -947,6 +948,34 @@ function GuideButton() {
 const deptName = (label) => DEPTS.find((d) => d.label === label)?.name || (label || '').split(' ')[0]
 const isChurchAssigned = (occLabel) => !/인이 투숙/.test(occLabel || '')
 
+// 드래그 가능한 사람 칩
+function PersonChip({ p }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: 'p' + p.row })
+  const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 50 } : undefined
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}
+      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : 'border-[#e5e8eb] bg-white'}`}>
+      {p.name}
+      <span className="text-[10px] text-[#8b95a1] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
+      {p.list && <span title={p.list}>📝</span>}
+    </div>
+  )
+}
+
+// 드롭 가능한 방 박스
+function RoomDrop({ id, title, count, cap, danger, children, onRemove }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} className={`rounded-2xl border p-3 mb-2 transition-colors ${isOver ? 'border-2 border-[#3182f6] bg-[#eaf3ff]' : danger ? 'border-[#f04452] bg-[#fff5f5]' : 'border-[#e5e8eb] bg-white'}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[13px] font-bold text-[#191f28]">{title} <span className={`text-[11px] font-normal ${danger ? 'text-[#f04452]' : 'text-[#8b95a1]'}`}>{count}{cap ? `/${cap}` : ''}명</span></span>
+        {onRemove && <button onClick={onRemove} className="text-[11px] text-[#8b95a1]">비우기</button>}
+      </div>
+      <div className="flex flex-wrap gap-1.5 min-h-[34px]">{children}</div>
+    </div>
+  )
+}
+
 function Collapsible({ title, count, defaultOpen, children }) {
   const [open, setOpen] = useState(!!defaultOpen)
   return (
@@ -970,6 +999,11 @@ function AdminApp() {
   const [assignDraft, setAssignDraft] = useState({})
   const [saveMsg, setSaveMsg] = useState('')
   const [sel, setSel] = useState({}) // 리마인드 다중선택 row→bool
+  const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+  )
 
   const post = (payload) =>
     fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) }).then((r) => r.json())
@@ -999,28 +1033,52 @@ function AdminApp() {
     return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups) }
   }, [rows, assignDraft])
 
-  const suggest = () => {
-    const byKey = {}
-    m.pool.forEach((p) => { const k = (p.campus || '기타') + '|' + (p.gender || '?'); (byKey[k] = byKey[k] || []).push(p) })
+  const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
+
+  // 명단에 적힌 짝을 같은 방으로 묶어 자동 배치 (캠퍼스별 8인 FFD)
+  const autoAssign = () => {
+    const pool = m.pool
+    const byName = {}; pool.forEach((p) => { byName[p.name] = p })
+    const parent = {}; pool.forEach((p) => { parent[p.row] = p.row })
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+    const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
+    const stop = /투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|방으로|명방/
+    const toks = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stop.test(x))
+    pool.forEach((p) => { toks(p.list).forEach((t) => { if (byName[t] && byName[t].row !== p.row) union(p.row, byName[t].row) }) })
+    const cl = {}; pool.forEach((p) => { const r = find(p.row); (cl[r] = cl[r] || []).push(p) })
+    const clusters = Object.values(cl)
     const order = DEPTS.map((d) => d.name)
+    const byCampus = {}; clusters.forEach((c) => { const k = c[0].campus || '기타'; (byCampus[k] = byCampus[k] || []).push(c) })
     const draft = {}
-    Object.entries(byKey).forEach(([k, ppl]) => {
-      ppl.sort((a, b) => order.indexOf(deptName(a.deptLabel)) - order.indexOf(deptName(b.deptLabel)))
-      const [campus, gender] = k.split('|')
+    Object.entries(byCampus).forEach(([campus, cls]) => {
+      cls.sort((a, b) => b.length - a.length || (a[0].gender || '').localeCompare(b[0].gender || '') || order.indexOf(deptName(a[0].deptLabel)) - order.indexOf(deptName(b[0].deptLabel)))
       const cs = campus.replace(' 캠퍼스', '')
-      let no = 1
-      for (let i = 0; i < ppl.length; i += 8) { const label = `${cs}-${gender}-${no++}`; ppl.slice(i, i + 8).forEach((p) => { draft[p.row] = label }) }
+      const rooms = []
+      cls.forEach((c) => {
+        let placed = false
+        for (const room of rooms) { if (room.n + c.length <= 8) { c.forEach((p) => { draft[p.row] = `${cs}-${room.no}` }); room.n += c.length; placed = true; break } }
+        if (!placed) { const no = rooms.length + 1; c.forEach((p) => { draft[p.row] = `${cs}-${no}` }); rooms.push({ n: c.length, no }) }
+      })
     })
-    setAssignDraft(draft)
-    setTab('방배정')
+    setAssignDraft(draft); setExtraRooms([])
+  }
+
+  const onDragEnd = ({ active, over }) => {
+    if (!over) return
+    const row = Number(String(active.id).slice(1))
+    setAssignDraft((d) => ({ ...d, [row]: over.id === '__pool__' ? '' : String(over.id) }))
+  }
+  const addRoom = () => {
+    let i = 1; const exist = new Set([...m.pool.map((p) => eff(p)).filter(Boolean), ...extraRooms])
+    while (exist.has(`방${i}`)) i++
+    setExtraRooms((r) => [...r, `방${i}`])
   }
 
   const saveAssign = async () => {
-    const updates = m.pool.filter((p) => assignDraft[p.row] != null).map((p) => ({ row: p.row, value: assignDraft[p.row] }))
-    if (!updates.length) { setSaveMsg('변경 없음'); return }
+    const updates = m.pool.map((p) => ({ row: p.row, value: eff(p) }))
     setSaveMsg('저장 중…')
     const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
-    if (j.ok) { setSaveMsg(`✓ ${j.count}명 배정 저장`); await reload(); setAssignDraft({}) } else setSaveMsg('오류: ' + (j.error || ''))
+    if (j.ok) { setSaveMsg(`✓ ${updates.length}명 저장`); await reload(); setAssignDraft({}); setExtraRooms([]) } else setSaveMsg('오류: ' + (j.error || ''))
     setTimeout(() => setSaveMsg(''), 3000)
   }
 
@@ -1090,54 +1148,51 @@ function AdminApp() {
           </div>
         )}
 
-        {tab === '방배정' && (
-          <div>
-            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
-              <p className="text-[12px] text-[#4e5968] leading-relaxed mb-3">
-                교회 배정 대상 <b>{m.pool.length}명</b>. 자동 제안은 <b>캠퍼스·성별</b>로 묶고 부서(연령) 순으로 정렬해 8인씩 방을 만듭니다. 제안 후 각자 방 이름을 직접 고칠 수 있습니다.
-              </p>
-              <div className="flex gap-2">
-                <button onClick={suggest} className="flex-1 py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[13px]">자동 배치 제안</button>
-                <button onClick={saveAssign} className="flex-1 py-3 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">배정 저장</button>
+        {tab === '방배정' && (() => {
+          const roomMap = {}; m.pool.forEach((p) => { const l = eff(p); if (l) (roomMap[l] = roomMap[l] || []).push(p) })
+          extraRooms.forEach((l) => { if (!roomMap[l]) roomMap[l] = [] })
+          const roomLabels = Object.keys(roomMap).sort()
+          const unassigned = m.pool.filter((p) => !eff(p))
+          const memoPeople = m.pool.filter((p) => p.list)
+          return (
+            <div>
+              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                <p className="text-[12px] text-[#4e5968] leading-relaxed mb-3">
+                  교회 배정 대상 <b>{m.pool.length}명</b>. <b>자동 배치</b>는 명단(📝)에 적힌 짝을 같은 방으로 묶고 캠퍼스별 8인으로 채웁니다. 이후 칩을 <b>드래그</b>해 방을 옮기세요.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={autoAssign} className="flex-1 py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[13px]">자동 배치</button>
+                  <button onClick={addRoom} className="px-4 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px]">+ 방</button>
+                  <button onClick={saveAssign} className="flex-1 py-3 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">저장</button>
+                </div>
+                {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
               </div>
-              {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
-            </div>
-            {/* 방별 미리보기 */}
-            {(() => {
-              const byRoom = {}
-              m.pool.forEach((p) => { const lab = assignDraft[p.row] ?? p.assigned; if (lab) (byRoom[lab] = byRoom[lab] || []).push(p) })
-              const rooms = Object.entries(byRoom).sort()
-              return rooms.length > 0 && (
-                <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
-                  <div className="text-[12px] font-bold text-[#191f28] mb-2">방 구성 미리보기 ({rooms.length}개 방)</div>
-                  {rooms.map(([lab, ppl]) => (
-                    <div key={lab} className="flex justify-between py-1.5 border-b border-[#f7f8fa] last:border-0 text-[12px]">
-                      <span className="font-bold text-[#1b64da]">{lab} <span className="text-[#8b95a1] font-normal">({ppl.length}명)</span></span>
-                      <span className="text-[#4e5968] text-right">{ppl.map((p) => p.name).join(', ')}</span>
+
+              {memoPeople.length > 0 && (
+                <Collapsible title="배정 요청 메모" count={`${memoPeople.length}건`}>
+                  {memoPeople.map((p) => (
+                    <div key={p.row} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
+                      <span className="text-[12px] font-bold text-[#191f28]">{p.name}</span>
+                      <span className="text-[11px] text-[#1b64da] ml-1">{p.list}</span>
                     </div>
                   ))}
-                </div>
-              )
-            })()}
-            {/* 개인별 배정 입력 */}
-            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-              <div className="text-[12px] font-bold text-[#191f28] mb-2">개인별 배정</div>
-              {m.pool.map((p) => (
-                <div key={p.row} className="py-2 border-b border-[#f7f8fa] last:border-0">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[13px] font-bold text-[#191f28]">{p.name}</span>
-                      <span className="text-[11px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{p.gender}·{deptName(p.deptLabel)}</span>
-                    </div>
-                    <input value={assignDraft[p.row] ?? p.assigned ?? ''} onChange={(e) => setAssignDraft((d) => ({ ...d, [p.row]: e.target.value }))}
-                      placeholder="방" className="w-24 bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1.5 text-[12px] text-center" />
-                  </div>
-                  {p.list && <div className="mt-1 text-[11px] text-[#1b64da] bg-[#f2f8ff] rounded-lg px-2 py-1 leading-snug">📝 {p.list}</div>}
-                </div>
-              ))}
+                </Collapsible>
+              )}
+
+              <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+                <RoomDrop id="__pool__" title="미배정" count={unassigned.length}>
+                  {unassigned.map((p) => <PersonChip key={p.row} p={p} />)}
+                </RoomDrop>
+                {roomLabels.map((lab) => (
+                  <RoomDrop key={lab} id={lab} title={lab} count={roomMap[lab].length} cap={8} danger={roomMap[lab].length > 8}>
+                    {roomMap[lab].map((p) => <PersonChip key={p.row} p={p} />)}
+                  </RoomDrop>
+                ))}
+              </DndContext>
+              <p className="text-[11px] text-[#b0b8c1] text-center mt-1">칩을 길게 눌러 방으로 끌어다 놓으세요. "저장"을 눌러야 시트에 반영됩니다.</p>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {tab === '리마인드' && (
           <div>

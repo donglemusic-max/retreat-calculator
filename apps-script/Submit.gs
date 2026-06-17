@@ -68,6 +68,13 @@ function _ensureAdminCols_(sheet, H) {
 }
 function _digits_(s) { return String(s || '').replace(/[^0-9]/g, ''); }
 function _gv_(row, c) { return c >= 0 ? String(row[c] || '').trim() : ''; }
+// 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
+function _nameTokens_(t) {
+  return String(t || '').split(/[^가-힣A-Za-z]+/).filter(function (x) {
+    return x && /^[가-힣]{2,4}$/.test(x) &&
+      !/투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로/.test(x);
+  });
+}
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
@@ -163,23 +170,31 @@ function _lookup_(body, sheet, H, col, width) {
       groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay),
     };
   }
-  var gids = {}, selfRows = [];
+  // 본인 행 + 연결 신호 수집 (그룹이 이메일별로 쪼개진 경우 대비)
+  var gids = {}, phones = {}, mentioned = {}, selfNames = {}, selfRows = [];
   for (var r = 1; r < n; r++) {
     var row = vals[r];
     if (_gv_(row, col.name) === name && _digits_(_gv_(row, col.contact)) === ph) {
-      selfRows.push(r); var g = _gv_(row, col.gid); if (g) gids[g] = true;
+      selfRows.push(r);
+      var g = _gv_(row, col.gid); if (g) gids[g] = true;
+      phones[_digits_(_gv_(row, col.contact))] = true;
+      selfNames[_gv_(row, col.name)] = true;
+      _nameTokens_(_gv_(row, col.list)).forEach(function (t) { mentioned[t] = true; });
     }
   }
   if (!selfRows.length) return _json_({ ok: true, results: [] });
-  var out = [], grouped = Object.keys(gids).length > 0;
-  if (grouped) {
-    for (var r2 = 1; r2 < n; r2++) {
-      if (gids[_gv_(vals[r2], col.gid)]) { var o = rowObj(vals[r2], r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o); }
+  // 확장: 같은 그룹ID / 같은 전화번호 / 본인이 명단에 적은 사람 / 본인을 명단에 적은 사람
+  var out = [];
+  for (var r2 = 1; r2 < n; r2++) {
+    var rw = vals[r2]; var nm = _gv_(rw, col.name); if (!nm) continue;
+    var match = gids[_gv_(rw, col.gid)] || phones[_digits_(_gv_(rw, col.contact))] || mentioned[nm];
+    if (!match) {
+      var toks = _nameTokens_(_gv_(rw, col.list));
+      for (var t = 0; t < toks.length && !match; t++) if (selfNames[toks[t]]) match = true;
     }
-  } else {
-    selfRows.forEach(function (rr) { var o2 = rowObj(vals[rr], rr); o2.isSelf = true; out.push(o2); });
+    if (match) { var o = rowObj(rw, r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o); }
   }
-  return _json_({ ok: true, results: out, grouped: grouped, me: name });
+  return _json_({ ok: true, results: out, grouped: out.length > 1, me: name });
 }
 
 // 본인 신청 수정 (개인 필드만: 성별/연락처/이메일/캠퍼스/부서/버스/설악산/문의)

@@ -160,10 +160,18 @@ git push "https://donglemusic-max:${TOKEN}@github.com/donglemusic-max/retreat-ca
 - 리마인드: **다중선택 체크 → 일괄 입금확인**(adminBatch field=paid) + **접이식**(Collapsible). 확인필요도 접이식.
 - **문의 탭** 추가(P열=문의, 26건). adminBatch는 field(assigned/paid/amemo) 일반화.
 
-### 미해결/백로그
-- 방배정 자동제안은 8인 균등 청크 — 명단 메모의 "함께 배정" 요청을 자동 반영하진 않음(관리자가 보고 수동 조정). 운영규칙 확정 시 고도화.
+### Phase 3 보강 2차 (사용자 피드백)
+- **본인조회 그룹 확장 강화**: 이메일이 달라 enrich가 그룹을 쪼갠 경우(예 임성현 4명이 G024/G025/G026) 대비 → lookup이 groupId ∪ 같은전화번호 ∪ 명단 상호언급으로 확장. 검증: 임성현→4명 OK.
+- **방배정 메모 자동 페어링**: 명단(L열) 이름 토큰으로 union-find 클러스터 → 짝을 같은 방, 캠퍼스별 8인 FFD. 검증: 이선희+안현진/최윤선+조형원/김남현+길태형+문상철 묶임.
+- **방배정 드래그앤드롭**: @dnd-kit/core. PersonChip(useDraggable)/RoomDrop(useDroppable), 미배정+방 박스, 칩 드래그로 이동, +방/저장(adminBatch field=assigned, eff값 전체 전송). TouchSensor(delay150)로 모바일 스크롤 공존.
+- ⚠️ Submit.gs 또 갱신(lookup 확장) → 재배포 1회 필요. 프론트는 Vercel 자동.
+
+### ⚠️ 알려진 정확성 이슈 (미수정, 사용자에게 보고함)
+- enrich가 **이메일로 그룹핑** → 그룹원이 서로 다른 이메일로 제출하면 그룹이 쪼개져 **객실/투숙 공동비용이 그룹 수만큼 중복 계상**됨. (임성현 4인투숙: 20만이 3개 그룹에 각각 → 실제 20만이어야 함). 총액(65,758,000)이 이런 그룹만큼 과다.
+- 근본 해결: enrich 그룹핑을 union-find(이메일 ∪ 전화 ∪ 입금자명 ∪ 명단언급)로 교체 → 그룹ID 통합·공동비용 1회·lookup도 groupId만으로 충분. 단 총액 또 바뀌고 재실행 필요 → 사용자 확인 후 진행 예정.
+
+### 백로그
 - 회사 사본 테스트행 "테스트삭제요망"(A260617171143) 삭제 요청 상태.
-- ⚠️ Submit.gs 또 갱신됨 → **최신본으로 재배포 1회**(버전 올리기)면 전체 반영.
 
 ### 기타 백로그
 - 구글폼 prefill 연동(가벼운 대안): `?usp=pp_url&entry.xxx=값`. A를 직접 만들면 불필요.

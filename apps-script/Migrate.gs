@@ -44,11 +44,13 @@ function ensureOverrideTab() {
   var sh = ss.getSheetByName('오버라이드');
   if (sh) return sh;
   sh = ss.insertSheet('오버라이드');
-  var head = ['대상 이름(원본)', '표시이름', '부서', '캠퍼스', '교통(버스/자차)', '신청유형(그룹/개인/부분)', '배정방', '비고'];
+  var head = ['대상 이름(원본)', '표시이름', '부서', '캠퍼스', '교통(버스/자차)', '신청유형(그룹/개인/부분)', '강제그룹(같은 값=한 그룹)', '배정방', '비고'];
   sh.getRange(1, 1, 1, head.length).setValues([head]);
-  sh.getRange(2, 1, 2, head.length).setValues([
-    ['첼로09', '박윤정', '', '', '', '', '', '예시: 표시이름만 보정'],
-    ['이한나', '이한나A', '청년부', '', '', '', '', '예시: 동명이인 — 청년부 이한나'],
+  sh.getRange(2, 1, 4, head.length).setValues([
+    ['첼로09', '박윤정', '', '', '', '', '', '', '예시: 표시이름만 보정'],
+    ['이한나', '이한나A', '청년부', '', '', '', '', '', '예시: 동명이인 — 청년부 이한나'],
+    ['윤예영', '', '', '', '', '', '임성현', '', '예시: 임성현과 한 그룹으로 강제 묶기'],
+    ['최데이빗', '', '', '', '', '', '임성현', '', '예시: 임성현 그룹'],
   ]);
   sh.setFrozenRows(1);
   SpreadsheetApp.getActiveSpreadsheet().toast('오버라이드 탭 생성됨 — 필요한 칸만 채우고 enrichSheet 재실행', '리트릿', 6);
@@ -61,15 +63,15 @@ function _loadOverrides_() {
   if (!sh || sh.getLastRow() < 2) return {};
   var v = sh.getDataRange().getValues(); var hd = v[0];
   var ix = function (re) { for (var i = 0; i < hd.length; i++) if (re.test(String(hd[i]))) return i; return -1; };
-  var cN = ix(/대상 ?이름|원본/), cD = ix(/표시이름/), cDept = ix(/부서/), cC = ix(/캠퍼스/), cB = ix(/교통/), cT = ix(/유형/), cR = ix(/배정방/), cM = ix(/비고/);
+  var cN = ix(/대상 ?이름|원본/), cD = ix(/표시이름/), cDept = ix(/부서/), cC = ix(/캠퍼스/), cB = ix(/교통/), cT = ix(/유형/), cF = ix(/강제그룹|강제 ?그룹/), cR = ix(/배정방/), cM = ix(/비고/);
   var m = {};
   for (var r = 1; r < v.length; r++) {
     var nm = String(v[r][cN] || '').trim(); if (!nm) continue;
     m[nm] = {
       disp: cD >= 0 ? String(v[r][cD] || '').trim() : '', dept: cDept >= 0 ? String(v[r][cDept] || '').trim() : '',
       campus: cC >= 0 ? String(v[r][cC] || '').trim() : '', bus: cB >= 0 ? String(v[r][cB] || '').trim() : '',
-      type: cT >= 0 ? String(v[r][cT] || '').trim() : '', room: cR >= 0 ? String(v[r][cR] || '').trim() : '',
-      memo: cM >= 0 ? String(v[r][cM] || '').trim() : '',
+      type: cT >= 0 ? String(v[r][cT] || '').trim() : '', force: cF >= 0 ? String(v[r][cF] || '').trim() : '',
+      room: cR >= 0 ? String(v[r][cR] || '').trim() : '', memo: cM >= 0 ? String(v[r][cM] || '').trim() : '',
     };
   }
   return m;
@@ -172,11 +174,12 @@ function enrichSheet() {
 
   // 0) 오버라이드 적용 (메모리 복사본만 수정 — 원본 시트 보존). 표시이름/부서/캠퍼스/교통은 즉시 반영.
   var OVR = _loadOverrides_();
-  var ovByRow = {};
+  var ovByRow = {}, byForce = {};
   for (var orr = 1; orr < data.length; orr++) {
     var onm = (C.name >= 0 ? String(data[orr][C.name] || '') : '').trim();
     var o = OVR[onm]; if (!o) continue;
     ovByRow[orr] = o;
+    if (o.force) (byForce[o.force] = byForce[o.force] || []).push(orr);
     if (o.disp && C.name >= 0) data[orr][C.name] = o.disp;
     if (o.dept && C.dept >= 0) data[orr][C.dept] = o.dept;
     if (o.campus && C.campus >= 0) data[orr][C.campus] = o.campus;
@@ -209,6 +212,8 @@ function enrichSheet() {
     for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]);
     (byNm[v] || []).forEach(function (srow) { union(arr[0], srow); });
   });
+  // 오버라이드 강제그룹: 같은 강제그룹 값을 가진 사람끼리 한 그룹으로 (명단만으로 엮인 그룹 수기 병합)
+  Object.keys(byForce).forEach(function (k) { var a = byForce[k]; for (var i = 1; i < a.length; i++) union(a[0], a[i]); });
   var clusters = {};
   rowsIdx.forEach(function (r) { var root = find(r); (clusters[root] = clusters[root] || []).push(r); });
 

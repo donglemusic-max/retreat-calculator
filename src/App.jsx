@@ -938,9 +938,224 @@ function GuideButton() {
   )
 }
 
+// ── 관리자 페이지 (#admin) ─────────────────────────────────────
+const deptName = (label) => DEPTS.find((d) => d.label === label)?.name || (label || '').split(' ')[0]
+const isChurchAssigned = (occLabel) => !/인이 투숙/.test(occLabel || '')
+
+function AdminApp() {
+  const [pin, setPin] = useState('')
+  const [auth, setAuth] = useState(false)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [tab, setTab] = useState('요약')
+  const [assignDraft, setAssignDraft] = useState({})
+  const [saveMsg, setSaveMsg] = useState('')
+
+  const post = (payload) =>
+    fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) }).then((r) => r.json())
+
+  const login = async () => {
+    setLoading(true); setErr('')
+    try {
+      const j = await post({ action: 'admin', pin })
+      if (j.ok) { setRows(j.rows || []); setAuth(true) } else setErr(j.error || '실패')
+    } catch (e) { setErr(String(e)) } finally { setLoading(false) }
+  }
+  const reload = async () => {
+    const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || [])
+  }
+
+  const m = useMemo(() => {
+    const totalPeople = rows.length
+    const totalAmount = rows.reduce((s, r) => s + (r.gtotal || 0), 0)
+    const byCampus = {}; rows.forEach((r) => { byCampus[r.campus || '기타'] = (byCampus[r.campus || '기타'] || 0) + 1 })
+    const busList = rows.filter((r) => r.mbus > 0)
+    const seorakN = rows.filter((r) => r.mseo > 0).length
+    const unpaid = rows.filter((r) => r.paid !== 'Y')
+    const pool = rows.filter((r) => isChurchAssigned(r.occLabel))
+    const unassigned = pool.filter((r) => !(r.assigned || assignDraft[r.row]))
+    const checkGroups = {}
+    rows.forEach((r) => { if (r.check === 'Y') checkGroups[r.gid] = { rep: r.rep, note: r.note, gid: r.gid } })
+    return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups) }
+  }, [rows, assignDraft])
+
+  const suggest = () => {
+    const byKey = {}
+    m.pool.forEach((p) => { const k = (p.campus || '기타') + '|' + (p.gender || '?'); (byKey[k] = byKey[k] || []).push(p) })
+    const order = DEPTS.map((d) => d.name)
+    const draft = {}
+    Object.entries(byKey).forEach(([k, ppl]) => {
+      ppl.sort((a, b) => order.indexOf(deptName(a.deptLabel)) - order.indexOf(deptName(b.deptLabel)))
+      const [campus, gender] = k.split('|')
+      const cs = campus.replace(' 캠퍼스', '')
+      let no = 1
+      for (let i = 0; i < ppl.length; i += 8) { const label = `${cs}-${gender}-${no++}`; ppl.slice(i, i + 8).forEach((p) => { draft[p.row] = label }) }
+    })
+    setAssignDraft(draft)
+    setTab('방배정')
+  }
+
+  const saveAssign = async () => {
+    const updates = m.pool.filter((p) => assignDraft[p.row] != null).map((p) => ({ row: p.row, assigned: assignDraft[p.row] }))
+    if (!updates.length) { setSaveMsg('변경 없음'); return }
+    setSaveMsg('저장 중…')
+    const j = await post({ action: 'adminBatch', pin, updates })
+    if (j.ok) { setSaveMsg(`✓ ${j.count}명 배정 저장`); await reload(); setAssignDraft({}) } else setSaveMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setSaveMsg(''), 3000)
+  }
+
+  const togglePaid = async (row, cur) => {
+    const val = cur === 'Y' ? '' : 'Y'
+    setRows((rs) => rs.map((r) => (r.row === row ? { ...r, paid: val } : r)))
+    await post({ action: 'adminSet', pin, row, field: 'paid', value: val })
+  }
+
+  if (!auth) {
+    return (
+      <div className="min-h-screen bg-[#f2f4f6] flex items-center justify-center p-4">
+        <div className="bg-white max-w-sm w-full rounded-[28px] shadow-xl p-8 space-y-6">
+          <h1 className="text-[20px] font-extrabold text-[#191f28] text-center">리트릿 관리자</h1>
+          <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()}
+            placeholder="PIN" className="w-full bg-[#f9fafb] border-none rounded-2xl px-4 py-4 text-center text-2xl tracking-[0.4em] focus:ring-2 focus:ring-[#3182f6]" />
+          {err && <p className="text-[#f04452] text-[13px] text-center font-semibold">{err}</p>}
+          <button onClick={login} disabled={loading || !pin} className="w-full bg-[#3182f6] hover:bg-[#1b64da] text-white font-bold py-4 rounded-2xl text-[15px]">
+            {loading ? '확인 중…' : '접속'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const stat = (label, value, sub) => (
+    <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+      <div className="text-[11px] text-[#8b95a1] font-semibold mb-1">{label}</div>
+      <div className="text-[20px] font-extrabold text-[#191f28] leading-none">{value}</div>
+      {sub && <div className="text-[11px] text-[#8b95a1] mt-1">{sub}</div>}
+    </div>
+  )
+
+  return (
+    <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12">
+      <div className="max-w-[720px] mx-auto px-4 pt-6">
+        <header className="flex items-center justify-between mb-4">
+          <h1 className="text-[20px] font-extrabold text-[#191f28]">리트릿 관리자</h1>
+          <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+        </header>
+
+        <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
+          {['요약', '방배정', '리마인드', '버스명단'].map((t) => (
+            <button key={t} onClick={() => setTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{t}</button>
+          ))}
+        </div>
+
+        {tab === '요약' && (
+          <div className="grid grid-cols-2 gap-2.5">
+            {stat('총 신청 인원', m.totalPeople + '명')}
+            {stat('총 등록 금액', won(m.totalAmount))}
+            {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
+            {stat('방배정 필요', m.pool.length + '명', `미배정 ${m.unassigned.length}명`)}
+            {stat('버스 신청', m.busList.length + '명')}
+            {stat('설악산뷰', m.seorakN + '명')}
+            {stat('확인필요 그룹', m.checkGroups.length + '건', '명단>제출')}
+            {stat('캠퍼스', Object.entries(m.byCampus).map(([k, v]) => `${k.replace(' 캠퍼스', '')} ${v}`).join(' / '))}
+          </div>
+        )}
+
+        {tab === '방배정' && (
+          <div>
+            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+              <p className="text-[12px] text-[#4e5968] leading-relaxed mb-3">
+                교회 배정 대상 <b>{m.pool.length}명</b>. 자동 제안은 <b>캠퍼스·성별</b>로 묶고 부서(연령) 순으로 정렬해 8인씩 방을 만듭니다. 제안 후 각자 방 이름을 직접 고칠 수 있습니다.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={suggest} className="flex-1 py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[13px]">자동 배치 제안</button>
+                <button onClick={saveAssign} className="flex-1 py-3 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">배정 저장</button>
+              </div>
+              {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
+            </div>
+            {/* 방별 미리보기 */}
+            {(() => {
+              const byRoom = {}
+              m.pool.forEach((p) => { const lab = assignDraft[p.row] ?? p.assigned; if (lab) (byRoom[lab] = byRoom[lab] || []).push(p) })
+              const rooms = Object.entries(byRoom).sort()
+              return rooms.length > 0 && (
+                <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                  <div className="text-[12px] font-bold text-[#191f28] mb-2">방 구성 미리보기 ({rooms.length}개 방)</div>
+                  {rooms.map(([lab, ppl]) => (
+                    <div key={lab} className="flex justify-between py-1.5 border-b border-[#f7f8fa] last:border-0 text-[12px]">
+                      <span className="font-bold text-[#1b64da]">{lab} <span className="text-[#8b95a1] font-normal">({ppl.length}명)</span></span>
+                      <span className="text-[#4e5968] text-right">{ppl.map((p) => p.name).join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            {/* 개인별 배정 입력 */}
+            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+              <div className="text-[12px] font-bold text-[#191f28] mb-2">개인별 배정</div>
+              {m.pool.map((p) => (
+                <div key={p.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-bold text-[#191f28]">{p.name}</span>
+                    <span className="text-[11px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{p.gender}·{deptName(p.deptLabel)}</span>
+                  </div>
+                  <input value={assignDraft[p.row] ?? p.assigned ?? ''} onChange={(e) => setAssignDraft((d) => ({ ...d, [p.row]: e.target.value }))}
+                    placeholder="방" className="w-24 bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1.5 text-[12px] text-center" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === '리마인드' && (
+          <div className="space-y-3">
+            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+              <div className="text-[13px] font-bold text-[#191f28] mb-2">미입금 {m.unpaid.length}명 (체크 시 입금확인)</div>
+              {m.unpaid.length === 0 ? <p className="text-[12px] text-[#8b95a1]">전원 입금확인 완료</p> :
+                m.unpaid.map((r) => (
+                  <div key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
+                    <input type="checkbox" checked={r.paid === 'Y'} onChange={() => togglePaid(r.row, r.paid)} className="w-4 h-4" />
+                    <span className="text-[13px] font-bold text-[#191f28] flex-1">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.pay ? ` · 입금자명 ${r.pay}` : ''}</span></span>
+                  </div>
+                ))}
+            </div>
+            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+              <div className="text-[13px] font-bold text-[#191f28] mb-2">확인필요 {m.checkGroups.length}건 (명단 &gt; 제출)</div>
+              {m.checkGroups.length === 0 ? <p className="text-[12px] text-[#8b95a1]">없음</p> :
+                m.checkGroups.map((g) => (
+                  <div key={g.gid} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
+                    <div className="text-[13px] font-bold text-[#191f28]">{g.rep} <span className="text-[11px] text-[#8b95a1]">{g.gid}</span></div>
+                    <div className="text-[11px] text-[#8b95a1] leading-snug">{g.note}</div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {tab === '버스명단' && (
+          <div className="space-y-3">
+            {Object.keys(m.byCampus).map((campus) => {
+              const list = m.busList.filter((r) => (r.campus || '기타') === campus)
+              return (
+                <div key={campus} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+                  <div className="text-[13px] font-bold text-[#191f28] mb-2">{campus.replace(' 캠퍼스', '')} 버스 {list.length}명</div>
+                  {list.length === 0 ? <p className="text-[12px] text-[#8b95a1]">없음</p> :
+                    <div className="text-[12px] text-[#4e5968] leading-relaxed">{list.map((r) => `${r.name}(${deptName(r.deptLabel)})`).join(', ')}</div>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 ───────────────────────────────────────────────────────
 export default function App() {
   const [mode, setMode] = useState('개인')
+  if (typeof window !== 'undefined' && window.location.hash.replace(/^#\/?/, '') === 'admin') return <AdminApp />
 
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12 animate-fade-in">

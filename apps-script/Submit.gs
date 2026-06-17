@@ -38,6 +38,8 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
+var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
+var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
 function _colMap_(H) {
   return {
@@ -51,7 +53,18 @@ function _colMap_(H) {
     mbus: H.indexOf('본인버스'), mseo: H.indexOf('본인설악산'),
     common: H.indexOf('그룹공동비용(객실+투숙)'), gtotal: H.indexOf('그룹총액'),
     check: H.indexOf('확인필요'), note: H.indexOf('비고'),
+    paid: H.indexOf('입금확인'), assigned: H.indexOf('배정방'), amemo: H.indexOf('관리자메모'),
   };
+}
+
+// 관리자 컬럼이 없으면 헤더 오른쪽에 생성 (멱등)
+function _ensureAdminCols_(sheet, H) {
+  var added = false;
+  ADMIN_COLS.forEach(function (name) {
+    if (H.indexOf(name) < 0) { H.push(name); added = true; }
+  });
+  if (added) sheet.getRange(1, 1, 1, H.length).setValues([H]);
+  return H;
 }
 function _digits_(s) { return String(s || '').replace(/[^0-9]/g, ''); }
 function _gv_(row, c) { return c >= 0 ? String(row[c] || '').trim() : ''; }
@@ -64,8 +77,18 @@ function doPost(e) {
     var sheet = _findResponseSheet_();
     var width = sheet.getLastColumn();
     var H = sheet.getRange(1, 1, 1, width).getValues()[0];
-    var col = _colMap_(H);
     var action = body.action || 'submit';
+    // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch') {
+      if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
+      H = _ensureAdminCols_(sheet, H);
+      width = H.length;
+      var acol = _colMap_(H);
+      if (action === 'admin') return _admin_(sheet, H, acol, width);
+      if (action === 'adminSet') return _adminSet_(body, sheet, acol, width);
+      if (action === 'adminBatch') return _adminBatch_(body, sheet, acol, width);
+    }
+    var col = _colMap_(H);
     if (action === 'lookup') return _lookup_(body, sheet, H, col, width);
     if (action === 'update') return _update_(body, sheet, H, col, width);
     return _submit_(body, sheet, col, width);
@@ -193,4 +216,49 @@ function _recalcGroup_(sheet, H, col, width, gid) {
   var total = perSum + common;
   idxs.forEach(function (r) { if (col.gtotal >= 0) sheet.getRange(r + 1, col.gtotal + 1).setValue(r === repR ? total : 0); });
   return total;
+}
+
+// 관리자: 전체 데이터 반환
+function _admin_(sheet, H, col, width) {
+  var n = sheet.getLastRow();
+  if (n < 2) return _json_({ ok: true, rows: [] });
+  var vals = sheet.getRange(1, 1, n, width).getValues();
+  var out = [];
+  for (var r = 1; r < n; r++) {
+    var row = vals[r];
+    if (!_gv_(row, col.name) && !_gv_(row, col.email)) continue;
+    out.push({
+      row: r + 1, name: _gv_(row, col.name), gender: _gv_(row, col.gender), contact: _gv_(row, col.contact),
+      email: _gv_(row, col.email), campus: _gv_(row, col.campus), deptLabel: _gv_(row, col.dept),
+      roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
+      bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
+      gid: _gv_(row, col.gid), rep: _gv_(row, col.grep), route: _gv_(row, col.route),
+      ifee: Number(row[col.ifee] || 0), iroom: Number(row[col.iroom] || 0),
+      mbus: Number(row[col.mbus] || 0), mseo: Number(row[col.mseo] || 0),
+      common: Number(row[col.common] || 0), gtotal: Number(row[col.gtotal] || 0),
+      check: _gv_(row, col.check), note: _gv_(row, col.note), pay: _gv_(row, col.pay),
+      paid: _gv_(row, col.paid), assigned: _gv_(row, col.assigned), amemo: _gv_(row, col.amemo),
+    });
+  }
+  return _json_({ ok: true, rows: out, cols: { paid: col.paid, assigned: col.assigned, amemo: col.amemo } });
+}
+
+// 관리자: 단일 셀 수정 (입금확인/배정방/관리자메모)
+function _adminSet_(body, sheet, col, width) {
+  var r = Number(body.row || 0); if (r < 2) return _json_({ ok: false, error: '잘못된 행' });
+  var map = { paid: col.paid, assigned: col.assigned, amemo: col.amemo };
+  var c = map[body.field];
+  if (c == null || c < 0) return _json_({ ok: false, error: '알 수 없는 필드' });
+  sheet.getRange(r, c + 1).setValue(body.value == null ? '' : body.value);
+  return _json_({ ok: true });
+}
+
+// 관리자: 방배정 일괄 저장 [{row, assigned}]
+function _adminBatch_(body, sheet, col, width) {
+  if (col.assigned < 0) return _json_({ ok: false, error: '배정방 컬럼 없음' });
+  var ups = body.updates || [];
+  ups.forEach(function (u) {
+    var r = Number(u.row || 0); if (r >= 2) sheet.getRange(r, col.assigned + 1).setValue(u.assigned == null ? '' : u.assigned);
+  });
+  return _json_({ ok: true, count: ups.length });
 }

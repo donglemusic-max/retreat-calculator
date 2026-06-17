@@ -110,8 +110,23 @@ const HELP = {
 * 가족/그룹으로 등록하셔도, 인원 확인과 숙소 배정을 위해 참여자별로 공식 신청서를 각각 따로 제출해야 합니다. (본 계산기는 금액 산정·입금 안내용)
 * 가족/그룹은 한정 수량이며 선착순 신청·입금 순으로 마감됩니다.
 
-[구성원별 버스·설악산뷰]
-버스(왕복 38,000원)와 설악산뷰(1만원)는 개인 비용이라, 신청한 구성원만큼만 합산됩니다. 각 구성원의 버튼으로 선택해 주세요.`,
+[구성원별 입력]
+· 이름: 등록비를 각자 이름으로 입금할 때(입금 방식 "등록비 각자") 사용됩니다.
+· 부서: 사람마다 등록비가 달라 각자 선택합니다.
+· 버스: 왕복 38,000원(개인 비용)이라 신청한 구성원만 합산됩니다.`,
+
+  seorakGroup: `1인당 등록비에 1만원을 추가하면 선착순으로 설악산뷰를 배정해 드립니다. [개인 비용]
+
+그룹은 같은 객실에 함께 투숙하므로, 설악산뷰를 신청하면 그룹 전원에게 적용됩니다. (구성원 수 × 1만원)`,
+
+  depositMode: `입금자명을 어떻게 적을지 선택합니다.
+
+· 대표자 일괄: 등록비를 포함한 모든 항목을 대표자 한 사람 이름으로 입금합니다.
+  (예: 등록비 김바울 / 객실선택 김바울 …)
+
+· 등록비 각자: 등록비는 각 구성원 본인 이름으로, 공동비용(객실·그룹·버스·설악산)은 대표자 이름으로 입금합니다.
+  (예: 등록 김바울 / 등록 클라우디아 / 등록 김노아 + 객실선택 김바울 / 그룹 김바울 …)
+  청년 등 가족이 아닌 그룹에서 각자 등록비를 내실 때 편리합니다.`,
 
   move: `[버스] 이동은 버스 또는 자차를 이용하실 수 있습니다. 버스 이용을 원하시면 신청해 주세요. 버스 비용은 등록비에 포함되지 않습니다. [개인 비용]
 · 왕복 버스비용: 1인 38,000원
@@ -272,17 +287,18 @@ function IndividualMode() {
   const room = ROOMS[roomIdx]
 
   const calc = useMemo(() => {
+    const who = name.trim() || '이름'
     const base = d.fee
     const roomAdd = room.indiv
     const busAmt = bus ? BUS_FEE : 0
     const seorakAmt = seorak ? SEORAK_FEE : 0
     const total = base + roomAdd + busAmt + seorakAmt
-    const lines = [{ cat: '등록비', amt: base, note: d.name }]
-    if (roomAdd > 0) lines.push({ cat: '객실선택', amt: roomAdd, note: room.name })
-    if (busAmt > 0) lines.push({ cat: '버스비', amt: busAmt, note: '왕복' })
-    if (seorakAmt > 0) lines.push({ cat: '설악산', amt: seorakAmt, note: '뷰 추가' })
+    const lines = [{ cat: '등록비', payer: who, amt: base, note: d.name }]
+    if (roomAdd > 0) lines.push({ cat: '객실선택', payer: who, amt: roomAdd, note: room.name })
+    if (busAmt > 0) lines.push({ cat: '버스비', payer: who, amt: busAmt, note: '왕복' })
+    if (seorakAmt > 0) lines.push({ cat: '설악산', payer: who, amt: seorakAmt, note: '뷰 추가' })
     return { total, perPerson: total, lines, count: 1 }
-  }, [d, room, bus, seorak])
+  }, [d, room, bus, seorak, name])
 
   return (
     <>
@@ -324,7 +340,7 @@ function IndividualMode() {
         />
       </Card>
 
-      <ResultPanel calc={calc} name={name} mode="개인" />
+      <ResultPanel calc={calc} subtitle={`※ 입금자명: ${name.trim() || '이름'}`} />
     </>
   )
 }
@@ -332,34 +348,46 @@ function IndividualMode() {
 // ── 가족 / 그룹 등록 ──────────────────────────────────────────
 function GroupMode() {
   const [leader, setLeader] = useState('')
-  const [members, setMembers] = useState([{ dept: '장년부', bus: false, seorak: false }])
+  const [members, setMembers] = useState([{ name: '', dept: '장년부', bus: false }])
   const [roomIdx, setRoomIdx] = useState(1)
   const [occOverride, setOccOverride] = useState(null) // null = 자동(인원수 기준)
+  const [seorak, setSeorak] = useState(false) // 그룹 전체 적용
+  const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
 
   const room = ROOMS[roomIdx]
   const count = members.length
   const effOcc = occOverride != null ? OCCUPANCY.find((o) => o.label === occOverride) : deriveOcc(count)
+  const who = leader.trim() || '대표자'
 
   const updateMember = (i, patch) =>
     setMembers((m) => m.map((mm, idx) => (idx === i ? { ...mm, ...patch } : mm)))
-  const addMember = () => setMembers((m) => [...m, { dept: '장년부', bus: false, seorak: false }])
+  const addMember = () => setMembers((m) => [...m, { name: '', dept: '장년부', bus: false }])
   const removeMember = (i) => setMembers((m) => (m.length > 1 ? m.filter((_, idx) => idx !== i) : m))
 
   const calc = useMemo(() => {
-    const baseSum = members.reduce((s, m) => s + (DEPTS.find((d) => d.name === m.dept)?.fee || 0), 0)
+    const memberFee = (m) => DEPTS.find((d) => d.name === m.dept)?.fee || 0
+    const baseSum = members.reduce((s, m) => s + memberFee(m), 0)
     const busCount = members.filter((m) => m.bus).length
-    const seorakCount = members.filter((m) => m.seorak).length
     const roomGroup = room.group
     const occFee = effOcc.fee
     const busTotal = busCount * BUS_FEE
-    const seorakTotal = seorakCount * SEORAK_FEE
+    const seorakTotal = seorak ? count * SEORAK_FEE : 0 // 그룹 전원 적용
     const total = baseSum + roomGroup + occFee + busTotal + seorakTotal
 
-    const lines = [{ cat: '등록비', amt: baseSum, note: `${count}명 합산` }]
-    if (roomGroup > 0) lines.push({ cat: '객실선택', amt: roomGroup, note: room.name })
-    if (occFee > 0) lines.push({ cat: '그룹', amt: occFee, note: `${effOcc.label} 투숙` })
-    if (busTotal > 0) lines.push({ cat: '버스비', amt: busTotal, note: `${busCount}명` })
-    if (seorakTotal > 0) lines.push({ cat: '설악산', amt: seorakTotal, note: `${seorakCount}명` })
+    // 등록비: depositMode에 따라 합산(대표자) 또는 각자(구성원 이름)
+    const lines = []
+    if (depositMode === 'split') {
+      members.forEach((m, i) =>
+        lines.push({ cat: '등록', payer: m.name.trim() || `구성원${i + 1}`, amt: memberFee(m), note: m.dept }),
+      )
+    } else {
+      lines.push({ cat: '등록비', payer: who, amt: baseSum, note: `${count}명 합산` })
+    }
+    // 공동비용은 항상 대표자 이름으로
+    if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: room.name })
+    if (occFee > 0) lines.push({ cat: '그룹', payer: who, amt: occFee, note: `${effOcc.label} 투숙` })
+    if (busTotal > 0) lines.push({ cat: '버스비', payer: who, amt: busTotal, note: `${busCount}명` })
+    if (seorakTotal > 0) lines.push({ cat: '설악산', payer: who, amt: seorakTotal, note: `${count}명 전원` })
 
     return {
       total,
@@ -368,15 +396,20 @@ function GroupMode() {
       count,
       overMax: count > room.max,
     }
-  }, [members, room, effOcc, count])
+  }, [members, room, effOcc, count, seorak, depositMode, who])
+
+  const subtitle =
+    depositMode === 'split'
+      ? `※ 등록비는 각 구성원 이름으로, 공동비용은 대표자(${who}) 이름으로 입금`
+      : `※ 모든 항목 대표자(${who}) 이름으로 입금`
 
   return (
     <>
-      <Card title="대표자 이름 (입금자명)">
+      <Card title="대표자 이름 (공동비용 입금자명)">
         <input
           value={leader}
           onChange={(e) => setLeader(e.target.value)}
-          placeholder="예: 김바울 (모든 항목 대표자 이름으로 입금)"
+          placeholder="예: 김바울 (객실·그룹·버스·설악산 등 공동비용 입금자)"
           className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
         />
       </Card>
@@ -391,25 +424,21 @@ function GroupMode() {
                   <button onClick={() => removeMember(i)} className="text-[12px] font-bold text-[#f04452]">삭제</button>
                 )}
               </div>
+              <input
+                value={m.name}
+                onChange={(e) => updateMember(i, { name: e.target.value })}
+                placeholder={i === 0 ? '이름 (대표자 본인이면 위와 동일하게)' : '이름'}
+                className="w-full bg-white border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2 focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
+              />
               <DeptSelect value={m.dept} onChange={(v) => updateMember(i, { dept: v })} />
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => updateMember(i, { bus: !m.bus })}
-                  className={`flex-1 py-2 rounded-xl text-[12px] font-bold border transition-all ${
-                    m.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
-                  }`}
-                >
-                  버스 {m.bus ? '✓' : ''}
-                </button>
-                <button
-                  onClick={() => updateMember(i, { seorak: !m.seorak })}
-                  className={`flex-1 py-2 rounded-xl text-[12px] font-bold border transition-all ${
-                    m.seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
-                  }`}
-                >
-                  설악산뷰 {m.seorak ? '✓' : ''}
-                </button>
-              </div>
+              <button
+                onClick={() => updateMember(i, { bus: !m.bus })}
+                className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border transition-all ${
+                  m.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+                }`}
+              >
+                버스 신청 {m.bus ? '✓' : ''} <span className="font-normal">(왕복 {won(BUS_FEE)})</span>
+              </button>
             </div>
           ))}
         </div>
@@ -419,6 +448,16 @@ function GroupMode() {
         >
           + 구성원 추가
         </button>
+      </Card>
+
+      <Card title="설악산 뷰 (그룹 전체)" help={HELP.seorakGroup} helpTitle="설악산뷰 안내">
+        <Toggle
+          on={seorak}
+          onChange={setSeorak}
+          label="설악산 뷰 신청 (전원 적용)"
+          sub={`그룹은 함께 투숙 → 전원 적용 · ${count}명 × ${won(SEORAK_FEE)}`}
+          price={`+${won(count * SEORAK_FEE)}`}
+        />
       </Card>
 
       <Card title="객실 종류 (그룹 추가비용)" help={HELP.room} helpTitle="객실 종류 안내">
@@ -472,23 +511,51 @@ function GroupMode() {
         </p>
       </Card>
 
-      <ResultPanel calc={calc} name={leader} mode="그룹" />
+      <Card title="입금 방식" help={HELP.depositMode} helpTitle="입금 방식 안내">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setDepositMode('leader')}
+            className={`px-3 py-3 rounded-xl text-[13px] font-bold border text-left transition-all ${
+              depositMode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+            }`}
+          >
+            대표자 일괄
+            <span className="block text-[11px] font-normal mt-0.5">전 항목 대표자 이름</span>
+          </button>
+          <button
+            onClick={() => setDepositMode('split')}
+            className={`px-3 py-3 rounded-xl text-[13px] font-bold border text-left transition-all ${
+              depositMode === 'split' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+            }`}
+          >
+            등록비 각자
+            <span className="block text-[11px] font-normal mt-0.5">등록비는 각 구성원 이름</span>
+          </button>
+        </div>
+        {depositMode === 'split' && (
+          <p className="text-[11px] text-[#8b95a1] mt-3 leading-relaxed">
+            * 등록비 각자 선택 시 구성원별 이름이 입금자명에 들어갑니다. 위 구성원 이름을 정확히 입력해 주세요.
+          </p>
+        )}
+      </Card>
+
+      <ResultPanel calc={calc} subtitle={subtitle} />
     </>
   )
 }
 
 // ── 결과 / 입금 안내 ──────────────────────────────────────────
-function ResultPanel({ calc, name, mode }) {
+function ResultPanel({ calc, subtitle }) {
   const [copied, setCopied] = useState(false)
-  const who = name?.trim() || (mode === '그룹' ? '대표자' : '이름')
 
   const guideText = useMemo(() => {
     const lines = calc.lines
-      .map((l) => `▸ ${l.cat} ${who}   ${won(l.amt)}${l.note ? `  (${l.note})` : ''}`)
+      .map((l) => `▸ ${l.cat} ${l.payer}   ${won(l.amt)}${l.note ? `  (${l.note})` : ''}`)
       .join('\n')
     const perLine = calc.count > 1 ? `\n(1인 평균 ${won(calc.perPerson)} · ${calc.count}명)` : ''
-    return `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n\n${lines}\n─────────────────\n총 합계: ${won(calc.total)}${perLine}\n\n* 위 항목별로 구분하여 따로 입금해 주세요.\n  (입금자명: ${who})`
-  }, [calc, who])
+    const sub = subtitle ? `${subtitle}\n` : ''
+    return `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n${sub}\n${lines}\n─────────────────\n총 합계: ${won(calc.total)}${perLine}\n\n* 위 항목별로 구분하여 따로 입금해 주세요.`
+  }, [calc, subtitle])
 
   const copy = async () => {
     try {
@@ -520,12 +587,13 @@ function ResultPanel({ calc, name, mode }) {
 
       {/* 입금 분할 */}
       <Card title="입금 안내 (항목별 따로 입금)" help={HELP.deposit} helpTitle="입금 방법 안내">
+        {subtitle && <p className="text-[12px] text-[#1b64da] font-semibold mb-3 leading-relaxed">{subtitle}</p>}
         <div className="space-y-2.5">
           {calc.lines.map((l, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-[#f2f4f6] last:border-0">
               <div>
                 <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-2 py-0.5 rounded-lg mr-2">
-                  {l.cat} {who}
+                  {l.cat} {l.payer}
                 </span>
                 {l.note && <span className="text-[11px] text-[#8b95a1]">{l.note}</span>}
               </div>

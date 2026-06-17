@@ -1133,13 +1133,14 @@ function AdminApp() {
 
   // 시트 정보 기반 (enrich가 정확하므로 저장된 그룹ID·그룹총액·확인필요를 그대로 사용)
   const m = useMemo(() => {
-    const totalPeople = rows.length
+    const submittedRows = rows.filter((r) => r.route !== '중복')
+    const totalPeople = submittedRows.length // 실제 제출(중복 재제출 제외)
     const totalAmount = rows.reduce((s, r) => s + (r.gtotal || 0), 0)
-    const byCampus = {}; rows.forEach((r) => { byCampus[r.campus || '기타'] = (byCampus[r.campus || '기타'] || 0) + 1 })
-    const busList = rows.filter((r) => r.bus)
-    const seorakN = rows.filter((r) => r.seorak).length
-    const unpaid = rows.filter((r) => r.paid !== 'Y')
-    const pool = rows.filter((r) => isChurchAssigned(r.occLabel))
+    const byCampus = {}; submittedRows.forEach((r) => { byCampus[r.campus || '기타'] = (byCampus[r.campus || '기타'] || 0) + 1 })
+    const busList = submittedRows.filter((r) => r.bus)
+    const seorakN = submittedRows.filter((r) => r.seorak).length
+    const unpaid = submittedRows.filter((r) => r.paid !== 'Y')
+    const pool = submittedRows.filter((r) => isChurchAssigned(r.occLabel))
     const unassigned = pool.filter((r) => !(r.assigned || assignDraft[r.row]))
     const checkGroups = {}
     rows.forEach((r) => { if (r.check === 'Y') checkGroups[r.gid] = { rep: r.rep, gid: r.gid, note: r.note } })

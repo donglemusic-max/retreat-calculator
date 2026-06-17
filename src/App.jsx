@@ -1144,7 +1144,14 @@ function AdminApp() {
     const unassigned = pool.filter((r) => !(r.assigned || assignDraft[r.row]))
     const checkGroups = {}
     rows.forEach((r) => { if (r.check === 'Y') checkGroups[r.gid] = { rep: r.rep, gid: r.gid, note: r.note } })
-    return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups) }
+    // 명단 기준 예상 인원: 그룹별로 max(제출 인원, 명단 인원). 명단의 "(N)"이 있으면 그 값 우선
+    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|님이/
+    const listCount = (t) => { if (!t) return 0; const mm = t.match(/\((\d+)\)/); if (mm) return +mm[1]; return t.split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x)).length }
+    const byGid = {}; submittedRows.forEach((r) => { (byGid[r.gid] = byGid[r.gid] || []).push(r) })
+    let expected = 0
+    Object.values(byGid).forEach((mem) => { let ln = 0; mem.forEach((r) => { const n = listCount(r.list); if (n > ln) ln = n }); expected += Math.max(mem.length, ln) })
+    const missing = Math.max(0, expected - totalPeople)
+    return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing }
   }, [rows, assignDraft])
 
   const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
@@ -1242,7 +1249,8 @@ function AdminApp() {
 
         {tab === '요약' && (
           <div className="grid grid-cols-2 gap-2.5">
-            {stat('총 신청 인원', m.totalPeople + '명')}
+            {stat('제출 인원 (확정)', m.totalPeople + '명', '중복 제외')}
+            {stat('명단 기준 예상', m.expected + '명', `미제출 추정 ${m.missing}명`)}
             {stat('총 등록 금액', won(m.totalAmount))}
             {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
             {stat('방배정 필요', m.pool.length + '명', `미배정 ${m.unassigned.length}명`)}

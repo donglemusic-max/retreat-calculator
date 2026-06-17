@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv4-merge'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv5-mergefix'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -402,13 +402,18 @@ function _mergeGroups_(body, sheet, H, col, width) {
   if (cN < 0) { cN = 0; }
   if (cF < 0) { cF = oh.length; osh.getRange(1, cF + 1).setValue('강제그룹(같은 값=한 그룹)'); }
   var nameRow = {}; for (var i = 1; i < ov.length; i++) { var k = String(ov[i][cN] || '').trim(); if (k) nameRow[k] = i + 1; }
+  var nextRow = osh.getLastRow() + 1; // 새 행은 수동 증가 (getLastRow 루프 내 미갱신 버그 방지)
+  var uniq = {}; var added = 0;
   names.forEach(function (nm) {
-    var rr = nameRow[nm] || (osh.getLastRow() + 1);
-    if (!nameRow[nm]) { osh.getRange(rr, cN + 1).setValue(nm); nameRow[nm] = rr; }
+    if (uniq[nm]) return; uniq[nm] = 1;
+    var rr = nameRow[nm];
+    if (!rr) { rr = nextRow++; osh.getRange(rr, cN + 1).setValue(nm); nameRow[nm] = rr; }
     osh.getRange(rr, cF + 1).setValue(key);
+    added++;
   });
+  SpreadsheetApp.flush(); // override 기록 확정 후 재계산
   enrichSheet(); // 재계산 → 강제그룹 반영
-  return _json_({ ok: true, merged: names.length, key: key });
+  return _json_({ ok: true, merged: added, key: key });
 }
 
 // 관리자: 일괄 저장. field='assigned'|'paid'|'amemo', updates=[{row, value}]

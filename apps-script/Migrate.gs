@@ -23,6 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
+var ENRICH_VERSION = 'v6-phonemerge'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -238,7 +239,7 @@ function enrichSheet() {
     sheet.getRange(2, C.contact + 1, phoneCol.length, 1).setValues(phoneCol);
   }
 
-  SpreadsheetApp.getActiveSpreadsheet().toast('정리 완료: ' + gid + '개 그룹 / 총 ' + grandTotal.toLocaleString() + '원', '리트릿', 6);
+  SpreadsheetApp.getActiveSpreadsheet().toast('[' + ENRICH_VERSION + '] ' + gid + '개 그룹 / 총 ' + grandTotal.toLocaleString() + '원', '리트릿 정리완료', 8);
 }
 
 /** 폼 제출 시 자동 갱신하려면, 이 함수로 설치형 트리거를 1회 등록 */

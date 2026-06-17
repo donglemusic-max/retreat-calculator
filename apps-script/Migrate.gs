@@ -115,15 +115,23 @@ function enrichSheet() {
   var find = function (x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
   var union = function (a, b) { var ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
   var digits = function (s) { return String(s || '').replace(/[^0-9]/g, ''); };
-  // 병합 신호는 "하드 신원"만: 같은 이메일 또는 같은 전화번호.
-  // (입금자명·명단으로 병합하면 무관한 사람이 잘못 묶임 → 명단은 아래 '확인필요'로만 사용)
-  var byEmail = {}, byPhone = {};
+  // 병합 신호: 같은 이메일 / 같은 전화번호 / 같은 대표자(G열) 선언.
+  // (입금자명·명단(L)으로 병합하면 무관한 사람이 잘못 묶임 → 명단은 아래 '확인필요'로만 사용)
+  var byEmail = {}, byPhone = {}, byRep = {}, byNm = {};
   rowsIdx.forEach(function (r) {
     var em = get(r, 'email'); if (em) (byEmail[em] = byEmail[em] || []).push(r);
     var ph = digits(get(r, 'contact')); if (ph) (byPhone[ph] = byPhone[ph] || []).push(r);
+    var nm = get(r, 'name'); if (nm) (byNm[nm] = byNm[nm] || []).push(r);
+    var rm = get(r, 'rep').match(/[가-힣]{2,4}/); if (rm) (byRep[rm[0]] = byRep[rm[0]] || []).push(r);
   });
   var unionBucket = function (map) { Object.keys(map).forEach(function (k) { var arr = map[k]; for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }); };
   unionBucket(byEmail); unionBucket(byPhone);
+  // 대표자(G) 명시 그룹: 같은 대표자값끼리 + 그 대표자 이름을 가진 본인 행과 묶기
+  Object.keys(byRep).forEach(function (v) {
+    var arr = byRep[v];
+    for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]);
+    (byNm[v] || []).forEach(function (srow) { union(arr[0], srow); });
+  });
   var clusters = {};
   rowsIdx.forEach(function (r) { var root = find(r); (clusters[root] = clusters[root] || []).push(r); });
 

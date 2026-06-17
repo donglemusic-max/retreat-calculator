@@ -66,7 +66,7 @@ function _ensureAdminCols_(sheet, H) {
   if (added) sheet.getRange(1, 1, 1, H.length).setValues([H]);
   return H;
 }
-function _digits_(s) { return String(s || '').replace(/[^0-9]/g, ''); }
+function _digits_(s) { var d = String(s || '').replace(/[^0-9]/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d; }
 function _gv_(row, c) { return c >= 0 ? String(row[c] || '').trim() : ''; }
 // 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
 function _nameTokens_(t) {

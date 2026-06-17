@@ -1060,7 +1060,7 @@ function AdminApp() {
     const parent = rows.map((_, i) => i)
     const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
     const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
-    const dig = (s) => String(s || '').replace(/\D/g, '')
+    const dig = (s) => { let d = String(s || '').replace(/\D/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d }
     const byE = {}, byP = {}, byR = {}, byN = {}
     rows.forEach((r, i) => {
       if (r.email) (byE[r.email] = byE[r.email] || []).push(i)

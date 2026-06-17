@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v6-phonemerge'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v7-phonekey'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -124,13 +124,14 @@ function enrichSheet() {
   var parent = {}; rowsIdx.forEach(function (r) { parent[r] = r; });
   var find = function (x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
   var union = function (a, b) { var ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
-  var digits = function (s) { return String(s || '').replace(/[^0-9]/g, ''); };
+  // 전화 병합 키: 숫자만 + 앞자리 0 보정 (셀이 숫자로 저장돼 0이 떨어진 경우 1012345678 → 01012345678)
+  var phoneKey = function (s) { var d = String(s || '').replace(/[^0-9]/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d; };
   // 병합 신호: 같은 이메일 / 같은 전화번호 / 같은 대표자(G열) 선언.
   // (입금자명·명단(L)으로 병합하면 무관한 사람이 잘못 묶임 → 명단은 아래 '확인필요'로만 사용)
   var byEmail = {}, byPhone = {}, byRep = {}, byNm = {};
   rowsIdx.forEach(function (r) {
     var em = get(r, 'email'); if (em) (byEmail[em] = byEmail[em] || []).push(r);
-    var ph = digits(get(r, 'contact')); if (ph) (byPhone[ph] = byPhone[ph] || []).push(r);
+    var ph = phoneKey(get(r, 'contact')); if (ph) (byPhone[ph] = byPhone[ph] || []).push(r);
     var nm = get(r, 'name'); if (nm) (byNm[nm] = byNm[nm] || []).push(r);
     var rm = get(r, 'rep').match(/[가-힣]{2,4}/); if (rm) (byRep[rm[0]] = byRep[rm[0]] || []).push(r);
   });

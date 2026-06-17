@@ -1074,6 +1074,7 @@ function PersonChip({ p, warn }) {
       className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : warn ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
       {warn && <span title="신청한 객실 옵션과 다른 방">⚠️</span>}
       {p.name}
+      {p.route === '미제출' && <span className="text-[9px] font-bold text-white bg-[#f04452] rounded px-1">미제출</span>}
       <span className="text-[10px] text-[#8b95a1] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
       <span className="text-[10px] text-[#1b64da] font-normal">{roomTypeShort(reqRoomType(p.roomLabel))}</span>
       {p.list && <span title={p.list}>📝</span>}
@@ -1131,6 +1132,8 @@ function AdminApp() {
   const [editGid, setEditGid] = useState(null) // 관리자 그룹 편집 대상
   const [mergeSel, setMergeSel] = useState({}) // 합치기 선택 gid→bool
   const [mergeMsg, setMergeMsg] = useState('')
+  const [ph, setPh] = useState({ name: '', dept: '' }) // 미제출 인원 추가
+  const [phMsg, setPhMsg] = useState('')
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1152,14 +1155,17 @@ function AdminApp() {
 
   // 시트 정보 기반 (enrich가 정확하므로 저장된 그룹ID·그룹총액·확인필요를 그대로 사용)
   const m = useMemo(() => {
-    const submittedRows = rows.filter((r) => r.route !== '중복')
-    const totalPeople = submittedRows.length // 실제 제출(중복 재제출 제외)
+    const notDup = rows.filter((r) => r.route !== '중복')           // 집계 대상(중복 제외)
+    const confirmed = notDup.filter((r) => r.route !== '미제출')     // 실제 제출 확정
+    const submittedRows = confirmed
+    const totalPeople = confirmed.length
+    const placeholderN = notDup.length - confirmed.length            // 수기 미제출 인원
     const totalAmount = rows.reduce((s, r) => s + (r.gtotal || 0), 0)
-    const byCampus = {}; submittedRows.forEach((r) => { byCampus[r.campus || '기타'] = (byCampus[r.campus || '기타'] || 0) + 1 })
-    const busList = submittedRows.filter((r) => r.bus)
-    const seorakN = submittedRows.filter((r) => r.seorak).length
-    const unpaid = submittedRows.filter((r) => r.paid !== 'Y')
-    const pool = submittedRows.filter((r) => isChurchAssigned(r.occLabel))
+    const byCampus = {}; confirmed.forEach((r) => { byCampus[r.campus || '기타'] = (byCampus[r.campus || '기타'] || 0) + 1 })
+    const busList = confirmed.filter((r) => r.bus)
+    const seorakN = confirmed.filter((r) => r.seorak).length
+    const unpaid = confirmed.filter((r) => r.paid !== 'Y')
+    const pool = notDup.filter((r) => isChurchAssigned(r.occLabel))  // 교회배정 풀(미제출 placeholder 포함→배정 가능)
     const unassigned = pool.filter((r) => !(r.assigned || assignDraft[r.row]))
     const checkGroups = {}
     rows.forEach((r) => { if (r.check === 'Y') checkGroups[r.gid] = { rep: r.rep, gid: r.gid, note: r.note } })
@@ -1172,7 +1178,7 @@ function AdminApp() {
     const seenMiss = new Set(); let missing = 0
     rows.forEach((r) => { tok(r.list).forEach((nm) => { const k = norm(nm); if (!subNames.has(k) && !seenMiss.has(k)) { seenMiss.add(k); missing++ } }) })
     const expected = totalPeople + missing
-    return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing }
+    return { totalPeople, placeholderN, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing }
   }, [rows, assignDraft])
 
   const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
@@ -1240,6 +1246,15 @@ function AdminApp() {
   }
   const toggleMerge = (gid) => setMergeSel((s) => ({ ...s, [gid]: !s[gid] }))
 
+  const addPlaceholder = async () => {
+    if (!ph.name.trim()) { setPhMsg('이름을 입력하세요'); return }
+    setPhMsg('추가 중…')
+    const deptLabel = ph.dept ? DEPTS.find((d) => d.name === ph.dept)?.label : ''
+    const j = await post({ action: 'addPlaceholder', pin, name: ph.name.trim(), deptLabel })
+    if (j.ok) { setPh({ name: '', dept: '' }); setPhMsg('✓ 미제출 인원 추가됨'); await reload() } else setPhMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setPhMsg(''), 3000)
+  }
+
   if (!auth) {
     return (
       <div className="min-h-screen bg-[#f2f4f6] flex items-center justify-center p-4">
@@ -1280,7 +1295,7 @@ function AdminApp() {
 
         {tab === '요약' && (
           <div className="grid grid-cols-2 gap-2.5">
-            {stat('제출 인원 (확정)', m.totalPeople + '명', '중복 제외')}
+            {stat('제출 인원 (확정)', m.totalPeople + '명', m.placeholderN > 0 ? `+ 미제출 ${m.placeholderN}명` : '중복 제외')}
             {stat('명단 기준 예상', m.expected + '명', `미제출 추정 ${m.missing}명`)}
             {stat('총 등록 금액', won(m.totalAmount))}
             {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
@@ -1314,6 +1329,18 @@ function AdminApp() {
                   <button onClick={saveAssign} className="flex-1 py-3 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">저장</button>
                 </div>
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
+                <div className="mt-3 pt-3 border-t border-[#f2f4f6]">
+                  <div className="text-[12px] font-bold text-[#191f28] mb-2">미제출 인원 추가 (이름만, 방배정용)</div>
+                  <div className="flex gap-2">
+                    <input value={ph.name} onChange={(e) => setPh({ ...ph, name: e.target.value })} placeholder="이름" className="flex-1 bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2 text-[13px]" />
+                    <select value={ph.dept} onChange={(e) => setPh({ ...ph, dept: e.target.value })} className="bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-2 py-2 text-[12px]">
+                      <option value="">부서?</option>
+                      {DEPTS.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                    </select>
+                    <button onClick={addPlaceholder} className="px-3 py-2 rounded-xl bg-[#f04452] text-white font-bold text-[12px] whitespace-nowrap">+ 미제출</button>
+                  </div>
+                  {phMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{phMsg}</p>}
+                </div>
               </div>
 
               {editGid && (

@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv5-mergefix'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv6-placeholder'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -97,6 +97,7 @@ function doPost(e) {
       if (action === 'adminSet') return _adminSet_(body, sheet, acol, width);
       if (action === 'adminBatch') return _adminBatch_(body, sheet, acol, width);
       if (action === 'mergeGroups') return _mergeGroups_(body, sheet, H, acol, width);
+      if (action === 'addPlaceholder') return _addPlaceholder_(body, sheet, H, acol, width);
     }
     var col = _colMap_(H);
     if (action === 'lookup') return _lookup_(body, sheet, H, col, width);
@@ -379,6 +380,26 @@ function _groupSet_(body, sheet, H, col, width) {
   if (body.occLabel != null) override.occLabel = body.occLabel;
   var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
   return _json_({ ok: true, groupTotal: total });
+}
+
+// 관리자: 미제출 인원을 이름만으로 방배정용으로 추가 (제출경로='미제출')
+function _addPlaceholder_(body, sheet, H, col, width) {
+  var nm = (body.name || '').trim();
+  if (!nm) return _json_({ ok: false, error: '이름을 입력하세요.' });
+  var row = new Array(width).fill('');
+  var set = function (c, v) { if (c >= 0) row[c] = v; };
+  set(col.ts, new Date());
+  set(col.name, nm); set(col.gender, body.gender || '');
+  if (body.deptLabel) set(col.dept, body.deptLabel);
+  if (body.campus) set(col.campus, body.campus);
+  set(col.route, '미제출'); set(col.gn, 1); set(col.grep, nm);
+  set(col.check, 'Y'); set(col.note, '수기 추가(미제출)');
+  if (body.deptLabel) set(col.ifee, deptFee_(body.deptLabel));
+  if (body.room) set(col.assigned, body.room);
+  var st = H.indexOf('신청유형'); if (st >= 0) row[st] = '개인';
+  var gidC = col.gid; if (gidC >= 0) set(gidC, 'P' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyMMddHHmmss') + Math.floor((sheet.getLastRow() % 97)));
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, width).setValues([row]);
+  return _json_({ ok: true });
 }
 
 // 관리자: 여러 그룹을 한 그룹으로 합치기 — 오버라이드 '강제그룹'에 기록 후 enrich 재계산

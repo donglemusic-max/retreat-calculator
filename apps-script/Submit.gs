@@ -54,6 +54,7 @@ function _colMap_(H) {
     common: H.indexOf('그룹공동비용(객실+투숙)'), gtotal: H.indexOf('그룹총액'),
     check: H.indexOf('확인필요'), note: H.indexOf('비고'),
     paid: H.indexOf('입금확인'), assigned: H.indexOf('배정방'), amemo: H.indexOf('관리자메모'),
+    ver: findCol_(H, /구버전/, 0),
   };
 }
 
@@ -98,6 +99,9 @@ function doPost(e) {
     var col = _colMap_(H);
     if (action === 'lookup') return _lookup_(body, sheet, H, col, width);
     if (action === 'update') return _update_(body, sheet, H, col, width);
+    if (action === 'memberAdd') return _memberAdd_(body, sheet, H, col, width);
+    if (action === 'memberDelete') return _memberDelete_(body, sheet, H, col, width);
+    if (action === 'groupSet') return _groupSet_(body, sheet, H, col, width);
     return _submit_(body, sheet, col, width);
   } catch (err) {
     return _json_({ ok: false, error: String(err) });
@@ -274,6 +278,105 @@ function _adminSet_(body, sheet, col, width) {
   if (c == null || c < 0) return _json_({ ok: false, error: '알 수 없는 필드' });
   sheet.getRange(r, c + 1).setValue(body.value == null ? '' : body.value);
   return _json_({ ok: true });
+}
+
+// 그룹 접근 권한: 관리자 PIN 또는 그룹의 연락처 일치
+function _verifyGroupAccess_(vals, col, gid, body) {
+  if (body.pin && body.pin === ADMIN_PIN) return true;
+  var ph = _digits_(body.verifyContact || '');
+  if (!ph) return false;
+  for (var r = 1; r < vals.length; r++) if (_gv_(vals[r], col.gid) === gid && _digits_(_gv_(vals[r], col.contact)) === ph) return true;
+  return false;
+}
+
+// 그룹 전체 재계산 (occ는 그룹 선택값 유지 — 인원수와 독립). override={roomLabel?, occLabel?}
+function _recalcGroupFull_(sheet, H, col, width, gid, override) {
+  var n = sheet.getLastRow(); if (n < 2) return 0;
+  var vals = sheet.getRange(1, 1, n, width).getValues();
+  var idxs = []; for (var r = 1; r < n; r++) if (_gv_(vals[r], col.gid) === gid) idxs.push(r);
+  if (!idxs.length) return 0;
+  var roomLabel = (override && override.roomLabel != null) ? override.roomLabel : _gv_(vals[idxs[0]], col.room);
+  var occLabel = (override && override.occLabel != null) ? override.occLabel : _gv_(vals[idxs[0]], col.occ);
+  var isGrp = isGroupOcc_(occLabel);
+  var common = isGrp ? (roomAdd_(roomLabel) + occAdd_(occLabel)) : 0;
+  // dedup by name (구버전 후순위)
+  var ord = idxs.slice().sort(function (a, b) { return ((col.ver >= 0 && _gv_(vals[a], col.ver) === '구') ? 1 : 0) - ((col.ver >= 0 && _gv_(vals[b], col.ver) === '구') ? 1 : 0); });
+  var seen = {}, counted = {}, names = [];
+  ord.forEach(function (r) { var nm = _gv_(vals[r], col.name); if (nm && !seen[nm]) { seen[nm] = 1; counted[r] = 1; names.push(nm); } });
+  var memberCount = names.length;
+  var rep = ''; for (var k = 0; k < idxs.length && !rep; k++) { var mm = _gv_(vals[idxs[k]], col.rep).match(/[가-힣]{2,4}/); if (mm) rep = mm[0]; }
+  if (!rep) rep = names[0] || _gv_(vals[idxs[0]], col.name);
+  var repRow = idxs.filter(function (r) { return counted[r] && _gv_(vals[r], col.name) === rep; })[0];
+  if (repRow === undefined) repRow = idxs.filter(function (r) { return counted[r]; })[0];
+  if (repRow === undefined) repRow = idxs[0];
+  var roster = names.join(' ') + ' (' + memberCount + ')';
+  var total = common;
+  idxs.forEach(function (r) {
+    if (!counted[r]) return;
+    total += deptFee_(_gv_(vals[r], col.dept)) + (isGrp ? 0 : roomIndiv_(roomLabel))
+      + (_gv_(vals[r], col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0)
+      + (_gv_(vals[r], col.seorak).indexOf('원합니다') >= 0 ? SEORAK_FEE : 0);
+  });
+  idxs.forEach(function (r) {
+    var dup = !counted[r]; var row = vals[r]; var set = function (c, v) { if (c >= 0) row[c] = v; };
+    set(col.room, roomLabel); set(col.occ, occLabel); set(col.list, roster);
+    set(col.gn, memberCount); set(col.grep, rep);
+    set(col.ifee, dup ? 0 : deptFee_(_gv_(row, col.dept)));
+    set(col.iroom, dup ? 0 : (isGrp ? 0 : roomIndiv_(roomLabel)));
+    set(col.mbus, dup ? 0 : (_gv_(row, col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0));
+    set(col.mseo, dup ? 0 : (_gv_(row, col.seorak).indexOf('원합니다') >= 0 ? SEORAK_FEE : 0));
+    set(col.common, r === repRow ? common : 0); set(col.gtotal, r === repRow ? total : 0);
+    if (dup) { set(col.route, '중복'); set(col.note, '중복 재제출(집계 제외)'); }
+    sheet.getRange(r + 1, 1, 1, width).setValues([row]);
+  });
+  return total;
+}
+
+// 그룹에 구성원 추가
+function _memberAdd_(body, sheet, H, col, width) {
+  var gid = String(body.gid || '');
+  var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+  if (!_verifyGroupAccess_(vals, col, gid, body)) return _json_({ ok: false, error: '권한 확인 실패(연락처/PIN)' });
+  var tpl = -1; for (var r = 1; r < n; r++) if (_gv_(vals[r], col.gid) === gid) { tpl = r; break; }
+  if (tpl < 0) return _json_({ ok: false, error: '그룹을 찾을 수 없습니다.' });
+  var m = body.member || {};
+  if (!(m.name || '').trim()) return _json_({ ok: false, error: '이름을 입력해 주세요.' });
+  var row = new Array(width).fill(''); var t = vals[tpl];
+  var set = function (c, v) { if (c >= 0) row[c] = v; };
+  set(col.ts, new Date());
+  set(col.email, _gv_(t, col.email)); set(col.contact, _gv_(t, col.contact)); set(col.campus, _gv_(t, col.campus));
+  set(col.rep, _gv_(t, col.rep)); set(col.room, _gv_(t, col.room)); set(col.occ, _gv_(t, col.occ));
+  set(col.seorak, _gv_(t, col.seorak)); set(col.pay, _gv_(t, col.pay));
+  set(col.name, (m.name || '').trim()); set(col.gender, m.gender || ''); set(col.dept, m.deptLabel || '');
+  set(col.bus, m.bus ? BUS_YES : BUS_NO);
+  set(col.route, '앱추가'); set(col.gid, gid);
+  sheet.getRange(n + 1, 1, 1, width).setValues([row]);
+  var total = _recalcGroupFull_(sheet, H, col, width, gid);
+  return _json_({ ok: true, groupTotal: total });
+}
+
+// 그룹에서 구성원 삭제 (행 삭제)
+function _memberDelete_(body, sheet, H, col, width) {
+  var gid = String(body.gid || ''); var rowNum = Number(body.row || 0);
+  if (rowNum < 2) return _json_({ ok: false, error: '잘못된 행' });
+  var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+  if (!_verifyGroupAccess_(vals, col, gid, body)) return _json_({ ok: false, error: '권한 확인 실패(연락처/PIN)' });
+  if (_gv_(vals[rowNum - 1], col.name) !== (body.name || '').trim()) return _json_({ ok: false, error: '정보가 변경되었습니다. 다시 조회해 주세요.' });
+  sheet.deleteRow(rowNum);
+  var total = _recalcGroupFull_(sheet, H, col, width, gid);
+  return _json_({ ok: true, groupTotal: total });
+}
+
+// 그룹 객실/투숙 인원 변경
+function _groupSet_(body, sheet, H, col, width) {
+  var gid = String(body.gid || '');
+  var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+  if (!_verifyGroupAccess_(vals, col, gid, body)) return _json_({ ok: false, error: '권한 확인 실패(연락처/PIN)' });
+  var override = {};
+  if (body.roomLabel != null) override.roomLabel = body.roomLabel;
+  if (body.occLabel != null) override.occLabel = body.occLabel;
+  var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
+  return _json_({ ok: true, groupTotal: total });
 }
 
 // 관리자: 일괄 저장. field='assigned'|'paid'|'amemo', updates=[{row, value}]

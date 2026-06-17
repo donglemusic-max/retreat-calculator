@@ -174,7 +174,16 @@ git push "https://donglemusic-max:${TOKEN}@github.com/donglemusic-max/retreat-ca
 - 실데이터: **92→89(+전화)→86(+대표자)그룹, 총액 65,758,000→65,386,000→64,616,000원**, 과병합 0(조형만은 실제 가족, 캠퍼스만 다름).
 - ⚠️ 사장님: **Migrate.gs 재붙여넣기+enrichSheet 재실행** + **Submit.gs 재배포**.
 
+### 그룹 편집 (조회·수정 + 관리자) — 완료
+- enrich v8: 중복 재제출 dedup(같은 이름 1회, 구버전 후순위). 전화 병합 키 앞자리0 보정(v7). 토스트에 버전 표시.
+- Submit.gs 액션 추가: `memberAdd`/`memberDelete`/`groupSet` + `_recalcGroupFull_`(occ는 그룹 선택값 유지=인원과 독립 → 부분그룹). 권한=그룹 연락처 일치 또는 ADMIN_PIN(`_verifyGroupAccess_`).
+- 프론트 `GroupEditor`: 객실/투숙인원 변경 + 구성원 추가(미제출자)/삭제. 조회·수정에서 그룹/그룹객실(N인투숙) 결과면 GroupEditor 렌더, 순수 개인은 EditCard. 관리자 방배정 탭 "이미 구성된 그룹"에 편집 버튼→GroupEditor(pin).
+- 부분그룹: 투숙인원(방크기)을 등록인원과 다르게 선택(예 2명 등록·4인방 → 996,000 검증).
+- GPT 방배정 탭 대조: GPT는 중복dedup(반영함)·명단으로 그룹완성(대표가 구성원추가로 해결)·그룹내 교통분리(미반영, 버스는 인당이라 큰 문제 아님).
+- ⚠️ 사장님: Migrate.gs(v8)+Submit.gs 둘 다 재반영(enrich 재실행+웹앱 재배포) 필요.
+
 ### 백로그
+- GPT 탭의 "그룹 내 캠퍼스/교통 혼합 분리"는 미반영(필요시 추후).
 - 회사 사본 테스트행 "테스트삭제요망"(A260617171143) 삭제 요청 상태.
 
 ### 기타 백로그

@@ -820,7 +820,7 @@ function SubmitSection({ payload, valid, missing }) {
 }
 
 // ── 내 신청 조회 / 수정 ────────────────────────────────────────
-function EditCard({ data }) {
+function EditCard({ data, onDelete }) {
   const [gender, setGender] = useState(data.gender || '')
   const [contact, setContact] = useState(fmtPhone(data.contact || ''))
   const [email, setEmail] = useState(data.email || '')
@@ -858,7 +858,10 @@ function EditCard({ data }) {
           {data.name}
           {data.isSelf && <span className="ml-1.5 text-[10px] font-bold text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 align-middle">본인</span>}
         </span>
-        <span className="text-[11px] text-[#8b95a1]">접수 {data.groupId} · 대표 {data.rep || '-'}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-[#8b95a1]">대표 {data.rep || '-'}</span>
+          {onDelete && <button onClick={onDelete} className="text-[11px] font-bold text-[#f04452]">삭제</button>}
+        </div>
       </div>
       <Field label="성별"><SegPicker value={gender} onChange={setGender} options={['남', '여']} /></Field>
       <Field label="연락처"><input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} inputMode="tel" className={inputCls} /></Field>
@@ -880,6 +883,77 @@ function EditCard({ data }) {
         {saving ? '저장 중…' : saved ? '✓ 저장됨' : '이 내용으로 수정 저장'}
       </button>
     </div>
+  )
+}
+
+// 그룹 편집기 (조회·수정 / 관리자 공용). auth = { verifyContact } 또는 { pin }
+function GroupEditor({ members, auth, onRefresh, title }) {
+  const cur = members[0] || {}
+  const gid = cur.gid || cur.groupId
+  const [roomName, setRoomName] = useState(reqRoomType(cur.roomLabel))
+  const occInit = (() => { const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : 8; return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
+  const [occSel, setOccSel] = useState(occInit)
+  const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false })
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState('')
+
+  const post = (p) => fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...p, ...auth }) }).then((r) => r.json())
+  const saveGroup = async () => {
+    setBusy('group'); setMsg('')
+    const roomLabel = ROOMS.find((r) => r.name === roomName).label
+    const occLabel = OCCUPANCY.find((o) => o.label === occSel).formLabel
+    const j = await post({ action: 'groupSet', gid, roomLabel, occLabel })
+    setBusy(''); setMsg(j.ok ? '✓ 객실/투숙 저장됨' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
+  }
+  const delMember = async (row, nm) => {
+    if (members.length <= 1) { setMsg('마지막 1명은 삭제할 수 없습니다.'); return }
+    setBusy('d' + row); setMsg('')
+    const j = await post({ action: 'memberDelete', gid, row, name: nm })
+    setBusy(''); if (j.ok) onRefresh && onRefresh(); else setMsg('오류: ' + (j.error || ''))
+  }
+  const addMember = async () => {
+    if (!add.name.trim() || !add.gender) { setMsg('추가할 분의 이름·성별을 입력해 주세요.'); return }
+    setBusy('add'); setMsg('')
+    const deptLabel = DEPTS.find((d) => d.name === add.dept).label
+    const j = await post({ action: 'memberAdd', gid, member: { name: add.name.trim(), gender: add.gender, deptLabel, bus: add.bus } })
+    setBusy('')
+    if (j.ok) { setAdd({ name: '', gender: '', dept: DEPTS[0].name, bus: false }); onRefresh && onRefresh() } else setMsg('오류: ' + (j.error || ''))
+  }
+
+  return (
+    <Card title={title || `그룹 편집 (${members.length}명)`}>
+      <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">방(객실)과 투숙 인원을 정하고, 구성원을 추가·삭제할 수 있습니다. 투숙 인원은 방 크기로, 등록 인원과 다르게(부분 그룹) 정할 수 있어요.</p>
+      <Field label="객실 종류">
+        <select value={roomName} onChange={(e) => setRoomName(e.target.value)} className={inputCls}>
+          {ROOMS.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+        </select>
+      </Field>
+      <Field label="투숙 인원 (방 크기)">
+        <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls}>
+          {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} {o.fee > 0 ? `(그룹 +${o.fee / 10000}만)` : '(추가없음)'}</option>)}
+        </select>
+      </Field>
+      <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#3182f6] text-white font-bold text-[13px] mb-1">
+        {busy === 'group' ? '저장 중…' : '객실/투숙 저장'}
+      </button>
+      {msg && <p className="text-[12px] text-[#1b64da] font-semibold my-2">{msg}</p>}
+
+      <div className="text-[13px] font-bold text-[#191f28] mt-4 mb-2">구성원 ({members.length}명)</div>
+      {members.map((mm) => <EditCard key={mm.row} data={{ ...mm, groupId: gid }} onDelete={() => delMember(mm.row, mm.name)} />)}
+
+      <div className="bg-[#f9fafb] rounded-2xl p-3 border border-dashed border-[#3182f6]/40 mt-2">
+        <div className="text-[12px] font-bold text-[#1b64da] mb-2">+ 구성원 추가 (미제출자 등)</div>
+        <input value={add.name} onChange={(e) => setAdd({ ...add, name: e.target.value })} placeholder="이름" className={inputCls + ' mb-2'} />
+        <div className="flex gap-2 mb-2">
+          {['남', '여'].map((g) => (
+            <button key={g} onClick={() => setAdd({ ...add, gender: g })} className={`flex-1 py-2 rounded-xl text-[12px] font-bold border ${add.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>{g}</button>
+          ))}
+        </div>
+        <DeptSelect value={add.dept} onChange={(v) => setAdd({ ...add, dept: v })} />
+        <button onClick={() => setAdd({ ...add, bus: !add.bus })} className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border ${add.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>버스 신청 {add.bus ? '✓' : ''}</button>
+        <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '구성원 추가'}</button>
+      </div>
+    </Card>
   )
 }
 
@@ -922,9 +996,10 @@ function LookupMode() {
           <Card title="조회 결과 없음">
             <p className="text-[12px] text-[#8b95a1] leading-relaxed">해당 이름·연락처로 제출된 신청이 없습니다. 입력을 확인하시거나 안내데스크로 문의해 주세요.</p>
           </Card>
+        ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '')) ? (
+          <GroupEditor members={results} auth={{ verifyContact: contact.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
         ) : (
-          <Card title={grouped ? `${name.trim()}님 그룹 (${results.length}명)` : `조회 결과 (${results.length}건)`}>
-            {grouped && <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">그룹 구성원 전체가 표시됩니다. 각자 항목을 수정 후 저장하세요.</p>}
+          <Card title={`조회 결과 (${results.length}건)`}>
             {results.map((r) => <EditCard key={r.row} data={r} />)}
           </Card>
         )
@@ -1036,6 +1111,7 @@ function AdminApp() {
   const [saveMsg, setSaveMsg] = useState('')
   const [sel, setSel] = useState({}) // 리마인드 다중선택 row→bool
   const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨
+  const [editGid, setEditGid] = useState(null) // 관리자 그룹 편집 대상
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1200,13 +1276,23 @@ function AdminApp() {
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
               </div>
 
+              {editGid && (
+                <div className="mb-3">
+                  <button onClick={() => setEditGid(null)} className="text-[12px] font-bold text-[#8b95a1] mb-1">✕ 편집 닫기</button>
+                  <GroupEditor members={rows.filter((r) => r.gid === editGid)} auth={{ pin }} onRefresh={reload} title="그룹 편집 (관리자)" />
+                </div>
+              )}
+
               {bookedList.length > 0 && (
-                <Collapsible title="이미 구성된 그룹 (변경 불가)" count={`${bookedList.length}방`}>
+                <Collapsible title="이미 구성된 그룹 (편집 가능)" count={`${bookedList.length}방`}>
                   {bookedList.map(([gid, mem, rep]) => {
                     const type = roomTypeOfMembers(mem); const cap = ROOM_CAP[type]
                     return (
                       <div key={gid} className="mb-2 pb-2 border-b border-[#f7f8fa] last:border-0">
-                        <div className="text-[12px] font-bold text-[#191f28] mb-1">{rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#8b95a1]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></div>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-[12px] font-bold text-[#191f28]">{rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#8b95a1]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></div>
+                          <button onClick={() => setEditGid(gid)} className="text-[11px] font-bold text-[#3182f6]">편집</button>
+                        </div>
                         <div className="flex flex-wrap gap-1.5">{mem.map((p) => <ReadChip key={p.row} p={p} />)}</div>
                       </div>
                     )

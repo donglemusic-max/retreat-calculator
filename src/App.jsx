@@ -1,38 +1,51 @@
 import React, { useState, useMemo } from 'react'
 
 // ── 요금 데이터 (2026 전교인 리트릿) ───────────────────────────
+// label = 구글폼/시트에 기록되는 정본 문자열 (제출 시 그대로 적재 → 폼 응답과 동일)
 const DEPTS = [
-  { name: '장년부', fee: 278000, hint: '' },
-  { name: '청년부', fee: 278000, hint: '' },
-  { name: '중고등부', fee: 268000, hint: '08~13년생' },
-  { name: '소년부', fee: 258000, hint: '14~15년생' },
-  { name: '초등부', fee: 248000, hint: '16~17년생' },
-  { name: '유년부', fee: 228000, hint: '18~19년생' },
-  { name: '유치부', fee: 208000, hint: '20~21년생' },
-  { name: '영유아부', fee: 198000, hint: '22~24년생' },
-  { name: '영아부(돌전)', fee: 178000, hint: '25~26년생' },
+  { name: '장년부', fee: 278000, hint: '', label: '장년부 278,000원' },
+  { name: '청년부', fee: 278000, hint: '', label: '청년부 278,000원' },
+  { name: '중고등부', fee: 268000, hint: '08~13년생', label: '중고등부 268,000원 (08~13년생)' },
+  { name: '소년부', fee: 258000, hint: '14~15년생', label: '소년부 258,000원 (14~15년생)' },
+  { name: '초등부', fee: 248000, hint: '16~17년생', label: '초등부 248,000원 (16~17년생)' },
+  { name: '유년부', fee: 228000, hint: '18~19년생', label: '유년부 228,000원 (18~19년생)' },
+  { name: '유치부', fee: 208000, hint: '20~21년생', label: '유치부 208,000원 (20~21년생)' },
+  { name: '영유아부', fee: 198000, hint: '22~24년생', label: '영유아부 198,000원 (22~24년생)' },
+  { name: '영아부(돌전)', fee: 178000, hint: '25~26년생', label: '영아부 돌전 178,000원 (25~26년생)' },
 ]
 
 const ROOMS = [
-  { name: '소노벨 패밀리', group: 0, indiv: 0, max: 6, desc: '최대 6인 · 원룸(더블 2개) · 예배실 도보 3~5분' },
-  { name: '소노벨 스위트', group: 60000, indiv: 10000, max: 8, desc: '최대 8인 · 투룸(온돌 / 더블·싱글) · 예배실 도보 3~5분' },
-  { name: '소노캄 스위트', group: 240000, indiv: 40000, max: 8, desc: '최대 8인 · 투룸(싱글2 / 더블) · 예배실 옆 건물' },
+  { name: '소노벨 패밀리', group: 0, indiv: 0, max: 6, desc: '최대 6인 · 원룸(더블 2개) · 예배실 도보 3~5분',
+    label: '소노벨 패밀리 (최대 인원 6인 원룸. 더블침대 2개) - 객실당 추가 비용은 없음 (인원에 따른 추가 비용은 선택에 따라 발생)' },
+  { name: '소노벨 스위트', group: 60000, indiv: 10000, max: 8, desc: '최대 8인 · 투룸(온돌 / 더블·싱글) · 예배실 도보 3~5분',
+    label: '소노벨 스위트 (최대 인원 8인 투룸. 침실A: 온돌 / 침실B: 더블 1개 or 싱글 2개) - 객실당 추가로 [그룹의 경우] 6만원 혹은 [개인비용] 1만원' },
+  { name: '소노캄 스위트', group: 240000, indiv: 40000, max: 8, desc: '최대 8인 · 투룸(싱글2 / 더블) · 예배실 옆 건물',
+    label: '소노캄 스위트 (최대 인원 8인 투룸. 침실A: 싱글 2개, 침실B: 더블 1개) - 객실당 추가로 [그룹의 경우] 24만원 혹은 [개인의 경우] 4만원' },
 ]
 
-// 투숙 인원별 그룹 추가비용 (객실당)
+// 투숙 인원별 그룹 추가비용 (객실당). formLabel = 시트 정본 문자열
 const OCCUPANCY = [
-  { people: 8, label: '7~8인', fee: 0 },
-  { people: 6, label: '6인', fee: 50000 },
-  { people: 5, label: '5인', fee: 100000 },
-  { people: 4, label: '4인', fee: 200000 },
-  { people: 3, label: '3인', fee: 300000 },
-  { people: 2, label: '2인', fee: 400000 },
-  { people: 1, label: '1인', fee: 500000 },
+  { people: 8, label: '7~8인', fee: 0, formLabel: '7~8인이 투숙합니다: 추가 비용 없음' },
+  { people: 6, label: '6인', fee: 50000, formLabel: '6인이 투숙합니다: [그룹 비용] 5만원' },
+  { people: 5, label: '5인', fee: 100000, formLabel: '5인이 투숙합니다: [그룹 비용] 10만원' },
+  { people: 4, label: '4인', fee: 200000, formLabel: '4인이 투숙합니다: [그룹 비용] 20만원' },
+  { people: 3, label: '3인', fee: 300000, formLabel: '3인이 투숙합니다: [그룹 비용] 30만원' },
+  { people: 2, label: '2인', fee: 400000, formLabel: '2인이 투숙합니다: [그룹 비용] 40만원' },
+  { people: 1, label: '1인', fee: 500000, formLabel: '1인이 투숙합니다: [그룹 비용] 50만원' },
 ]
+// 교회 배정(가족/그룹 미신청) 정본 문자열
+const OCC_CHURCH = '가족/그룹을 따로 신청하지 않고 교회에서 정해주시는 대로 신청합니다. 추가 비용 없음'
+const BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)'
+const BUS_NO = '자차를 이용합니다'
+const SEORAK_YES = '설악산 뷰 원합니다.'
+const CAMPUSES = ['분당 캠퍼스', '부산 캠퍼스']
 
 const BUS_FEE = 38000
 const SEORAK_FEE = 10000
 const ACCOUNT = '우리은행 1005803168121 주님의 교회'
+
+// 신청서 제출 Apps Script 웹앱 URL (Vercel 환경변수 VITE_SUBMIT_URL 우선, 없으면 빈값 → 제출 비활성)
+const SUBMIT_URL = (import.meta.env && import.meta.env.VITE_SUBMIT_URL) || ''
 
 // ── 도움말 콘텐츠 (구글폼 안내문) ──────────────────────────────
 const HELP = {
@@ -275,6 +288,39 @@ function DeptSelect({ value, onChange }) {
   )
 }
 
+// ── 입력 필드 헬퍼 ─────────────────────────────────────────────
+const inputCls =
+  'w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none'
+
+function Field({ label, required, children }) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <label className="block text-[12px] font-semibold text-[#4e5968] mb-1.5">
+        {label}{required && <span className="text-[#f04452]"> *</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function SegPicker({ value, onChange, options, render }) {
+  return (
+    <div className="flex gap-2">
+      {options.map((o) => (
+        <button
+          key={o}
+          onClick={() => onChange(o)}
+          className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border transition-all ${
+            value === o ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+          }`}
+        >
+          {render ? render(o) : o}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── 개인 등록 ──────────────────────────────────────────────────
 function IndividualMode() {
   const [dept, setDept] = useState('장년부')
@@ -282,9 +328,26 @@ function IndividualMode() {
   const [bus, setBus] = useState(false)
   const [seorak, setSeorak] = useState(false)
   const [name, setName] = useState('')
+  const [gender, setGender] = useState('')
+  const [contact, setContact] = useState('')
+  const [email, setEmail] = useState('')
+  const [campus, setCampus] = useState('')
+  const [inquiry, setInquiry] = useState('')
 
   const d = DEPTS.find((x) => x.name === dept)
   const room = ROOMS[roomIdx]
+
+  const missing = []
+  if (!name.trim()) missing.push('이름')
+  if (!gender) missing.push('성별')
+  if (!contact.trim()) missing.push('연락처')
+  if (!email.trim()) missing.push('이메일')
+  if (!campus) missing.push('캠퍼스')
+  const submission = {
+    mode: '개인', email: email.trim(), contact: contact.trim(), campus, leader: name.trim(), inquiry: inquiry.trim(),
+    roomLabel: room.label, occLabel: OCC_CHURCH, seorak, depositMode: 'leader', roster: '',
+    members: [{ name: name.trim(), gender, deptLabel: d.label, bus }],
+  }
 
   const calc = useMemo(() => {
     const who = name.trim() || '이름'
@@ -331,16 +394,29 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="입금자명 (선택)">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="예: 김바울"
-          className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
-        />
+      <Card title="신청자 정보 (제출용)">
+        <Field label="등록자 이름" required>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} />
+        </Field>
+        <Field label="성별" required>
+          <SegPicker value={gender} onChange={setGender} options={['남', '여']} />
+        </Field>
+        <Field label="연락처" required>
+          <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+        </Field>
+        <Field label="이메일" required>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
+        </Field>
+        <Field label="주로 예배드리는 캠퍼스" required>
+          <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} />
+        </Field>
+        <Field label="문의사항 (선택)">
+          <textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} />
+        </Field>
       </Card>
 
       <ResultPanel calc={calc} subtitle={`※ 입금자명: ${name.trim() || '이름'}`} />
+      <SubmitSection payload={submission} valid={missing.length === 0} missing={missing} />
     </>
   )
 }
@@ -348,11 +424,15 @@ function IndividualMode() {
 // ── 가족 / 그룹 등록 ──────────────────────────────────────────
 function GroupMode() {
   const [leader, setLeader] = useState('')
-  const [members, setMembers] = useState([{ name: '', dept: '장년부', bus: false }])
+  const [members, setMembers] = useState([{ name: '', dept: '장년부', bus: false, gender: '' }])
   const [roomIdx, setRoomIdx] = useState(1)
   const [occOverride, setOccOverride] = useState(null) // null = 자동(인원수 기준)
   const [seorak, setSeorak] = useState(false) // 그룹 전체 적용
   const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
+  const [email, setEmail] = useState('')
+  const [contact, setContact] = useState('')
+  const [campus, setCampus] = useState('')
+  const [inquiry, setInquiry] = useState('')
 
   const room = ROOMS[roomIdx]
   const count = members.length
@@ -361,8 +441,24 @@ function GroupMode() {
 
   const updateMember = (i, patch) =>
     setMembers((m) => m.map((mm, idx) => (idx === i ? { ...mm, ...patch } : mm)))
-  const addMember = () => setMembers((m) => [...m, { name: '', dept: '장년부', bus: false }])
+  const addMember = () => setMembers((m) => [...m, { name: '', dept: '장년부', bus: false, gender: '' }])
   const removeMember = (i) => setMembers((m) => (m.length > 1 ? m.filter((_, idx) => idx !== i) : m))
+
+  const roster = members.map((m) => m.name.trim()).filter(Boolean).join(' ') + ` (${count})`
+  const missing = []
+  if (!leader.trim()) missing.push('대표자 이름')
+  if (!email.trim()) missing.push('이메일')
+  if (!contact.trim()) missing.push('연락처')
+  if (!campus) missing.push('캠퍼스')
+  members.forEach((m, i) => {
+    if (!m.name.trim()) missing.push(`${i + 1}번 이름`)
+    if (!m.gender) missing.push(`${i + 1}번 성별`)
+  })
+  const submission = {
+    mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
+    roomLabel: room.label, occLabel: effOcc.formLabel, seorak, depositMode, roster,
+    members: members.map((m) => ({ name: m.name.trim(), gender: m.gender, deptLabel: DEPTS.find((d) => d.name === m.dept).label, bus: m.bus })),
+  }
 
   const calc = useMemo(() => {
     const memberFee = (m) => DEPTS.find((d) => d.name === m.dept)?.fee || 0
@@ -405,13 +501,23 @@ function GroupMode() {
 
   return (
     <>
-      <Card title="대표자 이름 (공동비용 입금자명)">
-        <input
-          value={leader}
-          onChange={(e) => setLeader(e.target.value)}
-          placeholder="예: 김바울 (객실·그룹·버스·설악산 등 공동비용 입금자)"
-          className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
-        />
+      <Card title="대표자 정보 (제출용)">
+        <Field label="대표자 이름 (공동비용 입금자명)" required>
+          <input value={leader} onChange={(e) => setLeader(e.target.value)} placeholder="예: 김바울" className={inputCls} />
+        </Field>
+        <Field label="대표 연락처" required>
+          <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+        </Field>
+        <Field label="대표 이메일" required>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
+        </Field>
+        <Field label="주로 예배드리는 캠퍼스" required>
+          <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} />
+        </Field>
+        <Field label="문의사항 (선택)">
+          <textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} />
+        </Field>
+        <p className="text-[11px] text-[#8b95a1] leading-relaxed">* 연락처·이메일은 가족/그룹 구성원 행에 공통으로 기록됩니다.</p>
       </Card>
 
       <Card title="구성원" badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
@@ -430,6 +536,19 @@ function GroupMode() {
                 placeholder={i === 0 ? '이름 (대표자 본인이면 위와 동일하게)' : '이름'}
                 className="w-full bg-white border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2 focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
               />
+              <div className="flex gap-2 mb-2">
+                {['남', '여'].map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => updateMember(i, { gender: g })}
+                    className={`flex-1 py-2 rounded-xl text-[12px] font-bold border transition-all ${
+                      m.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
               <DeptSelect value={m.dept} onChange={(v) => updateMember(i, { dept: v })} />
               <button
                 onClick={() => updateMember(i, { bus: !m.bus })}
@@ -540,6 +659,7 @@ function GroupMode() {
       </Card>
 
       <ResultPanel calc={calc} subtitle={subtitle} />
+      <SubmitSection payload={submission} valid={missing.length === 0} missing={missing} />
     </>
   )
 }
@@ -615,6 +735,76 @@ function ResultPanel({ calc, subtitle }) {
         </button>
       </Card>
     </div>
+  )
+}
+
+// ── 신청서 제출 ────────────────────────────────────────────────
+function SubmitSection({ payload, valid, missing }) {
+  const [status, setStatus] = useState('idle') // idle | loading | done | error
+  const [result, setResult] = useState(null)
+  const [err, setErr] = useState('')
+
+  const submit = async () => {
+    setStatus('loading'); setErr('')
+    try {
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+      })
+      const j = await res.json()
+      if (j.ok) { setResult(j); setStatus('done') }
+      else { setErr(j.error || '제출 실패'); setStatus('error') }
+    } catch (e) { setErr(String(e)); setStatus('error') }
+  }
+
+  if (!SUBMIT_URL) {
+    return (
+      <Card title="신청서 제출">
+        <p className="text-[12px] text-[#8b95a1] leading-relaxed">
+          제출 기능 준비 중입니다.<br />
+          <span className="text-[#b0b8c1]">(관리자: Apps Script 웹앱 배포 후 Vercel 환경변수 <code>VITE_SUBMIT_URL</code> 설정)</span>
+        </p>
+      </Card>
+    )
+  }
+
+  if (status === 'done') {
+    return (
+      <Card title="제출 완료">
+        <div className="text-center py-3">
+          <div className="text-[40px] mb-2">✅</div>
+          <div className="text-[15px] font-bold text-[#191f28] mb-1">신청서가 제출되었습니다</div>
+          <div className="text-[12px] text-[#8b95a1]">
+            접수번호 {result?.groupId} · {result?.rows}명 · 총 {won(result?.total || 0)}
+          </div>
+          <p className="text-[12px] text-[#8b95a1] mt-3 leading-relaxed">
+            입금까지 완료해야 등록이 확정됩니다.<br />위 "입금 안내"대로 항목별로 입금해 주세요.
+          </p>
+        </div>
+      </Card>
+    )
+  }
+
+  return (
+    <Card title="신청서 제출">
+      {!valid && missing.length > 0 && (
+        <p className="text-[12px] text-[#f04452] font-semibold mb-3 leading-relaxed">입력 필요: {missing.join(', ')}</p>
+      )}
+      {status === 'error' && <p className="text-[12px] text-[#f04452] mb-3 leading-relaxed">제출 오류: {err}</p>}
+      <button
+        onClick={submit}
+        disabled={!valid || status === 'loading'}
+        className={`w-full py-3.5 rounded-2xl font-bold text-[15px] transition-all ${
+          valid && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black shadow-lg' : 'bg-[#e5e8eb] text-[#b0b8c1]'
+        }`}
+      >
+        {status === 'loading' ? '제출 중…' : '신청서 제출하기'}
+      </button>
+      <p className="text-[11px] text-[#8b95a1] mt-3 leading-relaxed">
+        * 제출 후에도 입금을 완료해야 등록이 확정됩니다. 가족/그룹은 구성원 정보를 정확히 입력해 주세요.
+      </p>
+    </Card>
   )
 }
 

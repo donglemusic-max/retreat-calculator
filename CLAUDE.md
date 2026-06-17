@@ -116,13 +116,28 @@ git push "https://donglemusic-max:${TOKEN}@github.com/donglemusic-max/retreat-ca
 - **그룹 신호 = 이메일(col1)**. 대표자칸(col6)은 23/185만 채움. 가족은 한 이메일로 다인 제출.
 - 헤더탐색 주의: `/대표자/`는 col3(설명문에 '대표자' 포함)에 오매칭 → `/그룹의 대표자/` 사용.
 
-### Phase 1 결과물 (완료) — `apps-script/Migrate.gs` + `apps-script/README.md`
-- `enrichSheet()`: 이메일 그룹핑→그룹ID·대표추정·금액·확인필요 컬럼을 오른쪽에 멱등 기록. `installOnFormSubmit()` 트리거 옵션.
-- Node로 동일로직 시뮬 검증: **92그룹, 전체 66,738,000원(인당합+공동합 검산 일치), 확인필요 36건, 대표추정 91/92**.
-- 다음: 사장님이 배포 실행 → 결과 확인 후 Phase 2(doPost 제출) 착수.
+### Phase 1 결과물 (완료) — `apps-script/Migrate.gs`
+- `enrichSheet()`: 이메일 그룹핑→그룹ID·대표추정·금액·확인필요 컬럼 우측 멱등 기록. `installOnFormSubmit()` 트리거 옵션.
+- 사장님이 1차 실행 완료(시트 29→30열, 앱 컬럼 추가됨).
 
-### 남은 블로커
-- Phase 2/3는 Apps Script 웹앱 배포 URL 필요(사장님 배포 후 확보) → 그 URL을 계산기 프론트에 연결.
+### ⚠️ 객실비용 버그 수정 (Phase 2 중 발견)
+- 초판은 객실 추가비용을 항상 **그룹가**로 계산 → 교회배정/부분그룹인데 소노벨스위트·소노캄 고른 11명을 980,000원 과다계상.
+- 수정: 투숙칸이 "N인이 투숙"이면 그룹가(6만/24만) 그룹당 1회, 아니면(교회배정/부분그룹) **개인가(1만/4만) 인당**(`본인객실` 컬럼 신설).
+- **전체 총액 66,738,000 → 65,758,000원** (검산 일치). → 사장님 **Migrate.gs 재붙여넣기 후 enrichSheet 재실행 필요**(멱등, 본인객실 컬럼 추가됨).
+
+### Phase 2 결과물 (완료) — `apps-script/Submit.gs` + 프론트
+- `Submit.gs`: `doPost`로 계산기 제출 JSON을 폼과 동일 컬럼 구조로 적재(개인 1행/그룹 N행), 앱 컬럼·새 그룹ID(`A...`)까지 채움. Migrate.gs와 같은 프로젝트에 추가(상수 재사용).
+- 프론트(App.jsx): 개인/그룹 모드에 신청자정보(이메일·성별·연락처·캠퍼스·문의) 입력 + `SubmitSection`(fetch text/plain POST, 펜알티계산기와 동일 CORS 패턴). 제출 라벨은 시트 정본 문자열(DEPTS/ROOMS/OCCUPANCY의 label/formLabel) 사용.
+- `SUBMIT_URL = import.meta.env.VITE_SUBMIT_URL`. 미설정 시 제출 버튼 비활성+안내.
+- Node 시뮬 검증: enrich 재계산 65,758,000 / doPost 그룹4명split 1,510,000(입금자명 각자) / 개인 소노벨스위트 교회배정 336,000.
+
+### 사장님이 해야 할 것 (Phase 2 활성화)
+1. Migrate.gs 최신본 재붙여넣기 → `enrichSheet` 재실행 (총액 보정 + 본인객실 컬럼).
+2. Submit.gs 새 파일 추가 → [배포]→[웹 앱], 실행=나/액세스=모든 사용자 → `/exec` URL 확보.
+3. Vercel 환경변수 `VITE_SUBMIT_URL`에 URL 넣고 redeploy (또는 URL 주면 상수 박아 push).
+
+### 다음 (Phase 3, 미착수)
+- 본인 조회(doGet: 이름+연락처 매칭) + 관리자 뷰(캠퍼스별 버스명단/부서·객실 집계/미입금·확인필요). 웹앱 URL 확보 후 착수.
 
 ### 기타 백로그
 - 구글폼 prefill 연동(가벼운 대안): `?usp=pp_url&entry.xxx=값`. A를 직접 만들면 불필요.

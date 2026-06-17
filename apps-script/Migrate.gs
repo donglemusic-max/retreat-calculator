@@ -29,13 +29,15 @@ var SEORAK_FEE = 10000;
 // 앱이 추가하는 컬럼 (헤더 텍스트 = 식별자, 멱등 재계산)
 var APP_COLS = [
   '제출경로', '그룹ID', '그룹대표(추정)', '그룹인원(제출)',
-  '1인등록비', '본인버스', '본인설악산',
+  '1인등록비', '본인객실', '본인버스', '본인설악산',
   '그룹공동비용(객실+투숙)', '그룹총액',
   '확인필요', '비고',
 ];
 
 function deptFee_(t) { for (var k in DEPT_FEE) if (t.indexOf(k) >= 0) return DEPT_FEE[k]; return 0; }
-function roomAdd_(t) { return t.indexOf('소노캄') >= 0 ? 240000 : (t.indexOf('소노벨 스위트') >= 0 ? 60000 : 0); }
+function roomAdd_(t) { return t.indexOf('소노캄') >= 0 ? 240000 : (t.indexOf('소노벨 스위트') >= 0 ? 60000 : 0); }   // 그룹가
+function roomIndiv_(t) { return t.indexOf('소노캄') >= 0 ? 40000 : (t.indexOf('소노벨 스위트') >= 0 ? 10000 : 0); } // 개인가
+function isGroupOcc_(t) { return /인이 투숙/.test(t); } // "N인이 투숙" = 그룹 객실 신청
 function occAdd_(t) {
   var m = t.match(/(\d)인이 투숙/); if (!m) return 0;
   return ({ 6: 50000, 5: 100000, 4: 200000, 3: 300000, 2: 400000, 1: 500000 })[+m[1]] || 0;
@@ -113,10 +115,12 @@ function enrichSheet() {
     var members = groups[key];
     var names = members.map(function (r) { return get(r, 'name'); });
 
-    // 그룹 공동비용 (객실/투숙은 그룹당 1회 — 첫 행 기준)
-    var room = roomAdd_(get(members[0], 'room'));
-    var occ = occAdd_(get(members[0], 'occ'));
-    var commonFee = room + occ;
+    // 객실비용: "N인 투숙"(그룹)이면 그룹가를 그룹당 1회 + 투숙비. 아니면(교회배정/부분그룹) 개인 객실가를 인당.
+    var roomL0 = get(members[0], 'room');
+    var occL0 = get(members[0], 'occ');
+    var isGrp = isGroupOcc_(occL0);
+    var commonFee = isGrp ? (roomAdd_(roomL0) + occAdd_(occL0)) : 0;
+    var pRoom = function (r) { return isGrp ? 0 : roomIndiv_(get(r, 'room')); };
 
     // 대표자 추정: 대표자칸 → 입금자명 토큰(멤버이름 일치) → 장년부 → 첫행
     var rep = '';
@@ -143,7 +147,7 @@ function enrichSheet() {
     if (repRow === undefined) repRow = members[0];
 
     var groupTotal = members.reduce(function (s, r) {
-      return s + deptFee_(get(r, 'dept'))
+      return s + deptFee_(get(r, 'dept')) + pRoom(r)
         + (get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0)
         + (get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0);
     }, 0) + commonFee;
@@ -155,6 +159,7 @@ function enrichSheet() {
         '그룹대표(추정)': rep,
         '그룹인원(제출)': members.length,
         '1인등록비': deptFee_(get(r, 'dept')),
+        '본인객실': pRoom(r),
         '본인버스': get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0,
         '본인설악산': get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0,
         '그룹공동비용(객실+투숙)': r === repRow ? commonFee : 0,

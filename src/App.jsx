@@ -845,7 +845,10 @@ function EditCard({ data }) {
   return (
     <div className="bg-[#f9fafb] rounded-2xl p-4 border border-[#f2f4f6] mb-3">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[14px] font-bold text-[#191f28]">{data.name}</span>
+        <span className="text-[14px] font-bold text-[#191f28]">
+          {data.name}
+          {data.isSelf && <span className="ml-1.5 text-[10px] font-bold text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 align-middle">본인</span>}
+        </span>
         <span className="text-[11px] text-[#8b95a1]">접수 {data.groupId} · 대표 {data.rep || '-'}</span>
       </div>
       <Field label="성별"><SegPicker value={gender} onChange={setGender} options={['남', '여']} /></Field>
@@ -876,6 +879,7 @@ function LookupMode() {
   const [contact, setContact] = useState('')
   const [status, setStatus] = useState('idle') // idle | loading | loaded | error
   const [results, setResults] = useState([])
+  const [grouped, setGrouped] = useState(false)
   const [err, setErr] = useState('')
 
   const lookup = async () => {
@@ -886,7 +890,7 @@ function LookupMode() {
         body: JSON.stringify({ action: 'lookup', name: name.trim(), contact: contact.trim() }),
       })
       const j = await res.json()
-      if (j.ok) { setResults(j.results || []); setStatus('loaded') }
+      if (j.ok) { setResults(j.results || []); setGrouped(!!j.grouped); setStatus('loaded') }
       else { setErr(j.error || '조회 실패'); setStatus('error') }
     } catch (e) { setErr(String(e)); setStatus('error') }
   }
@@ -910,7 +914,8 @@ function LookupMode() {
             <p className="text-[12px] text-[#8b95a1] leading-relaxed">해당 이름·연락처로 제출된 신청이 없습니다. 입력을 확인하시거나 안내데스크로 문의해 주세요.</p>
           </Card>
         ) : (
-          <Card title={`조회 결과 (${results.length}건)`}>
+          <Card title={grouped ? `${name.trim()}님 그룹 (${results.length}명)` : `조회 결과 (${results.length}건)`}>
+            {grouped && <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">그룹 구성원 전체가 표시됩니다. 각자 항목을 수정 후 저장하세요.</p>}
             {results.map((r) => <EditCard key={r.row} data={r} />)}
           </Card>
         )
@@ -942,6 +947,19 @@ function GuideButton() {
 const deptName = (label) => DEPTS.find((d) => d.label === label)?.name || (label || '').split(' ')[0]
 const isChurchAssigned = (occLabel) => !/인이 투숙/.test(occLabel || '')
 
+function Collapsible({ title, count, defaultOpen, children }) {
+  const [open, setOpen] = useState(!!defaultOpen)
+  return (
+    <div className="bg-white rounded-2xl border border-[#f2f4f6] mb-3 overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3">
+        <span className="text-[13px] font-bold text-[#191f28]">{title}{count != null && <span className="text-[#8b95a1] font-normal"> · {count}</span>}</span>
+        <span className={`text-[#8b95a1] text-[12px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  )
+}
+
 function AdminApp() {
   const [pin, setPin] = useState('')
   const [auth, setAuth] = useState(false)
@@ -951,6 +969,7 @@ function AdminApp() {
   const [tab, setTab] = useState('요약')
   const [assignDraft, setAssignDraft] = useState({})
   const [saveMsg, setSaveMsg] = useState('')
+  const [sel, setSel] = useState({}) // 리마인드 다중선택 row→bool
 
   const post = (payload) =>
     fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) }).then((r) => r.json())
@@ -997,10 +1016,10 @@ function AdminApp() {
   }
 
   const saveAssign = async () => {
-    const updates = m.pool.filter((p) => assignDraft[p.row] != null).map((p) => ({ row: p.row, assigned: assignDraft[p.row] }))
+    const updates = m.pool.filter((p) => assignDraft[p.row] != null).map((p) => ({ row: p.row, value: assignDraft[p.row] }))
     if (!updates.length) { setSaveMsg('변경 없음'); return }
     setSaveMsg('저장 중…')
-    const j = await post({ action: 'adminBatch', pin, updates })
+    const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
     if (j.ok) { setSaveMsg(`✓ ${j.count}명 배정 저장`); await reload(); setAssignDraft({}) } else setSaveMsg('오류: ' + (j.error || ''))
     setTimeout(() => setSaveMsg(''), 3000)
   }
@@ -1010,6 +1029,15 @@ function AdminApp() {
     setRows((rs) => rs.map((r) => (r.row === row ? { ...r, paid: val } : r)))
     await post({ action: 'adminSet', pin, row, field: 'paid', value: val })
   }
+
+  const batchConfirmPaid = async () => {
+    const updates = Object.keys(sel).filter((r) => sel[r]).map((r) => ({ row: Number(r), value: 'Y' }))
+    if (!updates.length) return
+    setRows((rs) => rs.map((r) => (sel[r.row] ? { ...r, paid: 'Y' } : r)))
+    setSel({})
+    await post({ action: 'adminBatch', pin, field: 'paid', updates })
+  }
+  const toggleSel = (row) => setSel((s) => ({ ...s, [row]: !s[row] }))
 
   if (!auth) {
     return (
@@ -1044,7 +1072,7 @@ function AdminApp() {
         </header>
 
         <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
-          {['요약', '방배정', '리마인드', '버스명단'].map((t) => (
+          {['요약', '방배정', '리마인드', '버스명단', '문의'].map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{t}</button>
           ))}
         </div>
@@ -1095,13 +1123,16 @@ function AdminApp() {
             <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
               <div className="text-[12px] font-bold text-[#191f28] mb-2">개인별 배정</div>
               {m.pool.map((p) => (
-                <div key={p.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[13px] font-bold text-[#191f28]">{p.name}</span>
-                    <span className="text-[11px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{p.gender}·{deptName(p.deptLabel)}</span>
+                <div key={p.row} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[13px] font-bold text-[#191f28]">{p.name}</span>
+                      <span className="text-[11px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{p.gender}·{deptName(p.deptLabel)}</span>
+                    </div>
+                    <input value={assignDraft[p.row] ?? p.assigned ?? ''} onChange={(e) => setAssignDraft((d) => ({ ...d, [p.row]: e.target.value }))}
+                      placeholder="방" className="w-24 bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1.5 text-[12px] text-center" />
                   </div>
-                  <input value={assignDraft[p.row] ?? p.assigned ?? ''} onChange={(e) => setAssignDraft((d) => ({ ...d, [p.row]: e.target.value }))}
-                    placeholder="방" className="w-24 bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1.5 text-[12px] text-center" />
+                  {p.list && <div className="mt-1 text-[11px] text-[#1b64da] bg-[#f2f8ff] rounded-lg px-2 py-1 leading-snug">📝 {p.list}</div>}
                 </div>
               ))}
             </div>
@@ -1109,19 +1140,27 @@ function AdminApp() {
         )}
 
         {tab === '리마인드' && (
-          <div className="space-y-3">
-            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-              <div className="text-[13px] font-bold text-[#191f28] mb-2">미입금 {m.unpaid.length}명 (체크 시 입금확인)</div>
-              {m.unpaid.length === 0 ? <p className="text-[12px] text-[#8b95a1]">전원 입금확인 완료</p> :
-                m.unpaid.map((r) => (
-                  <div key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
-                    <input type="checkbox" checked={r.paid === 'Y'} onChange={() => togglePaid(r.row, r.paid)} className="w-4 h-4" />
-                    <span className="text-[13px] font-bold text-[#191f28] flex-1">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.pay ? ` · 입금자명 ${r.pay}` : ''}</span></span>
-                  </div>
-                ))}
-            </div>
-            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-              <div className="text-[13px] font-bold text-[#191f28] mb-2">확인필요 {m.checkGroups.length}건 (명단 &gt; 제출)</div>
+          <div>
+            {(() => { const selN = Object.keys(sel).filter((r) => sel[r]).length; return (
+              <Collapsible title="미입금" count={`${m.unpaid.length}명`} defaultOpen>
+                {m.unpaid.length === 0 ? <p className="text-[12px] text-[#8b95a1]">전원 입금확인 완료</p> : (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <button onClick={() => setSel(Object.fromEntries(m.unpaid.map((r) => [r.row, true])))} className="text-[11px] font-bold text-[#3182f6] bg-[#f2f8ff] px-2.5 py-1.5 rounded-lg">전체선택</button>
+                      <button onClick={() => setSel({})} className="text-[11px] font-bold text-[#8b95a1] bg-[#f2f4f6] px-2.5 py-1.5 rounded-lg">해제</button>
+                      <button onClick={batchConfirmPaid} disabled={!selN} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}명 입금확인</button>
+                    </div>
+                    {m.unpaid.map((r) => (
+                      <label key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 cursor-pointer">
+                        <input type="checkbox" checked={!!sel[r.row]} onChange={() => toggleSel(r.row)} className="w-4 h-4" />
+                        <span className="text-[13px] font-bold text-[#191f28] flex-1">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.pay ? ` · 입금자명 ${r.pay}` : ''}</span></span>
+                      </label>
+                    ))}
+                  </>
+                )}
+              </Collapsible>
+            ) })()}
+            <Collapsible title="확인필요 (명단 > 제출)" count={`${m.checkGroups.length}건`}>
               {m.checkGroups.length === 0 ? <p className="text-[12px] text-[#8b95a1]">없음</p> :
                 m.checkGroups.map((g) => (
                   <div key={g.gid} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
@@ -1129,8 +1168,26 @@ function AdminApp() {
                     <div className="text-[11px] text-[#8b95a1] leading-snug">{g.note}</div>
                   </div>
                 ))}
-            </div>
+            </Collapsible>
           </div>
+        )}
+
+        {tab === '문의' && (
+          (() => {
+            const qs = rows.filter((r) => r.inquiry)
+            return qs.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#8b95a1]">문의사항 없음</p></div>
+            ) : (
+              <div className="space-y-2">
+                {qs.map((r) => (
+                  <div key={r.row} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+                    <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${r.contact}` : ''}</span></div>
+                    <div className="text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed">{r.inquiry}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()
         )}
 
         {tab === '버스명단' && (

@@ -145,7 +145,7 @@ function _submit_(body, sheet, col, width) {
   return _json_({ ok: true, groupId: gid, rows: rows.length, total: groupTotal });
 }
 
-// 이름 + 연락처(숫자만)로 본인 신청 조회
+// 이름 + 연락처(숫자만)로 본인 신청 조회 (그룹이면 그룹 전체 반환)
 function _lookup_(body, sheet, H, col, width) {
   var name = (body.name || '').trim();
   var ph = _digits_(body.contact || '');
@@ -153,21 +153,33 @@ function _lookup_(body, sheet, H, col, width) {
   var n = sheet.getLastRow();
   if (n < 2) return _json_({ ok: true, results: [] });
   var vals = sheet.getRange(1, 1, n, width).getValues();
-  var out = [];
+  function rowObj(row, r) {
+    return {
+      row: r + 1, name: _gv_(row, col.name), gender: _gv_(row, col.gender), contact: _gv_(row, col.contact),
+      email: _gv_(row, col.email), campus: _gv_(row, col.campus), deptLabel: _gv_(row, col.dept),
+      roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
+      bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
+      inquiry: _gv_(row, col.inquiry), list: _gv_(row, col.list), groupId: _gv_(row, col.gid), rep: _gv_(row, col.grep),
+      groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay),
+    };
+  }
+  var gids = {}, selfRows = [];
   for (var r = 1; r < n; r++) {
     var row = vals[r];
     if (_gv_(row, col.name) === name && _digits_(_gv_(row, col.contact)) === ph) {
-      out.push({
-        row: r + 1, name: _gv_(row, col.name), gender: _gv_(row, col.gender), contact: _gv_(row, col.contact),
-        email: _gv_(row, col.email), campus: _gv_(row, col.campus), deptLabel: _gv_(row, col.dept),
-        roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
-        bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
-        inquiry: _gv_(row, col.inquiry), groupId: _gv_(row, col.gid), rep: _gv_(row, col.rep),
-        groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay),
-      });
+      selfRows.push(r); var g = _gv_(row, col.gid); if (g) gids[g] = true;
     }
   }
-  return _json_({ ok: true, results: out });
+  if (!selfRows.length) return _json_({ ok: true, results: [] });
+  var out = [], grouped = Object.keys(gids).length > 0;
+  if (grouped) {
+    for (var r2 = 1; r2 < n; r2++) {
+      if (gids[_gv_(vals[r2], col.gid)]) { var o = rowObj(vals[r2], r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o); }
+    }
+  } else {
+    selfRows.forEach(function (rr) { var o2 = rowObj(vals[rr], rr); o2.isSelf = true; out.push(o2); });
+  }
+  return _json_({ ok: true, results: out, grouped: grouped, me: name });
 }
 
 // 본인 신청 수정 (개인 필드만: 성별/연락처/이메일/캠퍼스/부서/버스/설악산/문의)
@@ -233,6 +245,7 @@ function _admin_(sheet, H, col, width) {
       roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
       bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
       gid: _gv_(row, col.gid), rep: _gv_(row, col.grep), route: _gv_(row, col.route),
+      list: _gv_(row, col.list), inquiry: _gv_(row, col.inquiry),
       ifee: Number(row[col.ifee] || 0), iroom: Number(row[col.iroom] || 0),
       mbus: Number(row[col.mbus] || 0), mseo: Number(row[col.mseo] || 0),
       common: Number(row[col.common] || 0), gtotal: Number(row[col.gtotal] || 0),
@@ -253,12 +266,15 @@ function _adminSet_(body, sheet, col, width) {
   return _json_({ ok: true });
 }
 
-// 관리자: 방배정 일괄 저장 [{row, assigned}]
+// 관리자: 일괄 저장. field='assigned'|'paid'|'amemo', updates=[{row, value}]
 function _adminBatch_(body, sheet, col, width) {
-  if (col.assigned < 0) return _json_({ ok: false, error: '배정방 컬럼 없음' });
+  var field = body.field || 'assigned';
+  var map = { assigned: col.assigned, paid: col.paid, amemo: col.amemo };
+  var c = map[field];
+  if (c == null || c < 0) return _json_({ ok: false, error: '필드 없음' });
   var ups = body.updates || [];
   ups.forEach(function (u) {
-    var r = Number(u.row || 0); if (r >= 2) sheet.getRange(r, col.assigned + 1).setValue(u.assigned == null ? '' : u.assigned);
+    var r = Number(u.row || 0); if (r >= 2) sheet.getRange(r, c + 1).setValue(u.value == null ? '' : u.value);
   });
   return _json_({ ok: true, count: ups.length });
 }

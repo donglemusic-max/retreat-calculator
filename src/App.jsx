@@ -166,6 +166,14 @@ const HELP = {
 
 const won = (n) => n.toLocaleString('ko-KR') + '원'
 
+// 전화번호 하이픈 포맷 (010-1234-5678). 숫자만 추출 후 3-4-4로 표시
+const fmtPhone = (v) => {
+  const d = String(v || '').replace(/\D/g, '').slice(0, 11)
+  if (d.length < 4) return d
+  if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3)
+  return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7)
+}
+
 function deriveOcc(count) {
   if (count >= 7) return OCCUPANCY[0]
   return OCCUPANCY.find((o) => o.people === count) || OCCUPANCY[0]
@@ -405,7 +413,7 @@ function IndividualMode() {
           <SegPicker value={gender} onChange={setGender} options={['남', '여']} />
         </Field>
         <Field label="연락처" required>
-          <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
         </Field>
         <Field label="이메일" required>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
@@ -509,7 +517,7 @@ function GroupMode() {
           <input value={leader} onChange={(e) => setLeader(e.target.value)} placeholder="예: 김바울" className={inputCls} />
         </Field>
         <Field label="대표 연락처" required>
-          <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
         </Field>
         <Field label="대표 이메일" required>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
@@ -814,7 +822,7 @@ function SubmitSection({ payload, valid, missing }) {
 // ── 내 신청 조회 / 수정 ────────────────────────────────────────
 function EditCard({ data }) {
   const [gender, setGender] = useState(data.gender || '')
-  const [contact, setContact] = useState(data.contact || '')
+  const [contact, setContact] = useState(fmtPhone(data.contact || ''))
   const [email, setEmail] = useState(data.email || '')
   const [campus, setCampus] = useState(data.campus || '')
   const [deptName, setDeptName] = useState(DEPTS.find((d) => d.label === data.deptLabel)?.name || DEPTS[0].name)
@@ -853,7 +861,7 @@ function EditCard({ data }) {
         <span className="text-[11px] text-[#8b95a1]">접수 {data.groupId} · 대표 {data.rep || '-'}</span>
       </div>
       <Field label="성별"><SegPicker value={gender} onChange={setGender} options={['남', '여']} /></Field>
-      <Field label="연락처"><input value={contact} onChange={(e) => setContact(e.target.value)} inputMode="tel" className={inputCls} /></Field>
+      <Field label="연락처"><input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} inputMode="tel" className={inputCls} /></Field>
       <Field label="이메일"><input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" className={inputCls} /></Field>
       <Field label="캠퍼스"><SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} /></Field>
       <Field label="소속부서"><DeptSelect value={deptName} onChange={setDeptName} /></Field>
@@ -901,7 +909,7 @@ function LookupMode() {
       <Card title="내 신청 조회">
         <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">제출하신 이름과 연락처로 조회합니다. 가족 대표자는 본인 이름으로 조회하세요.</p>
         <Field label="이름" required><input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} /></Field>
-        <Field label="연락처" required><input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="010-0000-0000" inputMode="tel" className={inputCls} /></Field>
+        <Field label="연락처" required><input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} /></Field>
         <button onClick={lookup} disabled={!name.trim() || !contact.trim() || status === 'loading'}
           className={`w-full py-3.5 rounded-2xl font-bold text-[15px] ${name.trim() && contact.trim() && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>
           {status === 'loading' ? '조회 중…' : '조회하기'}
@@ -1267,7 +1275,7 @@ function AdminApp() {
               <div className="space-y-2">
                 {qs.map((r) => (
                   <div key={r.row} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                    <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${r.contact}` : ''}</span></div>
+                    <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
                     <div className="text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed">{r.inquiry}</div>
                   </div>
                 ))}

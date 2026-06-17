@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv6-placeholder'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv7-mergefee'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -53,6 +53,7 @@ function _colMap_(H) {
     gn: H.indexOf('그룹인원(제출)'), ifee: H.indexOf('1인등록비'), iroom: H.indexOf('본인객실'),
     mbus: H.indexOf('본인버스'), mseo: H.indexOf('본인설악산'),
     common: H.indexOf('그룹공동비용(객실+투숙)'), gtotal: H.indexOf('그룹총액'),
+    type: H.indexOf('신청유형'),
     check: H.indexOf('확인필요'), note: H.indexOf('비고'),
     paid: H.indexOf('입금확인'), assigned: H.indexOf('배정방'), amemo: H.indexOf('관리자메모'),
     ver: findCol_(H, /구버전/, 0),
@@ -87,8 +88,8 @@ function doPost(e) {
     var width = sheet.getLastColumn();
     var H = sheet.getRange(1, 1, 1, width).getValues()[0];
     var action = body.action || 'submit';
-    // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신
-    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch') {
+    // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신 (PIN 필요)
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder') {
       if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
       H = _ensureAdminCols_(sheet, H);
       width = H.length;
@@ -174,7 +175,7 @@ function _lookup_(body, sheet, H, col, width) {
       roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
       bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
       inquiry: _gv_(row, col.inquiry), list: _gv_(row, col.list), groupId: _gv_(row, col.gid), rep: _gv_(row, col.grep),
-      groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay),
+      groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay), appType: _gv_(row, col.type),
     };
   }
   // 본인 행 수집 → 같은 그룹ID/같은 전화번호로 그룹 전체 확장
@@ -301,12 +302,18 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   var roomLabel = (override && override.roomLabel != null) ? override.roomLabel : _gv_(vals[idxs[0]], col.room);
   var occLabel = (override && override.occLabel != null) ? override.occLabel : _gv_(vals[idxs[0]], col.occ);
   var isGrp = isGroupOcc_(occLabel);
-  var common = isGrp ? (roomAdd_(roomLabel) + occAdd_(occLabel)) : 0;
+  // 강제그룹(합치기로 묶인 개인/부분): 6번 'N인 투숙' 텍스트는 없지만 enrich가 신청유형='그룹'을 남김.
+  //  → 그룹 요금 유지. 객실 그룹가는 대표자 객실(roomLabel), 그룹비는 인원수 기준.
+  var typeGrp = false;
+  if (col.type >= 0) for (var ti = 0; ti < idxs.length; ti++) if (_gv_(vals[idxs[ti]], col.type) === '그룹') { typeGrp = true; break; }
+  var forcedGrp = !isGrp && typeGrp;
+  var grp = isGrp || forcedGrp;
   // dedup by name (구버전 후순위)
   var ord = idxs.slice().sort(function (a, b) { return ((col.ver >= 0 && _gv_(vals[a], col.ver) === '구') ? 1 : 0) - ((col.ver >= 0 && _gv_(vals[b], col.ver) === '구') ? 1 : 0); });
   var seen = {}, counted = {}, names = [];
   ord.forEach(function (r) { var nm = _gv_(vals[r], col.name); if (nm && !seen[nm]) { seen[nm] = 1; counted[r] = 1; names.push(nm); } });
   var memberCount = names.length;
+  var common = grp ? (roomAdd_(roomLabel) + (isGrp ? occAdd_(occLabel) : groupFeeByCount_(memberCount))) : 0;
   var rep = ''; for (var k = 0; k < idxs.length && !rep; k++) { var mm = _gv_(vals[idxs[k]], col.rep).match(/[가-힣]{2,4}/); if (mm) rep = mm[0]; }
   if (!rep) rep = names[0] || _gv_(vals[idxs[0]], col.name);
   var repRow = idxs.filter(function (r) { return counted[r] && _gv_(vals[r], col.name) === rep; })[0];
@@ -316,7 +323,7 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   var total = common;
   idxs.forEach(function (r) {
     if (!counted[r]) return;
-    total += deptFee_(_gv_(vals[r], col.dept)) + (isGrp ? 0 : roomIndiv_(roomLabel))
+    total += deptFee_(_gv_(vals[r], col.dept)) + (grp ? 0 : roomIndiv_(roomLabel))
       + (_gv_(vals[r], col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0)
       + (_gv_(vals[r], col.seorak).indexOf('원합니다') >= 0 ? SEORAK_FEE : 0);
   });
@@ -324,8 +331,9 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
     var dup = !counted[r]; var row = vals[r]; var set = function (c, v) { if (c >= 0) row[c] = v; };
     set(col.room, roomLabel); set(col.occ, occLabel); set(col.list, roster);
     set(col.gn, memberCount); set(col.grep, rep);
+    if (grp && col.type >= 0 && !dup) set(col.type, '그룹'); // 강제그룹 유지(편집해도 그룹 요금 보존)
     set(col.ifee, dup ? 0 : deptFee_(_gv_(row, col.dept)));
-    set(col.iroom, dup ? 0 : (isGrp ? 0 : roomIndiv_(roomLabel)));
+    set(col.iroom, dup ? 0 : (grp ? 0 : roomIndiv_(roomLabel)));
     set(col.mbus, dup ? 0 : (_gv_(row, col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0));
     set(col.mseo, dup ? 0 : (_gv_(row, col.seorak).indexOf('원합니다') >= 0 ? SEORAK_FEE : 0));
     set(col.common, r === repRow ? common : 0); set(col.gtotal, r === repRow ? total : 0);

@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v10-type'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v11-mergefee'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -85,6 +85,9 @@ function occAdd_(t) {
   var m = t.match(/(\d)인이 투숙/); if (!m) return 0;
   return ({ 6: 50000, 5: 100000, 4: 200000, 3: 300000, 2: 400000, 1: 500000 })[+m[1]] || 0;
 }
+// 그룹비(그룹당 1회)를 '인원수'로 직접 산정 — 강제그룹(합치기)처럼 6번 'N인 투숙' 텍스트가 없을 때 사용.
+// 7~8인 0 / 6인 5 / 5인 10 / 4인 20 / 3인 30 / 2인 40 / 1인 50 (만원). 8인 초과(2방 이상)는 0 → 관리자 수기.
+function groupFeeByCount_(n) { return ({ 1: 500000, 2: 400000, 3: 300000, 4: 200000, 5: 100000, 6: 50000 })[n] || 0; }
 // 입금자명/대표자칸에서 카테고리 단어를 걷어내고 이름 토큰만 추출
 function repTokens_(p) {
   return (p || '')
@@ -268,6 +271,18 @@ function enrichSheet() {
     var repRow = members.filter(function (r) { return counted[r] && get(r, 'name') === rep; })[0];
     if (repRow === undefined) repRow = members.filter(function (r) { return counted[r]; })[0];
     if (repRow === undefined) repRow = members[0];
+
+    // 강제그룹(관리자 합치기/오버라이드)으로 묶였는데 아무도 6번 'N인 투숙'을 안 고른 경우(개인/부분 재편성)
+    //  → 그룹으로 간주: 객실 그룹가는 대표자 5번 객실 기준, 그룹비는 합산 인원수 기준, 침구도 인원수 기준.
+    //    (기존 그룹=grpRow 있음은 손대지 않아 검증값 85그룹/64,338,000원 불변)
+    var forced = members.some(function (r) { return ovByRow[r] && ovByRow[r].force; });
+    if (forced && grpRow < 0) {
+      isGrp = true;
+      var roomSel = get(repRow, 'room');
+      commonFee = roomAdd_(roomSel) + groupFeeByCount_(memberCount);
+      bedding = Math.max(0, memberCount - roomBase_(roomSel));
+      appType = '그룹';
+    }
 
     var groupTotal = members.reduce(function (s, r) {
       if (!counted[r]) return s;

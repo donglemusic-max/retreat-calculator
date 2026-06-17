@@ -34,7 +34,7 @@
 - 실사용 제출/조회/관리 엔드포인트(App.jsx `SUBMIT_URL` 기본값):
   `https://script.google.com/macros/s/AKfycbxSeDKQOKld3t4L6mAxS5beVV9XhWyQvHDr0PGo-ohx34CK1E1obvSC6Sz8XzDcCOgDUg/exec`
 - **버전 확인**: 웹앱 URL을 브라우저로 GET → `{"version":"svN-..."}`. enrich는 토스트에 `[vN-...]`.
-  - 현재 코드: enrich **v10-type**, submit **sv5-mergefix**.
+  - 현재 코드: enrich **v11-mergefee**, submit **sv7-mergefee**.
 - ⚠️ Submit.gs/Migrate.gs 바꾸면 사용자가 **재배포(기존 배포 버전 올리기, URL 유지) / enrich 재실행** 해야 함. 버전 마커로 반영 여부 확인.
 - ADMIN_PIN: Submit.gs 상단(기본 '2026', 운영시 변경 권장). 관리자 페이지 `사이트/#admin`.
 
@@ -48,7 +48,7 @@
 - **미제출 보존**: 명단>제출이면 확인필요. 관리자 요약에 "명단 기준 예상/미제출 추정"(미제출 이름 전체 1회씩, 부정확→추정).
 
 ## 5. Apps Script 함수 맵
-### Migrate.gs (enrich, v10-type)
+### Migrate.gs (enrich, v11-mergefee)
 - `enrichSheet()` — 응답탭 자동탐색(_findRespSheet_, getActiveSheet 안 씀) → 오버라이드 적용(메모리) → union-find 그룹 → dedup → 비용/신청유형/침구/확인필요 앱컬럼 기록 → F열 전화정규화. 토스트 `[v10-type] N그룹/총액`.
 - `ensureOverrideTab()` — `오버라이드` 탭 생성. 컬럼: 대상이름(원본)|표시이름|부서|캠퍼스|교통|신청유형|**강제그룹(같은 값=한 그룹)**|배정방|비고.
 - `_loadOverrides_()` — 오버라이드 읽기(이름 trim 키).
@@ -56,7 +56,7 @@
 - `installOnFormSubmit()` — 폼제출 자동 enrich 트리거(옵션).
 - 앱 컬럼: 제출경로/그룹ID/그룹대표(추정)/그룹인원(제출)/신청유형/1인등록비/본인객실/본인버스/본인설악산/그룹공동비용(객실+투숙)/그룹총액/침구추가/확인필요/비고. (+관리자: 입금확인/배정방/관리자메모)
 
-### Submit.gs (웹앱 doPost, sv5-mergefix)
+### Submit.gs (웹앱 doPost, sv7-mergefee)
 - doGet → {ok, version}. doPost는 `action`으로 분기:
   - `submit` 신규제출(개인1행/그룹N행), `lookup`(이름+전화, 그룹이면 전체), `update`(개인필드 수정+재계산)
   - `memberAdd`/`memberDelete`/`groupSet`(객실·투숙) — 그룹편집, 권한=그룹연락처 또는 PIN
@@ -72,8 +72,11 @@
 - 전화: fmtPhone(010-1234-5678) 입력·표시 통일.
 
 ## 7. 현재 상태 / 마지막 작업
-- 방금: 관리자 **그룹 합치기(mergeGroups)** 추가 → **버그수정 sv5**(오버라이드 새 행을 getLastRow로 구해 덮어써지던 문제 → 수동 행증가+flush). 본인부담금 글씨 크게, "별도로 문의 부탁드립니다" 문구.
-- 사용자가 4그룹 합치기 했을 때 1명만 남던 버그 = 위 sv5로 해결. **사용자는 sv5 재배포 + 깨진 김연지 그룹 오버라이드 정리 후 재합치기** 해야 함.
+- 방금(v11/sv7 — **합치기 추가요금 버그 수정**): 합치기/강제그룹으로 재편성한 그룹에 **객실 그룹가·그룹비·침구가 안 붙어 조회 시 등록비만** 보이던 버그 해결.
+  - 근본 원인: "그룹 여부"를 6번 문항 `"N인이 투숙"` 텍스트로만 판정 → 개인/부분 신청자를 합치면 그룹 취급이 안 됨(백엔드 요금 0 + 프론트 표시 게이트도 occ 텍스트 의존).
+  - 수정: enrich에서 **강제그룹이고 아무도 N인투숙 안 골랐으면** 그룹으로 간주 → 객실 그룹가=대표자 5번 객실, 그룹비=합산 인원수(`groupFeeByCount_`), 침구=인원수 기준, **신청유형='그룹'** 기록. `_recalcGroupFull_`도 기존 신청유형='그룹'이면 그룹요금 유지(편집해도 안 깨짐). 프론트는 `appType==='그룹'`이면 그룹총액 표시. (기존 그룹=grpRow 있음은 불변 → 검증값 85그룹/64,338,000원 유지)
+  - **곁다리 회귀도 수정**: sv6에서 doPost 관리자 가드에 `mergeGroups`/`addPlaceholder`가 빠져 두 액션이 도달 불가(dead code)였음 → 가드에 추가(합치기 자체가 작동하게 됨).
+- **사용자 할 일**: ① Migrate.gs/Submit.gs 시트에 붙여넣고 enrich 재실행 + 웹앱 재배포(마커 v11-mergefee / sv7-mergefee 확인) ② 깨진 김연지 그룹 오버라이드 정리 후 재합치기 → 조회 시 그룹총액·추가요금 표시 확인.
 
 ## 8. 사용자(운영자)가 직접 하는 것
 1. Migrate.gs/Submit.gs 변경 시 시트 Apps Script에 붙여넣기 → enrich 재실행 / 웹앱 재배포(버전 마커 확인).

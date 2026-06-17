@@ -876,7 +876,7 @@ function EditCard({ data, onDelete }) {
       </Field>
       <Field label="문의사항"><textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} /></Field>
       {(() => {
-        const isGroupRoom = /인이 투숙/.test(data.occLabel || '')
+        const isGroupRoom = /인이 투숙/.test(data.occLabel || '') || data.appType === '그룹'
         const selfRoom = isGroupRoom ? 0 : roomIndivFee(data.roomLabel)
         const selfFee = (DEPTS.find((d) => d.name === deptName)?.fee || 0) + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0)
         return (
@@ -908,7 +908,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const cur = members[0] || {}
   const gid = cur.gid || cur.groupId
   const [roomName, setRoomName] = useState(reqRoomType(cur.roomLabel))
-  const occInit = (() => { const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : 8; return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
+  const occInit = (() => { const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : (members.length || 8); return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
   const [occSel, setOccSel] = useState(occInit)
   const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false })
   const [busy, setBusy] = useState('')
@@ -1013,7 +1013,7 @@ function LookupMode() {
           <Card title="조회 결과 없음">
             <p className="text-[12px] text-[#8b95a1] leading-relaxed">해당 이름·연락처로 제출된 신청이 없습니다. 입력을 확인하시거나 안내데스크로 문의해 주세요.</p>
           </Card>
-        ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '')) ? (
+        ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (
           <GroupEditor members={results} auth={{ verifyContact: contact.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
         ) : (
           <Card title={`조회 결과 (${results.length}건)`}>

@@ -170,29 +170,24 @@ function _lookup_(body, sheet, H, col, width) {
       groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay),
     };
   }
-  // 본인 행 + 연결 신호 수집 (그룹이 이메일별로 쪼개진 경우 대비)
-  var gids = {}, phones = {}, mentioned = {}, selfNames = {}, selfRows = [];
+  // 본인 행 수집 → 같은 그룹ID/같은 전화번호로 그룹 전체 확장
+  // (enrich가 이메일+전화로 그룹을 묶으므로 보통 groupId만으로 충분. 전화는 보강.)
+  var gids = {}, phones = {}, selfRows = [];
   for (var r = 1; r < n; r++) {
     var row = vals[r];
     if (_gv_(row, col.name) === name && _digits_(_gv_(row, col.contact)) === ph) {
       selfRows.push(r);
       var g = _gv_(row, col.gid); if (g) gids[g] = true;
       phones[_digits_(_gv_(row, col.contact))] = true;
-      selfNames[_gv_(row, col.name)] = true;
-      _nameTokens_(_gv_(row, col.list)).forEach(function (t) { mentioned[t] = true; });
     }
   }
   if (!selfRows.length) return _json_({ ok: true, results: [] });
-  // 확장: 같은 그룹ID / 같은 전화번호 / 본인이 명단에 적은 사람 / 본인을 명단에 적은 사람
   var out = [];
   for (var r2 = 1; r2 < n; r2++) {
-    var rw = vals[r2]; var nm = _gv_(rw, col.name); if (!nm) continue;
-    var match = gids[_gv_(rw, col.gid)] || phones[_digits_(_gv_(rw, col.contact))] || mentioned[nm];
-    if (!match) {
-      var toks = _nameTokens_(_gv_(rw, col.list));
-      for (var t = 0; t < toks.length && !match; t++) if (selfNames[toks[t]]) match = true;
+    var rw = vals[r2]; if (!_gv_(rw, col.name)) continue;
+    if (gids[_gv_(rw, col.gid)] || phones[_digits_(_gv_(rw, col.contact))]) {
+      var o = rowObj(rw, r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o);
     }
-    if (match) { var o = rowObj(rw, r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o); }
   }
   return _json_({ ok: true, results: out, grouped: out.length > 1, me: name });
 }

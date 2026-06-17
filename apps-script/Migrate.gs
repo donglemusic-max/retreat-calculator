@@ -58,6 +58,14 @@ function listCount_(t) {
   return n.length;
 }
 
+// 명단 텍스트에서 한글 이름 토큰 추출 (Submit.gs의 _nameTokens_와 동일 규칙, 이름만 다름)
+function _listNames_(t) {
+  return String(t || '').split(/[^가-힣A-Za-z]+/).filter(function (x) {
+    return x && /^[가-힣]{2,4}$/.test(x) &&
+      !/투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로/.test(x);
+  });
+}
+
 function findCol_(headers, re, occurrence) {
   var seen = 0;
   for (var i = 0; i < headers.length; i++) {
@@ -99,27 +107,41 @@ function enrichSheet() {
 
   var get = function (row, key) { return C[key] >= 0 ? String(data[row][C[key]] || '').trim() : ''; };
 
-  // 1) 이메일 기준 그룹핑
-  var groups = {}; // key -> [rowIndex,...]
-  for (var r = 1; r < data.length; r++) {
-    var em = get(r, 'email') || ('noemail_' + get(r, 'name') + '_' + r);
-    (groups[em] = groups[em] || []).push(r);
-  }
+  // 1) union-find 그룹핑 (이메일 ∪ 전화 ∪ 입금자명rep ∪ 명단 상호언급)
+  //    그룹원이 서로 다른 이메일로 제출해도 하나로 묶어 공동비용 중복 계상을 방지
+  var rowsIdx = [];
+  for (var ri = 1; ri < data.length; ri++) if (get(ri, 'name') || get(ri, 'email')) rowsIdx.push(ri);
+  var parent = {}; rowsIdx.forEach(function (r) { parent[r] = r; });
+  var find = function (x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  var union = function (a, b) { var ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+  var digits = function (s) { return String(s || '').replace(/[^0-9]/g, ''); };
+  // 병합 신호는 "하드 신원"만: 같은 이메일 또는 같은 전화번호.
+  // (입금자명·명단으로 병합하면 무관한 사람이 잘못 묶임 → 명단은 아래 '확인필요'로만 사용)
+  var byEmail = {}, byPhone = {};
+  rowsIdx.forEach(function (r) {
+    var em = get(r, 'email'); if (em) (byEmail[em] = byEmail[em] || []).push(r);
+    var ph = digits(get(r, 'contact')); if (ph) (byPhone[ph] = byPhone[ph] || []).push(r);
+  });
+  var unionBucket = function (map) { Object.keys(map).forEach(function (k) { var arr = map[k]; for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }); };
+  unionBucket(byEmail); unionBucket(byPhone);
+  var clusters = {};
+  rowsIdx.forEach(function (r) { var root = find(r); (clusters[root] = clusters[root] || []).push(r); });
 
   // 2) 그룹별 계산
   var out = {}; // rowIndex -> {label: value}
-  var gid = 0;
-  Object.keys(groups).forEach(function (key) {
+  var gid = 0, grandTotal = 0;
+  Object.keys(clusters).forEach(function (key) {
     gid++;
     var gidStr = 'G' + ('00' + gid).slice(-3);
-    var members = groups[key];
+    var members = clusters[key];
     var names = members.map(function (r) { return get(r, 'name'); });
 
-    // 객실비용: "N인 투숙"(그룹)이면 그룹가를 그룹당 1회 + 투숙비. 아니면(교회배정/부분그룹) 개인 객실가를 인당.
-    var roomL0 = get(members[0], 'room');
-    var occL0 = get(members[0], 'occ');
-    var isGrp = isGroupOcc_(occL0);
-    var commonFee = isGrp ? (roomAdd_(roomL0) + occAdd_(occL0)) : 0;
+    // 객실비용: 클러스터 안에 "N인 투숙"(그룹 신청) 행이 있으면 그 행의 그룹가+투숙비를 1회만.
+    //           없으면(교회배정/부분그룹) 각자 행의 개인 객실가를 인당.
+    var grpRow = -1;
+    for (var gi = 0; gi < members.length; gi++) { if (isGroupOcc_(get(members[gi], 'occ'))) { grpRow = members[gi]; break; } }
+    var isGrp = grpRow >= 0;
+    var commonFee = isGrp ? (roomAdd_(get(grpRow, 'room')) + occAdd_(get(grpRow, 'occ'))) : 0;
     var pRoom = function (r) { return isGrp ? 0 : roomIndiv_(get(r, 'room')); };
 
     // 대표자 추정: 대표자칸 → 입금자명 토큰(멤버이름 일치) → 장년부 → 첫행
@@ -151,6 +173,7 @@ function enrichSheet() {
         + (get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0)
         + (get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0);
     }, 0) + commonFee;
+    grandTotal += groupTotal;
 
     members.forEach(function (r) {
       out[r] = {
@@ -191,7 +214,7 @@ function enrichSheet() {
   }
   sheet.getRange(2, minCol + 1, body.length, width).setValues(body);
 
-  SpreadsheetApp.getActiveSpreadsheet().toast('정리 완료: ' + gid + '개 그룹', '리트릿', 5);
+  SpreadsheetApp.getActiveSpreadsheet().toast('정리 완료: ' + gid + '개 그룹 / 총 ' + grandTotal.toLocaleString() + '원', '리트릿', 6);
 }
 
 /** 폼 제출 시 자동 갱신하려면, 이 함수로 설치형 트리거를 1회 등록 */

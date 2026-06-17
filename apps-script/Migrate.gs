@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v7-phonekey'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v8-dedup'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -104,6 +104,7 @@ function enrichSheet() {
     bus: findCol_(headers, /버스 신청 혹은 자차/, 0),
     seorak: findCol_(headers, /설악산뷰/, 0),
     pay: findCol_(headers, /입금자명/, 0),
+    ver: findCol_(headers, /구버전/, 0),
   };
 
   // 앱 컬럼 위치 확보 (없으면 오른쪽에 추가)
@@ -163,6 +164,11 @@ function enrichSheet() {
     var commonFee = isGrp ? (roomAdd_(get(grpRow, 'room')) + occAdd_(get(grpRow, 'occ'))) : 0;
     var pRoom = function (r) { return isGrp ? 0 : roomIndiv_(get(r, 'room')); };
 
+    // 중복 재제출 제거: 같은 이름은 1명만 집계 (구버전 행은 후순위로 밀어 비집계)
+    var ordered = members.slice().sort(function (a, b) { return (get(a, 'ver') === '구' ? 1 : 0) - (get(b, 'ver') === '구' ? 1 : 0); });
+    var seenNm = {}, counted = {}, memberCount = 0;
+    ordered.forEach(function (r) { var nm = get(r, 'name'); if (nm && !seenNm[nm]) { seenNm[nm] = true; counted[r] = true; memberCount++; } });
+
     // 대표자 추정: 대표자칸 → 입금자명 토큰(멤버이름 일치) → 장년부 → 첫행
     var rep = '';
     for (var i = 0; i < members.length && !rep; i++) {
@@ -178,16 +184,18 @@ function enrichSheet() {
     if (!rep) { var jang = members.filter(function (r) { return get(r, 'dept').indexOf('장년부') >= 0; }); if (jang.length) rep = get(jang[0], 'name'); }
     if (!rep) rep = names[0];
 
-    // 명단 인원 vs 제출 인원 → 확인필요
+    // 명단 인원 vs 집계 인원 → 확인필요
     var listN = 0, listRaw = '';
     members.forEach(function (r) { var n = listCount_(get(r, 'list')); if (n > listN) { listN = n; listRaw = get(r, 'list'); } });
-    var needCheck = (listN > members.length);
+    var needCheck = (listN > memberCount);
 
-    // 대표행 = 이름이 rep와 같은 첫 행, 없으면 첫 행
-    var repRow = members.filter(function (r) { return get(r, 'name') === rep; })[0];
+    // 대표행 = 이름이 rep와 같은 (집계되는) 첫 행, 없으면 집계 첫 행
+    var repRow = members.filter(function (r) { return counted[r] && get(r, 'name') === rep; })[0];
+    if (repRow === undefined) repRow = members.filter(function (r) { return counted[r]; })[0];
     if (repRow === undefined) repRow = members[0];
 
     var groupTotal = members.reduce(function (s, r) {
+      if (!counted[r]) return s;
       return s + deptFee_(get(r, 'dept')) + pRoom(r)
         + (get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0)
         + (get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0);
@@ -195,19 +203,20 @@ function enrichSheet() {
     grandTotal += groupTotal;
 
     members.forEach(function (r) {
+      var dup = !counted[r];
       out[r] = {
-        '제출경로': '기존폼',
+        '제출경로': dup ? '중복' : '기존폼',
         '그룹ID': gidStr,
         '그룹대표(추정)': rep,
-        '그룹인원(제출)': members.length,
-        '1인등록비': deptFee_(get(r, 'dept')),
-        '본인객실': pRoom(r),
-        '본인버스': get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0,
-        '본인설악산': get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0,
+        '그룹인원(제출)': memberCount,
+        '1인등록비': dup ? 0 : deptFee_(get(r, 'dept')),
+        '본인객실': dup ? 0 : pRoom(r),
+        '본인버스': dup ? 0 : (get(r, 'bus').indexOf('버스') >= 0 ? BUS_FEE : 0),
+        '본인설악산': dup ? 0 : (get(r, 'seorak').indexOf('원합니다') >= 0 ? SEORAK_FEE : 0),
         '그룹공동비용(객실+투숙)': r === repRow ? commonFee : 0,
         '그룹총액': r === repRow ? groupTotal : 0,
-        '확인필요': needCheck ? 'Y' : '',
-        '비고': needCheck ? ('명단 ' + listN + '명 / 제출 ' + members.length + '명 — 명단: ' + listRaw) : '',
+        '확인필요': dup ? '' : (needCheck ? 'Y' : ''),
+        '비고': dup ? '중복 재제출(집계 제외)' : (needCheck ? ('명단 ' + listN + '명 / 집계 ' + memberCount + '명 — 명단: ' + listRaw) : ''),
       };
     });
   });

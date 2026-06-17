@@ -875,6 +875,23 @@ function EditCard({ data, onDelete }) {
         </div>
       </Field>
       <Field label="문의사항"><textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} /></Field>
+      {(() => {
+        const isGroupRoom = /인이 투숙/.test(data.occLabel || '')
+        const selfRoom = isGroupRoom ? 0 : roomIndivFee(data.roomLabel)
+        const selfFee = (DEPTS.find((d) => d.name === deptName)?.fee || 0) + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0)
+        return (
+          <div className="bg-[#f2f8ff] rounded-xl p-3 mb-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-semibold text-[#1b64da]">본인 부담 금액</span>
+              <span className="text-[15px] font-extrabold text-[#191f28]">{won(selfFee)}</span>
+            </div>
+            <div className="text-[11px] text-[#8b95a1] mt-1 leading-snug">
+              등록비 {won(DEPTS.find((d) => d.name === deptName)?.fee || 0)}{selfRoom > 0 ? ` · 객실 ${won(selfRoom)}` : ''}{bus ? ` · 버스 ${won(BUS_FEE)}` : ''}{seorak ? ` · 설악산 ${won(SEORAK_FEE)}` : ''}
+              {isGroupRoom && <><br />* 객실·투숙 그룹비용은 대표자({data.rep || '-'})가 납부{data.groupTotal > 0 ? ` · 그룹 총액 ${won(data.groupTotal)}` : ''}</>}
+            </div>
+          </div>
+        )
+      })()}
       <div className="text-[11px] text-[#8b95a1] bg-white rounded-xl p-3 mb-3 leading-relaxed">
         객실: {roomShort || '-'} · 투숙/그룹/입금자명 변경은 안내데스크로 문의해 주세요.
       </div>

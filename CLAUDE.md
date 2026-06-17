@@ -131,13 +131,16 @@ git push "https://donglemusic-max:${TOKEN}@github.com/donglemusic-max/retreat-ca
 - `SUBMIT_URL = import.meta.env.VITE_SUBMIT_URL`. 미설정 시 제출 버튼 비활성+안내.
 - Node 시뮬 검증: enrich 재계산 65,758,000 / doPost 그룹4명split 1,510,000(입금자명 각자) / 개인 소노벨스위트 교회배정 336,000.
 
-### 사장님이 해야 할 것 (Phase 2 활성화)
-1. Migrate.gs 최신본 재붙여넣기 → `enrichSheet` 재실행 (총액 보정 + 본인객실 컬럼).
-2. Submit.gs 새 파일 추가 → [배포]→[웹 앱], 실행=나/액세스=모든 사용자 → `/exec` URL 확보.
-3. Vercel 환경변수 `VITE_SUBMIT_URL`에 URL 넣고 redeploy (또는 URL 주면 상수 박아 push).
+### Phase 2 활성화 완료 (2026-06-17)
+- 사장님이 Migrate 재실행(시트 30열, 본인객실 추가됨) + Submit.gs 배포 완료.
+- 웹앱 URL: `https://script.google.com/macros/s/AKfycbxCE943Z3votQ78ml1Hl9ZoIAFVptc2KiS2iMBqVcHWUfb9AUh32sEfH8xWXdZatwk3/exec`
+  → App.jsx `SUBMIT_URL` 기본값에 하드코딩 (VITE_SUBMIT_URL 있으면 우선). push→Vercel 자동재배포로 제출 라이브.
+- **엔드투엔드 검증 완료**: GET ok / POST 개인 테스트 → `{ok:true, groupId:A260617171143, total:278000}`, 시트에 30열 전부 정확 매핑 확인.
+  - ⚠️ 회사 사본에 **테스트 행 1개**("테스트삭제요망", A260617171143) 남김 → 사장님께 삭제 요청함.
 
 ### 다음 (Phase 3, 미착수)
-- 본인 조회(doGet: 이름+연락처 매칭) + 관리자 뷰(캠퍼스별 버스명단/부서·객실 집계/미입금·확인필요). 웹앱 URL 확보 후 착수.
+- 본인 조회(doGet: 이름+연락처 매칭) + 관리자 뷰(캠퍼스별 버스명단/부서·객실 집계/미입금·확인필요).
+- 웹앱 URL 이미 확보 → doGet에 조회 분기 추가하면 됨(같은 Submit.gs/별도 파일). 관리자뷰는 별도 페이지(라우트) 또는 시트 내 대시보드 탭 둘 중 결정 필요.
 
 ### 기타 백로그
 - 구글폼 prefill 연동(가벼운 대안): `?usp=pp_url&entry.xxx=값`. A를 직접 만들면 불필요.

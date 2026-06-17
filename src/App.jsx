@@ -1189,7 +1189,7 @@ function AdminApp() {
   }
 
   const saveAssign = async () => {
-    const updates = m.pool.map((p) => ({ row: p.row, value: eff(p) }))
+    const updates = m.pool.map((p) => ({ row: p.row, value: eff(p), assigned: eff(p) }))
     setSaveMsg('저장 중…')
     const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
     if (j.ok) { setSaveMsg(`✓ ${updates.length}명 저장`); await reload(); setAssignDraft({}); setExtraRooms([]) } else setSaveMsg('오류: ' + (j.error || ''))

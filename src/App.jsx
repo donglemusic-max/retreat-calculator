@@ -48,7 +48,7 @@ const ACCOUNT = '우리은행 1005803168121 주님의 교회'
 // 신청서 제출 Apps Script 웹앱 URL (Vercel 환경변수 VITE_SUBMIT_URL 우선, 없으면 아래 기본값)
 const SUBMIT_URL =
   (import.meta.env && import.meta.env.VITE_SUBMIT_URL) ||
-  'https://script.google.com/macros/s/AKfycbxCE943Z3votQ78ml1Hl9ZoIAFVptc2KiS2iMBqVcHWUfb9AUh32sEfH8xWXdZatwk3/exec'
+  'https://script.google.com/macros/s/AKfycbxSeDKQOKld3t4L6mAxS5beVV9XhWyQvHDr0PGo-ohx34CK1E1obvSC6Sz8XzDcCOgDUg/exec'
 
 // ── 도움말 콘텐츠 (구글폼 안내문) ──────────────────────────────
 const HELP = {

@@ -1055,53 +1055,20 @@ function AdminApp() {
     const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || [])
   }
 
-  // 원본 데이터로 그룹을 직접 재계산 (enrich 재실행에 의존하지 않음 — 이메일∪전화∪대표자G)
-  const derived = useMemo(() => {
-    const parent = rows.map((_, i) => i)
-    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
-    const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
-    const dig = (s) => { let d = String(s || '').replace(/\D/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d }
-    const byE = {}, byP = {}, byR = {}, byN = {}
-    rows.forEach((r, i) => {
-      if (r.email) (byE[r.email] = byE[r.email] || []).push(i)
-      const p = dig(r.contact); if (p) (byP[p] = byP[p] || []).push(i)
-      if (r.name) (byN[r.name] = byN[r.name] || []).push(i)
-      const rv = (r.repInput || '').match(/[가-힣]{2,4}/); if (rv) (byR[rv[0]] = byR[rv[0]] || []).push(i)
-    })
-    const ub = (mp) => Object.values(mp).forEach((a) => { for (let i = 1; i < a.length; i++) union(a[0], a[i]) })
-    ub(byE); ub(byP)
-    Object.keys(byR).forEach((v) => { const a = byR[v]; for (let i = 1; i < a.length; i++) union(a[0], a[i]); (byN[v] || []).forEach((s) => union(a[0], s)) })
-    const stop = /투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|방으로|명방/
-    const listCount = (t) => { if (!t) return 0; const mm = t.match(/\((\d+)\)/); if (mm) return +mm[1]; return t.split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stop.test(x)).length }
-    const cmap = {}; rows.forEach((r, i) => { const root = find(i); (cmap[root] = cmap[root] || []).push(r) })
-    const rowCluster = {}, clusters = []; let grand = 0
-    Object.values(cmap).forEach((mem, ci) => {
-      const grpRow = mem.find((p) => /인이 투숙/.test(p.occLabel || ''))
-      const isGrp = !!grpRow
-      const common = isGrp ? (roomGroupFee(grpRow.roomLabel) + occFeeOf(grpRow.occLabel)) : 0
-      const total = mem.reduce((s, p) => s + deptFeeOf(p.deptLabel) + (isGrp ? 0 : roomIndivFee(p.roomLabel)) + (p.bus ? BUS_FEE : 0) + (p.seorak ? SEORAK_FEE : 0), 0) + common
-      grand += total
-      let listN = 0, listRaw = ''; mem.forEach((p) => { const cc = listCount(p.list); if (cc > listN) { listN = cc; listRaw = p.list } })
-      const repTok = mem.map((p) => (p.repInput || '').match(/[가-힣]{2,4}/)).find(Boolean)
-      const rep = (repTok && repTok[0]) || mem.find((p) => deptName(p.deptLabel) === '장년부')?.name || mem[0].name
-      const c = { cid: 'C' + ci, members: mem, isGrp, total, need: listN > mem.length, listN, listRaw, rep }
-      clusters.push(c); mem.forEach((p) => { rowCluster[p.row] = c })
-    })
-    return { clusters, rowCluster, grand }
-  }, [rows])
-
+  // 시트 정보 기반 (enrich가 정확하므로 저장된 그룹ID·그룹총액·확인필요를 그대로 사용)
   const m = useMemo(() => {
     const totalPeople = rows.length
-    const totalAmount = derived.grand
+    const totalAmount = rows.reduce((s, r) => s + (r.gtotal || 0), 0)
     const byCampus = {}; rows.forEach((r) => { byCampus[r.campus || '기타'] = (byCampus[r.campus || '기타'] || 0) + 1 })
     const busList = rows.filter((r) => r.bus)
     const seorakN = rows.filter((r) => r.seorak).length
     const unpaid = rows.filter((r) => r.paid !== 'Y')
-    const pool = rows.filter((r) => !derived.rowCluster[r.row]?.isGrp)
+    const pool = rows.filter((r) => isChurchAssigned(r.occLabel))
     const unassigned = pool.filter((r) => !(r.assigned || assignDraft[r.row]))
-    const checkGroups = derived.clusters.filter((c) => c.need).map((c) => ({ rep: c.rep, gid: c.cid, note: `명단 ${c.listN}명 / 제출 ${c.members.length}명 — ${c.listRaw}` }))
-    return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups }
-  }, [rows, assignDraft, derived])
+    const checkGroups = {}
+    rows.forEach((r) => { if (r.check === 'Y') checkGroups[r.gid] = { rep: r.rep, gid: r.gid, note: r.note } })
+    return { totalPeople, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups) }
+  }, [rows, assignDraft])
 
   const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
 
@@ -1217,7 +1184,8 @@ function AdminApp() {
           const reqCheck = unassigned.filter((p) => p.list)   // 메모 있는 사람(수동 확인)
           const plain = unassigned.filter((p) => !p.list)
           // 이미 구성된 그룹(N인 투숙) = 읽기 전용 (재계산된 클러스터 기준)
-          const bookedList = derived.clusters.filter((c) => c.isGrp).map((c) => [c.cid, c.members, c.rep])
+          const bookedGroups = {}; rows.forEach((r) => { if (!isChurchAssigned(r.occLabel)) (bookedGroups[r.gid] = bookedGroups[r.gid] || []).push(r) })
+          const bookedList = Object.entries(bookedGroups).map(([gid, mem]) => [gid, mem, mem[0].rep])
           return (
             <div>
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">

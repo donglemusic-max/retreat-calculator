@@ -1537,7 +1537,8 @@ function AdminApp() {
 
               {/* 이름 검색 → 대상 그룹도 이름 검색 → 이동 */}
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
-                <div className="text-[13px] font-bold text-[#191f28] mb-2">🔎 이름으로 이동</div>
+                <div className="text-[13px] font-bold text-[#191f28] mb-1">🔎 이름으로 이동</div>
+                <div className="text-[11px] text-[#8b95a1] mb-2">그룹을 옮기거나 합치면 방 배정도 자동으로 같이 맞춰집니다.</div>
                 {!movePick ? (
                   <>
                     <div className="text-[11px] text-[#8b95a1] mb-1.5">① 옮길 사람을 검색해 선택하세요</div>

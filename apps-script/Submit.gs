@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv9-move'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv10-roomsync'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -423,7 +423,36 @@ function _moveMember_(body, sheet, col, width) {
   }
   SpreadsheetApp.flush();
   enrichSheet();
+  // 배정방 자동 싱크: 그룹=방. 이동→대상 그룹 방으로, 분리→미배정(비움)
+  _syncRoomToGroup_(sheet, name, to === '__solo__');
   return _json_({ ok: true });
+}
+
+// 배정방을 그룹에 자동 맞춤(그룹=방). enrich 재계산 후 호출.
+//  - clearOnly=true: anchorName 사람의 배정방만 비움(단독 분리 → 미배정)
+//  - 그 외: anchorName이 속한 그룹(gid) 전원 배정방 = "{대표} 방"
+function _syncRoomToGroup_(sheet, anchorName, clearOnly) {
+  var n = sheet.getLastRow(); if (n < 2) return;
+  var lc = sheet.getLastColumn();
+  var data = sheet.getRange(1, 1, n, lc).getValues();
+  var H = data[0];
+  var cName = findCol_(H, /등록자 이름/, 0);
+  var cGid = H.indexOf('그룹ID');
+  var cRep = H.indexOf('그룹대표(추정)');
+  var cAsg = H.indexOf('배정방');
+  if (cAsg < 0 || cName < 0) return;
+  anchorName = String(anchorName || '').trim();
+  if (clearOnly) {
+    for (var r = 1; r < n; r++) if (String(data[r][cName] || '').trim() === anchorName) sheet.getRange(r + 1, cAsg + 1).setValue('');
+    return;
+  }
+  var gid = '', rep = '';
+  for (var r = 1; r < n; r++) {
+    if (String(data[r][cName] || '').trim() === anchorName) { gid = cGid >= 0 ? data[r][cGid] : ''; rep = cRep >= 0 ? String(data[r][cRep] || '') : ''; break; }
+  }
+  if (!gid || cGid < 0) return;
+  var label = (rep || anchorName) + ' 방';
+  for (var r = 1; r < n; r++) if (data[r][cGid] === gid) sheet.getRange(r + 1, cAsg + 1).setValue(label);
 }
 
 // 관리자: 미제출 인원을 이름만으로 방배정용으로 추가 (제출경로='미제출')
@@ -478,6 +507,7 @@ function _mergeGroups_(body, sheet, H, col, width) {
   });
   SpreadsheetApp.flush(); // override 기록 확정 후 재계산
   enrichSheet(); // 재계산 → 강제그룹 반영
+  _syncRoomToGroup_(sheet, names[0], false); // 합친 그룹 전원 배정방 = "{대표} 방"
   return _json_({ ok: true, merged: added, key: key });
 }
 

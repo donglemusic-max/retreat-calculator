@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv8-repfee'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv9-move'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -89,7 +89,7 @@ function doPost(e) {
     var H = sheet.getRange(1, 1, 1, width).getValues()[0];
     var action = body.action || 'submit';
     // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신 (PIN 필요)
-    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder') {
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember') {
       if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
       H = _ensureAdminCols_(sheet, H);
       width = H.length;
@@ -99,6 +99,7 @@ function doPost(e) {
       if (action === 'adminBatch') return _adminBatch_(body, sheet, acol, width);
       if (action === 'mergeGroups') return _mergeGroups_(body, sheet, H, acol, width);
       if (action === 'addPlaceholder') return _addPlaceholder_(body, sheet, H, acol, width);
+      if (action === 'moveMember') return _moveMember_(body, sheet, acol, width);
     }
     var col = _colMap_(H);
     if (action === 'lookup') return _lookup_(body, sheet, H, col, width);
@@ -388,6 +389,41 @@ function _groupSet_(body, sheet, H, col, width) {
   if (body.occLabel != null) override.occLabel = body.occLabel;
   var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
   return _json_({ ok: true, groupTotal: total });
+}
+
+// 관리자: 사람을 다른 그룹으로 이동(대상 그룹원+본인에 공유 강제그룹) / 단독 분리 — 오버라이드 기록 후 재계산
+function _moveMember_(body, sheet, col, width) {
+  var name = (body.name || '').trim(); if (!name) return _json_({ ok: false, error: '이름 없음' });
+  var to = String(body.to || '').trim(); if (!to) return _json_({ ok: false, error: '이동 대상 없음' });
+  ensureOverrideTab();
+  var osh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('오버라이드');
+  var oh = osh.getRange(1, 1, 1, osh.getLastColumn()).getValues()[0];
+  var ix = function (re) { for (var i = 0; i < oh.length; i++) if (re.test(String(oh[i]))) return i; return -1; };
+  var cN = ix(/대상 ?이름|원본/); if (cN < 0) cN = 0;
+  var cF = ix(/강제그룹/); if (cF < 0) { cF = oh.length; oh.push('강제그룹(같은 값=한 그룹)'); osh.getRange(1, cF + 1).setValue(oh[cF]); }
+  var cS = ix(/분리|단독/); if (cS < 0) { cS = oh.length; oh.push('분리(단독=Y)'); osh.getRange(1, cS + 1).setValue(oh[cS]); }
+  var ov = osh.getDataRange().getValues();
+  var nameRow = {}; for (var i = 1; i < ov.length; i++) { var k = String(ov[i][cN] || '').trim(); if (k) nameRow[k] = i + 1; }
+  var nextRow = osh.getLastRow() + 1;
+  var upsert = function (nm, force, split) {
+    var rr = nameRow[nm]; if (!rr) { rr = nextRow++; osh.getRange(rr, cN + 1).setValue(nm); nameRow[nm] = rr; }
+    osh.getRange(rr, cF + 1).setValue(force); osh.getRange(rr, cS + 1).setValue(split);
+  };
+  if (to === '__solo__') {
+    upsert(name, '', 'Y'); // 단독 분리
+  } else {
+    // to = 대상 그룹ID: 대상 그룹원들과 본인에게 공유 강제그룹 키 부여
+    var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+    var key = '', members = [];
+    for (var r = 1; r < n; r++) { if (_gv_(vals[r], col.gid) === to) { var nm2 = _gv_(vals[r], col.name); if (nm2) members.push(nm2); if (!key) key = _gv_(vals[r], col.grep) || nm2; } }
+    if (!members.length) return _json_({ ok: false, error: '대상 그룹을 찾지 못했습니다.' });
+    key = key + ' 방';
+    members.forEach(function (nm3) { upsert(nm3, key, ''); });
+    upsert(name, key, ''); // 본인 합류(분리 해제)
+  }
+  SpreadsheetApp.flush();
+  enrichSheet();
+  return _json_({ ok: true });
 }
 
 // 관리자: 미제출 인원을 이름만으로 방배정용으로 추가 (제출경로='미제출')

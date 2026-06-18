@@ -1326,6 +1326,13 @@ function AdminApp() {
   }
   const toggleMerge = (gid) => setMergeSel((s) => ({ ...s, [gid]: !s[gid] }))
 
+  const moveMember = async (name, to) => {
+    setMergeMsg(`${name} 이동 중… (재계산 포함, 수 초)`)
+    const j = await post({ action: 'moveMember', pin, name, to })
+    if (j.ok) { setMergeMsg(`✓ ${name} 이동 완료`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setMergeMsg(''), 3500)
+  }
+
   const addPlaceholder = async () => {
     if (!ph.name.trim()) { setPhMsg('이름을 입력하세요'); return }
     setPhMsg('추가 중…')
@@ -1368,7 +1375,7 @@ function AdminApp() {
         </header>
 
         <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
-          {['요약', '방배정', '리마인드', '버스명단', '문의'].map((t) => (
+          {['요약', '방배정', '그룹정리', '리마인드', '버스명단', '문의'].map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{t}</button>
           ))}
         </div>
@@ -1483,6 +1490,72 @@ function AdminApp() {
                 })}
               </DndContext>
               <p className="text-[11px] text-[#b0b8c1] text-center mt-1">칩을 길게 눌러 방으로 끌어다 놓으세요. ⚠️=신청 옵션과 다른 방. "저장"을 눌러야 반영됩니다.</p>
+            </div>
+          )
+        })()}
+
+        {tab === '그룹정리' && (() => {
+          const live = rows.filter((r) => r.route !== '중복')
+          const groups = {}; live.forEach((r) => { (groups[r.gid] = groups[r.gid] || []).push(r) })
+          const gidList = Object.keys(groups)
+          const repOf = (g) => (g.find((r) => (r.groupTotal || 0) > 0) || g[0]).rep || g[0].name
+          const labelOf = (gid) => `${repOf(groups[gid])} 그룹 (${groups[gid].length})`
+          const pk = (s) => { let d = String(s || '').replace(/\D/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d }
+          // S1: 같은 전화번호인데 그룹이 여러 개
+          const phoneG = {}; live.forEach((r) => { const p = pk(r.contact); if (p) { (phoneG[p] = phoneG[p] || {}); phoneG[p][r.gid] = true } })
+          const s1 = Object.keys(phoneG).filter((p) => Object.keys(phoneG[p]).length > 1).map((p) => ({ phone: p, gids: Object.keys(phoneG[p]) }))
+          // S3: 명단>제출(확인필요)
+          const s3 = gidList.filter((gid) => groups[gid].some((r) => r.check === 'Y'))
+          const selN = Object.keys(mergeSel).filter((g) => mergeSel[g]).length
+          return (
+            <div>
+              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                <p className="text-[12px] text-[#4e5968] leading-relaxed">잘못 묶이거나 따로 떨어진 그룹을 정리합니다. <b>의심 목록</b>에서 합치고, 아래 그룹에서 사람을 <b>다른 그룹으로 이동</b>하거나 <b>단독 분리</b>하세요.</p>
+                {mergeMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{mergeMsg}</p>}
+              </div>
+
+              <Collapsible title="⚠ 확인이 필요해요 (의심 목록)" count={`${s1.length + s3.length}건`} defaultOpen>
+                {s1.length === 0 && s3.length === 0 && <p className="text-[12px] text-[#8b95a1]">의심 항목 없음</p>}
+                {s1.map((s, i) => (
+                  <div key={'s1' + i} className="py-2 border-b border-[#f7f8fa]">
+                    <div className="text-[12px] font-bold text-[#191f28] mb-1">📞 같은 번호인데 {s.gids.length}개 그룹으로 나뉨</div>
+                    <div className="text-[11px] text-[#8b95a1] mb-1">{s.gids.map((g) => labelOf(g)).join(' / ')}</div>
+                    <button onClick={() => { setMergeMsg('합치는 중…'); post({ action: 'mergeGroups', pin, gids: s.gids }).then((j) => { setMergeMsg(j.ok ? `✓ ${j.merged}명 합침` : '오류'); reload() }) }}
+                      className="text-[12px] font-bold text-white bg-[#191f28] rounded-lg px-3 py-1.5">이 그룹들 합치기</button>
+                  </div>
+                ))}
+                {s3.map((gid) => (
+                  <div key={'s3' + gid} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                    <div className="text-[12px] font-bold text-[#191f28]">📝 {repOf(groups[gid])} 그룹 · 명단보다 제출 적음</div>
+                    <div className="text-[11px] text-[#8b95a1]">{(groups[gid].find((r) => r.note) || {}).note || '명단에 미제출자 있음 — 미제출 추가/확인'}</div>
+                  </div>
+                ))}
+              </Collapsible>
+
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[11px] text-[#8b95a1]">합칠 그룹 체크</span>
+                <button onClick={mergeSelected} disabled={selN < 2} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN >= 2 ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}그룹 합치기</button>
+              </div>
+
+              {gidList.map((gid) => (
+                <div key={gid} className="bg-white rounded-2xl border border-[#f2f4f6] p-3 mb-2">
+                  <label className="flex items-center gap-1.5 mb-2 cursor-pointer">
+                    <input type="checkbox" checked={!!mergeSel[gid]} onChange={() => toggleMerge(gid)} className="w-4 h-4" />
+                    <span className="text-[13px] font-bold text-[#191f28]">{labelOf(gid)}</span>
+                  </label>
+                  {groups[gid].map((p) => (
+                    <div key={p.row} className="flex items-center gap-2 py-1 border-b border-[#f7f8fa] last:border-0">
+                      <span className="text-[13px] text-[#191f28] flex-1">{p.name}<span className="text-[10px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{deptName(p.deptLabel)}</span></span>
+                      <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) moveMember(p.name, v) }}
+                        className="bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1 text-[11px] max-w-[130px]">
+                        <option value="">이동 ▾</option>
+                        <option value="__solo__">단독으로 분리</option>
+                        {gidList.filter((g) => g !== gid).map((g) => <option key={g} value={g}>→ {labelOf(g)}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           )
         })()}

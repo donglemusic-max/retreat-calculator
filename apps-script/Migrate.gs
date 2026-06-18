@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v12-roster'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v13-split'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -44,13 +44,13 @@ function ensureOverrideTab() {
   var sh = ss.getSheetByName('오버라이드');
   if (sh) return sh;
   sh = ss.insertSheet('오버라이드');
-  var head = ['대상 이름(원본)', '표시이름', '부서', '캠퍼스', '교통(버스/자차)', '신청유형(그룹/개인/부분)', '강제그룹(같은 값=한 그룹)', '배정방', '비고'];
+  var head = ['대상 이름(원본)', '표시이름', '부서', '캠퍼스', '교통(버스/자차)', '신청유형(그룹/개인/부분)', '강제그룹(같은 값=한 그룹)', '분리(단독=Y)', '배정방', '비고'];
   sh.getRange(1, 1, 1, head.length).setValues([head]);
   sh.getRange(2, 1, 4, head.length).setValues([
-    ['첼로09', '박윤정', '', '', '', '', '', '', '예시: 표시이름만 보정'],
-    ['이한나', '이한나A', '청년부', '', '', '', '', '', '예시: 동명이인 — 청년부 이한나'],
-    ['윤예영', '', '', '', '', '', '임성현', '', '예시: 임성현과 한 그룹으로 강제 묶기'],
-    ['최데이빗', '', '', '', '', '', '임성현', '', '예시: 임성현 그룹'],
+    ['첼로09', '박윤정', '', '', '', '', '', '', '', '예시: 표시이름만 보정'],
+    ['이한나', '이한나A', '청년부', '', '', '', '', '', '', '예시: 동명이인 — 청년부 이한나'],
+    ['윤예영', '', '', '', '', '', '임성현', '', '', '예시: 임성현과 한 그룹으로 강제 묶기'],
+    ['최데이빗', '', '', '', '', '', '임성현', '', '', '예시: 임성현 그룹'],
   ]);
   sh.setFrozenRows(1);
   SpreadsheetApp.getActiveSpreadsheet().toast('오버라이드 탭 생성됨 — 필요한 칸만 채우고 enrichSheet 재실행', '리트릿', 6);
@@ -63,7 +63,7 @@ function _loadOverrides_() {
   if (!sh || sh.getLastRow() < 2) return {};
   var v = sh.getDataRange().getValues(); var hd = v[0];
   var ix = function (re) { for (var i = 0; i < hd.length; i++) if (re.test(String(hd[i]))) return i; return -1; };
-  var cN = ix(/대상 ?이름|원본/), cD = ix(/표시이름/), cDept = ix(/부서/), cC = ix(/캠퍼스/), cB = ix(/교통/), cT = ix(/유형/), cF = ix(/강제그룹|강제 ?그룹/), cR = ix(/배정방/), cM = ix(/비고/);
+  var cN = ix(/대상 ?이름|원본/), cD = ix(/표시이름/), cDept = ix(/부서/), cC = ix(/캠퍼스/), cB = ix(/교통/), cT = ix(/유형/), cF = ix(/강제그룹|강제 ?그룹/), cS = ix(/분리|단독/), cR = ix(/배정방/), cM = ix(/비고/);
   var m = {};
   for (var r = 1; r < v.length; r++) {
     var nm = String(v[r][cN] || '').trim(); if (!nm) continue;
@@ -71,6 +71,7 @@ function _loadOverrides_() {
       disp: cD >= 0 ? String(v[r][cD] || '').trim() : '', dept: cDept >= 0 ? String(v[r][cDept] || '').trim() : '',
       campus: cC >= 0 ? String(v[r][cC] || '').trim() : '', bus: cB >= 0 ? String(v[r][cB] || '').trim() : '',
       type: cT >= 0 ? String(v[r][cT] || '').trim() : '', force: cF >= 0 ? String(v[r][cF] || '').trim() : '',
+      split: cS >= 0 ? String(v[r][cS] || '').trim() : '',
       room: cR >= 0 ? String(v[r][cR] || '').trim() : '', memo: cM >= 0 ? String(v[r][cM] || '').trim() : '',
     };
   }
@@ -177,11 +178,12 @@ function enrichSheet() {
 
   // 0) 오버라이드 적용 (메모리 복사본만 수정 — 원본 시트 보존). 표시이름/부서/캠퍼스/교통은 즉시 반영.
   var OVR = _loadOverrides_();
-  var ovByRow = {}, byForce = {};
+  var ovByRow = {}, byForce = {}, splitSet = {};
   for (var orr = 1; orr < data.length; orr++) {
     var onm = (C.name >= 0 ? String(data[orr][C.name] || '') : '').trim();
     var o = OVR[onm]; if (!o) continue;
     ovByRow[orr] = o;
+    if (o.split) splitSet[orr] = true; // 분리: 자동 병합 신호에서 제외 (강제그룹만 따름)
     if (o.force) (byForce[o.force] = byForce[o.force] || []).push(orr);
     if (o.disp && C.name >= 0) data[orr][C.name] = o.disp;
     if (o.dept && C.dept >= 0) data[orr][C.dept] = o.dept;
@@ -202,6 +204,7 @@ function enrichSheet() {
   // (입금자명·명단(L)으로 병합하면 무관한 사람이 잘못 묶임 → 명단은 아래 '확인필요'로만 사용)
   var byEmail = {}, byPhone = {}, byRep = {}, byNm = {};
   rowsIdx.forEach(function (r) {
+    if (splitSet[r]) return; // 분리 지정 행은 자동 병합 버킷에서 제외 (강제그룹으로만 합류)
     var em = get(r, 'email'); if (em) (byEmail[em] = byEmail[em] || []).push(r);
     var ph = phoneKey(get(r, 'contact')); if (ph) (byPhone[ph] = byPhone[ph] || []).push(r);
     var nm = get(r, 'name'); if (nm) (byNm[nm] = byNm[nm] || []).push(r);
@@ -221,6 +224,7 @@ function enrichSheet() {
   //   이름 하나만 겹치는 건 병합 안 함 → 무관한 사람 과병합 방지. 2명 이상 명단일 때만.
   var byRoster = {};
   rowsIdx.forEach(function (r) {
+    if (splitSet[r]) return;
     var tk = _listNames_(get(r, 'list'));
     if (tk.length >= 2) { var key = tk.slice().sort().join(','); (byRoster[key] = byRoster[key] || []).push(r); }
   });

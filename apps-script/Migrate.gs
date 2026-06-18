@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v11-mergefee'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v12-roster'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -217,6 +217,14 @@ function enrichSheet() {
   });
   // 오버라이드 강제그룹: 같은 강제그룹 값을 가진 사람끼리 한 그룹으로 (명단만으로 엮인 그룹 수기 병합)
   Object.keys(byForce).forEach(function (k) { var a = byForce[k]; for (var i = 1; i < a.length; i++) union(a[0], a[i]); });
+  // 동일 명단 묶음 자동 병합: 명단 이름 집합이 "완전히 동일"하면 한 그룹으로 (같은 그룹원들이 같은 명단을 적은 경우).
+  //   이름 하나만 겹치는 건 병합 안 함 → 무관한 사람 과병합 방지. 2명 이상 명단일 때만.
+  var byRoster = {};
+  rowsIdx.forEach(function (r) {
+    var tk = _listNames_(get(r, 'list'));
+    if (tk.length >= 2) { var key = tk.slice().sort().join(','); (byRoster[key] = byRoster[key] || []).push(r); }
+  });
+  Object.keys(byRoster).forEach(function (k) { var a = byRoster[k]; for (var i = 1; i < a.length; i++) union(a[0], a[i]); });
   var clusters = {};
   rowsIdx.forEach(function (r) { var root = find(r); (clusters[root] = clusters[root] || []).push(r); });
 

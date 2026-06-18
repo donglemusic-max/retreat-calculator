@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv7-mergefee'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv8-repfee'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -175,7 +175,7 @@ function _lookup_(body, sheet, H, col, width) {
       roomLabel: _gv_(row, col.room), occLabel: _gv_(row, col.occ),
       bus: _gv_(row, col.bus).indexOf('버스') >= 0, seorak: _gv_(row, col.seorak).indexOf('원합니다') >= 0,
       inquiry: _gv_(row, col.inquiry), list: _gv_(row, col.list), groupId: _gv_(row, col.gid), rep: _gv_(row, col.grep),
-      groupTotal: Number(row[col.gtotal] || 0), payer: _gv_(row, col.pay), appType: _gv_(row, col.type),
+      groupTotal: Number(row[col.gtotal] || 0), common: Number(row[col.common] || 0), payer: _gv_(row, col.pay), appType: _gv_(row, col.type),
     };
   }
   // 본인 행 수집 → 같은 그룹ID/같은 전화번호로 그룹 전체 확장

@@ -878,16 +878,20 @@ function EditCard({ data, onDelete }) {
       {(() => {
         const isGroupRoom = /인이 투숙/.test(data.occLabel || '') || data.appType === '그룹'
         const selfRoom = isGroupRoom ? 0 : roomIndivFee(data.roomLabel)
-        const selfFee = (DEPTS.find((d) => d.name === deptName)?.fee || 0) + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0)
+        const common = data.common || 0                       // 그룹공동비용(객실+투숙) — 대표 행에만 값
+        const isRep = common > 0 || data.groupTotal > 0        // 대표자 행
+        const deptF = DEPTS.find((d) => d.name === deptName)?.fee || 0
+        const selfFee = deptF + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0) + (isRep ? common : 0)
         return (
           <div className="bg-[#f2f8ff] rounded-2xl p-4 mb-3 border border-[#d8e8ff]">
             <div className="flex justify-between items-baseline">
-              <span className="text-[13px] font-bold text-[#1b64da]">본인 부담 금액</span>
+              <span className="text-[13px] font-bold text-[#1b64da]">{isRep ? '본인 부담 (공동비용 포함)' : '본인 부담 금액'}</span>
               <span className="text-[24px] font-extrabold text-[#191f28] leading-none">{won(selfFee)}</span>
             </div>
             <div className="text-[12px] text-[#4e5968] mt-2 leading-snug">
-              등록비 {won(DEPTS.find((d) => d.name === deptName)?.fee || 0)}{selfRoom > 0 ? ` · 객실 ${won(selfRoom)}` : ''}{bus ? ` · 버스 ${won(BUS_FEE)}` : ''}{seorak ? ` · 설악산 ${won(SEORAK_FEE)}` : ''}
-              {isGroupRoom && <><br /><span className="text-[#8b95a1]">* 객실·투숙 그룹비용은 대표자({data.rep || '-'})가 납부{data.groupTotal > 0 ? ` · 그룹 총액 ${won(data.groupTotal)}` : ''}</span></>}
+              등록비 {won(deptF)}{selfRoom > 0 ? ` · 객실 ${won(selfRoom)}` : ''}{bus ? ` · 버스 ${won(BUS_FEE)}` : ''}{seorak ? ` · 설악산 ${won(SEORAK_FEE)}` : ''}{isRep && common > 0 ? ` · 객실+투숙 그룹비 ${won(common)}` : ''}
+              {isGroupRoom && isRep && data.groupTotal > 0 && <><br /><span className="text-[#8b95a1]">* 대표자라 공동비용 포함. 그룹 전체 총액 {won(data.groupTotal)}</span></>}
+              {isGroupRoom && !isRep && <><br /><span className="text-[#8b95a1]">* 객실·투숙 그룹비용은 대표자({data.rep || '-'})가 납부</span></>}
             </div>
           </div>
         )

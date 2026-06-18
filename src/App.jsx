@@ -1214,6 +1214,9 @@ function AdminApp() {
   const [mergeMsg, setMergeMsg] = useState('')
   const [ph, setPh] = useState({ name: '', dept: '' }) // 미제출 인원 추가
   const [phMsg, setPhMsg] = useState('')
+  const [moveQ, setMoveQ] = useState('') // 그룹정리: 옮길 사람 이름 검색
+  const [movePick, setMovePick] = useState(null) // 선택된 옮길 사람
+  const [moveTargetQ, setMoveTargetQ] = useState('') // 대상 그룹 이름 검색
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1532,11 +1535,58 @@ function AdminApp() {
                 ))}
               </Collapsible>
 
+              {/* 이름 검색 → 대상 그룹도 이름 검색 → 이동 */}
+              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                <div className="text-[13px] font-bold text-[#191f28] mb-2">🔎 이름으로 이동</div>
+                {!movePick ? (
+                  <>
+                    <div className="text-[11px] text-[#8b95a1] mb-1.5">① 옮길 사람을 검색해 선택하세요</div>
+                    <input value={moveQ} onChange={(e) => setMoveQ(e.target.value)} placeholder="옮길 사람 이름 검색" className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2" />
+                    {moveQ.trim() && (() => {
+                      const matches = live.filter((r) => r.name.indexOf(moveQ.trim()) >= 0).slice(0, 12)
+                      if (!matches.length) return <p className="text-[12px] text-[#8b95a1]">일치하는 이름 없음</p>
+                      return matches.map((p) => (
+                        <button key={p.row} onClick={() => { setMovePick(p); setMoveTargetQ('') }}
+                          className="w-full flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 text-left">
+                          <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{p.name}<span className="text-[10px] text-[#8b95a1] ml-1">현재: {repOf(groups[p.gid] || [p])} 그룹 · {deptName(p.deptLabel)}</span></span>
+                          <span className="text-[12px] font-bold text-[#3182f6] shrink-0">선택 →</span>
+                        </button>
+                      ))
+                    })()}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-2 bg-[#eef5ff] rounded-xl px-3 py-2">
+                      <span className="text-[13px] text-[#191f28] flex-1 min-w-0"><b>{movePick.name}</b><span className="text-[10px] text-[#8b95a1] ml-1">현재: {repOf(groups[movePick.gid] || [movePick]) } 그룹</span></span>
+                      <button onClick={() => { setMovePick(null); setMoveQ(''); setMoveTargetQ('') }} className="text-[11px] text-[#8b95a1] underline shrink-0">다른 사람</button>
+                    </div>
+                    <div className="text-[11px] text-[#8b95a1] mb-1.5">② 옮길 그룹을 검색하세요 (그 그룹 사람 이름)</div>
+                    <input value={moveTargetQ} onChange={(e) => setMoveTargetQ(e.target.value)} placeholder="대상 그룹의 아무 구성원 이름" className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2" />
+                    <button onClick={() => { moveMember(movePick.name, '__solo__'); setMovePick(null); setMoveQ(''); setMoveTargetQ('') }}
+                      className="w-full text-[12px] text-[#4e5968] bg-[#f2f4f6] rounded-lg py-2 mb-2">{movePick.name}님 단독으로 분리</button>
+                    {moveTargetQ.trim() && (() => {
+                      const hit = live.filter((r) => r.name.indexOf(moveTargetQ.trim()) >= 0 && r.gid !== movePick.gid)
+                      const seen = {}; const tgts = []
+                      hit.forEach((r) => { if (!seen[r.gid]) { seen[r.gid] = true; tgts.push(r.gid) } })
+                      if (!tgts.length) return <p className="text-[12px] text-[#8b95a1]">일치하는 그룹 없음</p>
+                      return tgts.slice(0, 12).map((g) => (
+                        <button key={g} onClick={() => { moveMember(movePick.name, g); setMovePick(null); setMoveQ(''); setMoveTargetQ('') }}
+                          className="w-full flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 text-left">
+                          <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{labelOf(g)}<span className="text-[10px] text-[#8b95a1] ml-1">{(groups[g] || []).length}명</span></span>
+                          <span className="text-[12px] font-bold text-[#3182f6] shrink-0">여기로 이동 →</span>
+                        </button>
+                      ))
+                    })()}
+                  </>
+                )}
+              </div>
+
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[11px] text-[#8b95a1]">합칠 그룹 체크</span>
                 <button onClick={mergeSelected} disabled={selN < 2} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN >= 2 ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}그룹 합치기</button>
               </div>
 
+              <Collapsible title={`전체 그룹 목록 (${gidList.length}그룹)`}>
               {gidList.map((gid) => (
                 <div key={gid} className="bg-white rounded-2xl border border-[#f2f4f6] p-3 mb-2">
                   <label className="flex items-center gap-1.5 mb-2 cursor-pointer">
@@ -1556,6 +1606,7 @@ function AdminApp() {
                   ))}
                 </div>
               ))}
+              </Collapsible>
             </div>
           )
         })()}

@@ -978,34 +978,57 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   )
 }
 
-// 조회 결과의 입금 안내 (항목별 + 계좌 + 복사)
+// 조회 결과의 입금 안내 (대표자 일괄 / 등록비 각자 토글 + 계좌 + 복사)
 function LookupDeposit({ results }) {
   const [copied, setCopied] = useState(false)
+  const [mode, setMode] = useState('leader') // leader=대표자 일괄, each=등록비 각자
   const deptFeeOfLabel = (label) => DEPTS.find((d) => d.label === label)?.fee || 0
   const isGroup = results.some((r) => /인이 투숙/.test(r.occLabel || '') || r.appType === '그룹')
+  const multi = results.length > 1
   const rep = results.find((r) => (r.common || 0) > 0 || (r.groupTotal || 0) > 0) || results[0]
   const repName = rep.rep || rep.name
+  const common = rep.common || 0
+  const rg = isGroup ? roomGroupFee(rep.roomLabel) : 0
+  const occFee = isGroup ? Math.max(0, common - rg) : 0
+
   const lines = []
-  results.forEach((r) => {
-    lines.push({ cat: '등록비', payer: r.name, amt: deptFeeOfLabel(r.deptLabel) })
-    if (!isGroup) { const ri = roomIndivFee(r.roomLabel); if (ri > 0) lines.push({ cat: '객실선택', payer: r.name, amt: ri }) }
-  })
-  if (isGroup && (rep.common || 0) > 0) {
-    const rg = roomGroupFee(rep.roomLabel); if (rg > 0) lines.push({ cat: '객실선택', payer: repName, amt: rg })
-    const oc = (rep.common || 0) - rg; if (oc > 0) lines.push({ cat: '그룹', payer: repName, amt: oc })
+  if (mode === 'leader' && multi) {
+    // 대표자 일괄: 모든 항목을 대표자 이름으로
+    const regSum = results.reduce((s, r) => s + deptFeeOfLabel(r.deptLabel) + (isGroup ? 0 : roomIndivFee(r.roomLabel)), 0)
+    lines.push({ cat: '등록비', payer: repName, amt: regSum })
+    if (rg > 0) lines.push({ cat: '객실선택', payer: repName, amt: rg })
+    if (occFee > 0) lines.push({ cat: '그룹', payer: repName, amt: occFee })
+    const busSum = results.filter((r) => r.bus).length * BUS_FEE; if (busSum) lines.push({ cat: '버스비', payer: repName, amt: busSum })
+    const seoSum = results.filter((r) => r.seorak).length * SEORAK_FEE; if (seoSum) lines.push({ cat: '설악산', payer: repName, amt: seoSum })
+  } else {
+    // 등록비 각자 (공동비용은 대표자)
+    results.forEach((r) => {
+      lines.push({ cat: '등록비', payer: r.name, amt: deptFeeOfLabel(r.deptLabel) })
+      if (!isGroup) { const ri = roomIndivFee(r.roomLabel); if (ri > 0) lines.push({ cat: '객실선택', payer: r.name, amt: ri }) }
+    })
+    if (rg > 0) lines.push({ cat: '객실선택', payer: repName, amt: rg })
+    if (occFee > 0) lines.push({ cat: '그룹', payer: repName, amt: occFee })
+    results.forEach((r) => { if (r.bus) lines.push({ cat: '버스비', payer: r.name, amt: BUS_FEE }) })
+    results.forEach((r) => { if (r.seorak) lines.push({ cat: '설악산', payer: r.name, amt: SEORAK_FEE }) })
   }
-  results.forEach((r) => { if (r.bus) lines.push({ cat: '버스비', payer: r.name, amt: BUS_FEE }) })
-  results.forEach((r) => { if (r.seorak) lines.push({ cat: '설악산', payer: r.name, amt: SEORAK_FEE }) })
   const total = lines.reduce((s, l) => s + l.amt, 0)
 
-  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n\n` +
+  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n방식: ${mode === 'leader' && multi ? '대표자 일괄' : '항목별/각자'}\n\n` +
     lines.map((l) => `▸ ${l.cat} ${l.payer}   ${won(l.amt)}`).join('\n') +
-    `\n─────────────────\n총 합계: ${won(total)}\n\n* 항목별로 구분하여 따로 입금해 주세요. (입금자명에 위 항목+이름)`
+    `\n─────────────────\n총 합계: ${won(total)}\n\n* 항목별로 구분하여 따로 입금해 주세요. (입금자명: "항목 이름")`
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { alert('복사 실패 — 길게 눌러 복사해 주세요.') } }
 
   return (
     <Card title="입금 안내">
-      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed">아래 항목별로 <b>구분해서 따로</b> 입금해 주세요. 입금자명은 "항목 이름" (예: 등록비 김바울).</p>
+      {multi && (
+        <div className="flex gap-2 mb-3">
+          <button onClick={() => setMode('leader')} className={`flex-1 py-2 rounded-xl text-[13px] font-bold border ${mode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>대표자 일괄</button>
+          <button onClick={() => setMode('each')} className={`flex-1 py-2 rounded-xl text-[13px] font-bold border ${mode === 'each' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>등록비 각자</button>
+        </div>
+      )}
+      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed">
+        {mode === 'leader' && multi ? <>대표자 <b>{repName}</b>님 이름으로 항목별 입금. 입금자명 "항목 {repName}".</> : <>각자 등록비는 본인 이름, 공동비용(객실·투숙)은 대표자 이름으로. 입금자명 "항목 이름".</>}
+      </p>
       <div className="space-y-1.5 mb-3">
         {lines.map((l, i) => (
           <div key={i} className="flex items-center justify-between py-1 border-b border-[#f7f8fa] last:border-0">

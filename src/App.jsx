@@ -978,6 +978,57 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   )
 }
 
+// 조회 결과의 입금 안내 (항목별 + 계좌 + 복사)
+function LookupDeposit({ results }) {
+  const [copied, setCopied] = useState(false)
+  const deptFeeOfLabel = (label) => DEPTS.find((d) => d.label === label)?.fee || 0
+  const isGroup = results.some((r) => /인이 투숙/.test(r.occLabel || '') || r.appType === '그룹')
+  const rep = results.find((r) => (r.common || 0) > 0 || (r.groupTotal || 0) > 0) || results[0]
+  const repName = rep.rep || rep.name
+  const lines = []
+  results.forEach((r) => {
+    lines.push({ cat: '등록비', payer: r.name, amt: deptFeeOfLabel(r.deptLabel) })
+    if (!isGroup) { const ri = roomIndivFee(r.roomLabel); if (ri > 0) lines.push({ cat: '객실선택', payer: r.name, amt: ri }) }
+  })
+  if (isGroup && (rep.common || 0) > 0) {
+    const rg = roomGroupFee(rep.roomLabel); if (rg > 0) lines.push({ cat: '객실선택', payer: repName, amt: rg })
+    const oc = (rep.common || 0) - rg; if (oc > 0) lines.push({ cat: '그룹', payer: repName, amt: oc })
+  }
+  results.forEach((r) => { if (r.bus) lines.push({ cat: '버스비', payer: r.name, amt: BUS_FEE }) })
+  results.forEach((r) => { if (r.seorak) lines.push({ cat: '설악산', payer: r.name, amt: SEORAK_FEE }) })
+  const total = lines.reduce((s, l) => s + l.amt, 0)
+
+  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n\n` +
+    lines.map((l) => `▸ ${l.cat} ${l.payer}   ${won(l.amt)}`).join('\n') +
+    `\n─────────────────\n총 합계: ${won(total)}\n\n* 항목별로 구분하여 따로 입금해 주세요. (입금자명에 위 항목+이름)`
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { alert('복사 실패 — 길게 눌러 복사해 주세요.') } }
+
+  return (
+    <Card title="입금 안내">
+      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed">아래 항목별로 <b>구분해서 따로</b> 입금해 주세요. 입금자명은 "항목 이름" (예: 등록비 김바울).</p>
+      <div className="space-y-1.5 mb-3">
+        {lines.map((l, i) => (
+          <div key={i} className="flex items-center justify-between py-1 border-b border-[#f7f8fa] last:border-0">
+            <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-2 py-0.5 rounded-lg">{l.cat} {l.payer}</span>
+            <span className="text-[14px] font-bold text-[#191f28]">{won(l.amt)}</span>
+          </div>
+        ))}
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-[12px] font-bold text-[#8b95a1]">총 합계</span>
+          <span className="text-[16px] font-extrabold text-[#191f28]">{won(total)}</span>
+        </div>
+      </div>
+      <div className="bg-[#f9fafb] rounded-xl p-3 mb-3">
+        <div className="text-[11px] text-[#8b95a1] font-semibold mb-0.5">입금 계좌</div>
+        <div className="text-[13px] font-bold text-[#191f28]">{ACCOUNT}</div>
+      </div>
+      <button onClick={copy} className="w-full py-3 rounded-2xl bg-[#3182f6] hover:bg-[#1b64da] text-white font-bold text-[14px]">
+        {copied ? '✓ 복사 완료' : '입금 안내 문구 복사하기'}
+      </button>
+    </Card>
+  )
+}
+
 function LookupMode() {
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
@@ -1025,6 +1076,8 @@ function LookupMode() {
           </Card>
         )
       )}
+
+      {status === 'loaded' && results.length > 0 && <LookupDeposit results={results} />}
     </>
   )
 }

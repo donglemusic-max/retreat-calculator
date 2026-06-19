@@ -1577,6 +1577,7 @@ function AdminApp() {
   const [confirmBox, setConfirmBox] = useState(null) // 공용 확인 다이얼로그 {title, lines, onOk, okLabel}
   const ask = (title, lines, onOk, okLabel = '진행') => setConfirmBox({ title, lines, onOk, okLabel })
   const [showGuide, setShowGuide] = useState(false) // 인앱 사용법 가이드
+  const [undoStack, setUndoStack] = useState([]) // 실행 취소: 방/입금 컬럼 작업의 직전 값 스냅샷
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1594,6 +1595,22 @@ function AdminApp() {
   }
   const reload = async () => {
     const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || [])
+  }
+
+  // 실행 취소: 작업 전 해당 컬럼 값을 스냅샷 → 되돌릴 때 그대로 복원
+  const pushUndo = (label, field, rowNums) => {
+    const updates = [...new Set(rowNums)].map((r) => { const row = rows.find((x) => x.row === r); return { row: r, value: (row && row[field]) || '' } })
+    if (updates.length) setUndoStack((s) => [...s, { label, field, updates }].slice(-10))
+  }
+  const undoLast = () => {
+    const last = undoStack[undoStack.length - 1]
+    if (!last) return
+    ask('실행 취소할까요?', `직전 작업 '${last.label}'을(를) 되돌립니다 (${last.updates.length}건 원래대로).`, async () => {
+      setSaveMsg('되돌리는 중…'); setMergeMsg('되돌리는 중…')
+      const j = await post({ action: 'adminBatch', pin, field: last.field, updates: last.updates })
+      if (j.ok) { setUndoStack((s) => s.slice(0, -1)); setSaveMsg('↩ 되돌렸어요'); setMergeMsg('↩ 되돌렸어요'); await reload() } else { setSaveMsg('오류: ' + (j.error || '')); setMergeMsg('오류: ' + (j.error || '')) }
+      setTimeout(() => { setSaveMsg(''); setMergeMsg('') }, 3000)
+    }, '되돌리기')
   }
 
   // 시트 정보 기반 (enrich가 정확하므로 저장된 그룹ID·그룹총액·확인필요를 그대로 사용)
@@ -1762,6 +1779,7 @@ function AdminApp() {
   const saveAssign = () => {
     const changed = m.pool.filter((p) => eff(p) !== (p.assigned || '')).length
     ask('방배정을 저장할까요?', `교회배정 대상 ${m.pool.length}명의 방배정을 시트에 저장합니다.${changed ? `\n(이번에 바뀐 사람: ${changed}명)` : '\n(바뀐 내용이 없습니다)'}`, async () => {
+      pushUndo('방배정 저장', 'assigned', m.pool.filter((p) => eff(p) !== (p.assigned || '')).map((p) => p.row))
       const updates = m.pool.map((p) => ({ row: p.row, value: eff(p), assigned: eff(p) }))
       setSaveMsg('저장 중…')
       const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
@@ -1780,6 +1798,7 @@ function AdminApp() {
     const updates = Object.keys(sel).filter((r) => sel[r]).map((r) => ({ row: Number(r), value: 'Y' }))
     if (!updates.length) return
     ask('입금확인 처리할까요?', `선택한 ${updates.length}명을 '입금확인'으로 표시합니다. 실제로 입금된 분만 선택했는지 확인하세요.`, async () => {
+      pushUndo('입금확인 일괄', 'paid', updates.map((u) => u.row))
       setRows((rs) => rs.map((r) => (sel[r.row] ? { ...r, paid: 'Y' } : r)))
       setSel({})
       await post({ action: 'adminBatch', pin, field: 'paid', updates })
@@ -1822,6 +1841,7 @@ function AdminApp() {
   // 요청조합 확정: 같은 방 라벨(배정방)만 부여 — 비용은 그대로(그룹 합치기 아님)
   const assignRoom = async (rowList, label) => {
     if (!rowList.length) return
+    pushUndo(`방 배정(${label})`, 'assigned', rowList)
     setSaveMsg(`${label} 배정 중…`)
     const updates = rowList.map((row) => ({ row, value: label }))
     const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
@@ -1855,6 +1875,7 @@ function AdminApp() {
     })
     if (!updates.length) { setMergeMsg('이미 모든 그룹이 방과 동기화돼 있습니다'); setTimeout(() => setMergeMsg(''), 3000); return }
     ask('그룹 기준으로 방을 맞출까요?', `${groupLabels.length}개 그룹(${updates.length}명)의 배정방을 '대표 방'으로 통일합니다.\n바뀌는 방: ${groupLabels.slice(0, 8).join(', ')}${groupLabels.length > 8 ? ` 외 ${groupLabels.length - 8}개` : ''}\n\n※ 개인(1명)은 안 건드립니다. 방배정 보드에서 따로 지정한 라벨이 있으면 덮어써집니다.`, async () => {
+      pushUndo('그룹 기준 방 맞추기', 'assigned', updates.map((u) => u.row))
       setMergeMsg(`방 일괄 정렬 중… ${updates.length}명`)
       const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
       if (j.ok) { setMergeMsg(`✓ ${updates.length}명 배정방을 그룹 기준으로 맞췄습니다`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
@@ -1934,6 +1955,7 @@ function AdminApp() {
                 <div className="font-bold text-[#191f28] mb-1">④ 신호 색</div>
                 <p>🔴 먼저 풀어야 함 · 🟡 확인 후 진행 · 🟢/✅ 바로 가능·완료</p>
                 <p className="mt-1 text-[12px] text-[#8b95a1]">합치기·이동·일괄저장은 누르면 <b>확인창</b>이 떠요. "비용이 바뀜/안 바뀜"을 보고 진행하세요.</p>
+                <p className="mt-1 text-[12px] text-[#8b95a1]">방·입금 작업(방배정·방 맞추기·입금확인)은 헤더 <b>‘↩ 되돌리기’</b>로 직전 작업을 되돌릴 수 있어요.</p>
               </div>
               <div>
                 <div className="font-bold text-[#191f28] mb-1">⑤ 이럴 땐 웹앱 제작자에게</div>
@@ -1961,8 +1983,9 @@ function AdminApp() {
           <div className="flex items-center justify-between">
             <h1 className="text-[20px] font-extrabold text-[#191f28]">리트릿 관리자</h1>
             <div className="flex gap-1.5">
-              <button onClick={() => setShowGuide(true)} className="text-[12px] bg-[#eef5ff] text-[#1b64da] px-3 py-1.5 rounded-xl font-bold">📖 사용법</button>
-              <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+              {undoStack.length > 0 && <button onClick={undoLast} className="text-[12px] bg-[#fff4e5] text-[#b45309] px-3 py-1.5 rounded-xl font-bold whitespace-nowrap">↩ 되돌리기</button>}
+              <button onClick={() => setShowGuide(true)} className="text-[12px] bg-[#eef5ff] text-[#1b64da] px-3 py-1.5 rounded-xl font-bold whitespace-nowrap">📖 사용법</button>
+              <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968] whitespace-nowrap">새로고침</button>
             </div>
           </div>
           <p className="text-[12px] text-[#8b95a1] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>

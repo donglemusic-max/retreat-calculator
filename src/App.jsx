@@ -1595,10 +1595,11 @@ function AdminApp() {
     // → 그룹이 쪼개져도 이중계산 안 됨. 이름 정규화(공백/"가족/" 제거)로 매칭 정확도 ↑
     const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
     const allNames = new Set(notDup.map((r) => norm(r.name)))   // 제출 + 미제출(placeholder) 행 전체
-    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|객실|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명/
+    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|객실|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명|인원|인실|대표|정도|혹시/
     const josa = /(와|과|은|는|이|가|을|를|도|만|의|님|씨|께|들|랑|이랑|에게|한테|에서|하고)$/
     const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
-    const resolveNm = (k) => allNames.has(k) ? k : k.replace(josa, '')
+    // 조사 보정은 "자른 결과가 실제 등록자일 때만" 적용 (이사랑→이사 같은 오절단 방지). 아니면 원본 유지
+    const resolveNm = (k) => { if (allNames.has(k)) return k; const s = k.replace(josa, ''); return (s.length >= 2 && allNames.has(s)) ? s : k }
     const missMap = {}
     rows.forEach((r) => { tok(r.list).forEach((nm) => { const k = resolveNm(norm(nm)); if (k.length >= 2 && !allNames.has(k)) { (missMap[k] = missMap[k] || new Set()).add(r.rep || r.name) } }) })
     const missingList = Object.keys(missMap).map((k) => ({ name: k, from: [...missMap[k]].slice(0, 3).join(', ') }))
@@ -1612,7 +1613,7 @@ function AdminApp() {
   const reqCombine = useMemo(() => {
     const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
     // 이름이 아닌 단어(객실/동사/관형어/오타) 광범위 제외
-    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|하도|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명/
+    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|하도|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명|인원|인실|대표|정도|혹시/
     const josa = /(와|과|은|는|이|가|을|를|도|만|의|님|씨|께|들|랑|이랑|에게|한테|에서|하고)$/
     const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
     const live = rows.filter((r) => r.route !== '중복')

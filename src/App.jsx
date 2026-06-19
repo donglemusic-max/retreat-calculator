@@ -1529,6 +1529,17 @@ function RoomDrop({ id, title, sub, count, cap, danger, children }) {
   )
 }
 
+// 탭별 도움말 토글 (ⓘ 누르면 상세 설명)
+function HelpToggle({ children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mb-3">
+      <button onClick={() => setOpen(!open)} className="text-[12px] font-bold text-[#1b64da] bg-[#eef5ff] rounded-lg px-2.5 py-1.5">ⓘ 이 탭 사용법 {open ? '▲' : '▼'}</button>
+      {open && <div className="mt-2 bg-[#f9fafb] border border-[#eef0f2] rounded-xl p-3 text-[12px] text-[#4e5968] leading-relaxed whitespace-pre-wrap">{children}</div>}
+    </div>
+  )
+}
+
 function Collapsible({ title, count, defaultOpen, children }) {
   const [open, setOpen] = useState(!!defaultOpen)
   return (
@@ -1565,6 +1576,7 @@ function AdminApp() {
   const [showNoise, setShowNoise] = useState(false) // 문의탭: '없음/없습니다' 표시 여부
   const [confirmBox, setConfirmBox] = useState(null) // 공용 확인 다이얼로그 {title, lines, onOk, okLabel}
   const ask = (title, lines, onOk, okLabel = '진행') => setConfirmBox({ title, lines, onOk, okLabel })
+  const [showGuide, setShowGuide] = useState(false) // 인앱 사용법 가이드
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1862,6 +1874,56 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12">
+      {showGuide && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setShowGuide(false)}>
+          <div className="bg-white w-full max-w-[480px] rounded-2xl my-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-2 sticky top-0 bg-white rounded-t-2xl">
+              <div className="text-[17px] font-extrabold text-[#191f28]">📖 리트릿 관리자 사용법</div>
+              <button onClick={() => setShowGuide(false)} className="text-[13px] font-bold text-[#8b95a1]">닫기 ✕</button>
+            </div>
+            <div className="px-5 pb-6 text-[13px] text-[#4e5968] leading-relaxed space-y-4">
+              <div>
+                <div className="font-bold text-[#191f28] mb-1">① 꼭 알아야 할 2가지</div>
+                <div className="bg-[#f9fafb] rounded-xl p-3">
+                  <p><b className="text-[#1b64da]">그룹</b> = <b>비용</b>을 함께 내는 단위(가족 등). 합치면 객실 그룹가 등 <b>비용이 다시 계산</b>돼요.</p>
+                  <p className="mt-1.5"><b className="text-[#7c3aed]">방</b> = <b>같이 자는</b> 단위. 비용과 무관하게 방 번호만 같이 붙입니다.</p>
+                  <p className="mt-1.5 text-[12px] text-[#8b95a1]">→ "돈도 같이"는 <b>그룹정리</b>, "방만 같이"는 <b>같은 방 요청</b> 탭.</p>
+                </div>
+              </div>
+              <div>
+                <div className="font-bold text-[#191f28] mb-1">② 이 순서로 하면 됩니다</div>
+                <ol className="list-decimal pl-5 space-y-1">
+                  <li><b>그룹정리</b> — 잘못 묶이거나 떨어진 가족·그룹을 바로잡기</li>
+                  <li><b>같은 방 요청</b> — "○○랑 같은 방" 요청을 모아 방 묶기(비용 각자)</li>
+                  <li><b>방배정</b> — 교회가 정해줄 사람을 방에 배치(자동배치 + 드래그)</li>
+                  <li><b>입금·확인</b> — 입금 확인하고, 미제출자 연락</li>
+                </ol>
+                <p className="text-[12px] text-[#8b95a1] mt-1">요약 탭의 <b>'오늘 할 일'</b>을 위에서부터 누르면 해당 탭으로 갑니다.</p>
+              </div>
+              <div>
+                <div className="font-bold text-[#191f28] mb-1">③ 자주 하는 일</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li><b>잘못 나뉜 가족 합치기</b>: 그룹정리 → 의심목록 '합치기' 또는 체크 후 합치기</li>
+                  <li><b>사람 다른 그룹으로 옮기기</b>: 그룹정리 → '이름으로 이동'</li>
+                  <li><b>같은 방 요청 처리</b>: 같은 방 요청 → 🟢/🟡 카드 '묶기'</li>
+                  <li><b>미제출자 추가</b>: 요약 '미제출 추정 명단' 또는 방배정에서 추가</li>
+                  <li><b>입금 확인</b>: 입금·확인 → 체크 후 '입금확인'</li>
+                </ul>
+              </div>
+              <div>
+                <div className="font-bold text-[#191f28] mb-1">④ 신호 색</div>
+                <p>🔴 먼저 풀어야 함 · 🟡 확인 후 진행 · 🟢/✅ 바로 가능·완료</p>
+                <p className="mt-1 text-[12px] text-[#8b95a1]">합치기·이동·일괄저장은 누르면 <b>확인창</b>이 떠요. "비용이 바뀜/안 바뀜"을 보고 진행하세요.</p>
+              </div>
+              <div>
+                <div className="font-bold text-[#191f28] mb-1">⑤ 이럴 땐 담당자(임성현)에게</div>
+                <p>비용이 이상하게 계산됨 · 오류 메시지가 뜸 · 화면이 안 바뀜(배포/시트 문제). 그 외 자유텍스트 분류(요청조합·미제출 명단)는 <b>어림짐작</b>이라 틀릴 수 있으니 사람이 확인하고 진행하세요.</p>
+              </div>
+              <button onClick={() => setShowGuide(false)} className="w-full py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[14px]">알겠습니다</button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmBox && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setConfirmBox(null)}>
           <div className="bg-white w-full max-w-[420px] rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
@@ -1878,7 +1940,10 @@ function AdminApp() {
         <header className="mb-3">
           <div className="flex items-center justify-between">
             <h1 className="text-[20px] font-extrabold text-[#191f28]">리트릿 관리자</h1>
-            <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+            <div className="flex gap-1.5">
+              <button onClick={() => setShowGuide(true)} className="text-[12px] bg-[#eef5ff] text-[#1b64da] px-3 py-1.5 rounded-xl font-bold">📖 사용법</button>
+              <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+            </div>
           </div>
           <p className="text-[12px] text-[#8b95a1] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
         </header>
@@ -1967,6 +2032,15 @@ function AdminApp() {
           const { clusters } = reqCombine
           return (
             <div>
+              <HelpToggle>{`성도들이 명단·문의에 적은 "○○랑 같은 방 해주세요" 요청을 자동으로 모았습니다.
+
+• 카드 = 같은 방 후보 한 묶음
+• 🔴 = 먼저 풀어야 함(남녀 혼방·정원 초과·이미 다른 그룹 등) → 묶기 버튼 잠김
+• 🟡 = 확인 후 묶기(동명이인·미등록자 등)
+• 🟢/✅ = 바로 묶기 가능 / 이미 같은 방
+
+⚠ 여기서 '묶기'는 같은 방 번호만 붙입니다. 비용은 각자 그대로예요(가족처럼 돈도 합치려면 '그룹정리' 탭).
+이름이 아닌 단어가 잡히면 옆 '제외'를 누르세요.`}</HelpToggle>
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                 <p className="text-[12px] text-[#4e5968] leading-relaxed">
                   부분그룹·"○○와 같은 방" 요청을 모아 방으로 묶습니다. 🔴는 해소 후, 🟡는 확인 후 묶으세요.
@@ -2025,6 +2099,12 @@ function AdminApp() {
           const bookedList = Object.entries(bookedGroups).map(([gid, mem]) => [gid, mem, mem[0].rep])
           return (
             <div>
+              <HelpToggle>{`교회가 방을 정해줘야 하는 사람(개인·부분 신청)을 방에 배치하는 화면입니다.
+
+• [자동 배치]: 요청을 안 적은 사람만 캠퍼스·객실 종류별로 방에 자동으로 채웁니다.
+• "○○랑 같이"처럼 글을 남긴 사람은 자동배치에서 빠지고 '🔎 배정 요청 확인'에 모입니다 → 직접 칸으로 끌어다 놓으세요(모바일은 길게 누른 뒤 드래그).
+• 다 옮겼으면 꼭 [저장]을 눌러야 시트에 반영됩니다.
+• '이미 구성된 가족·그룹'은 따로 방 안 정해도 됩니다(참고용).`}</HelpToggle>
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                 <p className="text-[12px] text-[#4e5968] leading-relaxed mb-3">
                   교회 배정 대상 <b>{m.pool.length}명</b>. <b>자동 배치</b>는 <u>메모 없는</u> 사람만 캠퍼스·신청 객실옵션별 정원(패밀리 6 / 스위트·소노캄 8)에 맞춰 채웁니다. 메모 있는 사람은 아래 "배정 요청 확인"에 따로 두니 직접 드래그하세요.
@@ -2129,6 +2209,13 @@ function AdminApp() {
           const roomOutOfSync = gidList.filter((gid) => groups[gid].length >= 2).filter((gid) => { const lbl = `${repOf(groups[gid])} 방`; return groups[gid].some((r) => (r.assigned || '') !== lbl) })
           return (
             <div>
+              <HelpToggle>{`그룹 = 비용을 함께 내는 단위(가족 등)입니다. 잘못 나뉘거나 합쳐진 그룹을 바로잡습니다.
+
+• '의심 목록': 같은 번호인데 따로 묶인 그룹 등을 자동으로 찾아줍니다 → '합치기'.
+• '이름으로 이동': 사람을 다른 그룹으로 옮기거나 혼자로 분리.
+• '그룹 기준으로 방 맞추기': 그룹대로 방 이름을 통일(예전에 합쳐 방이 안 따라온 경우).
+
+⚠ 여기서 '합치기/이동'을 하면 비용이 다시 계산됩니다(누르면 확인창이 떠요). 단순히 같은 방만 쓰는 건 '같은 방 요청' 탭에서 하세요.`}</HelpToggle>
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                 <p className="text-[12px] text-[#4e5968] leading-relaxed">잘못 묶이거나 따로 떨어진 그룹을 정리합니다. <b>의심 목록</b>에서 합치고, 아래 그룹에서 사람을 <b>다른 그룹으로 이동</b>하거나 <b>단독 분리</b>하세요.</p>
                 {mergeMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{mergeMsg}</p>}
@@ -2241,6 +2328,10 @@ function AdminApp() {
 
         {tab === '리마인드' && (
           <div>
+            <HelpToggle>{`입금 확인과 연락이 필요한 사람을 봅니다.
+
+• '미입금': 아직 입금확인 안 된 사람. 체크 후 [선택 N명 입금확인]으로 한 번에 처리.
+• '확인 필요': 명단엔 있는데 본인 신청서가 없는 그룹 — 연락해 신청을 받거나 미제출로 추가하세요.`}</HelpToggle>
             {(() => { const selN = Object.keys(sel).filter((r) => sel[r]).length; return (
               <Collapsible title="미입금" count={`${m.unpaid.length}명`} defaultOpen>
                 {m.unpaid.length === 0 ? <p className="text-[12px] text-[#8b95a1]">전원 입금확인 완료</p> : (
@@ -2308,6 +2399,11 @@ function AdminApp() {
             if (qs.length === 0) return <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#8b95a1]">문의사항 없음</p></div>
             return (
               <div className="space-y-4">
+                <HelpToggle>{`성도들이 남긴 문의를 맥락에 따라 자동으로 나눠 묶었습니다(입금 문의 / 입금 보고 / 방배정 요청 / 방배정 질문 / 기타).
+
+• '없음/없습니다' 같은 빈 문의는 기본 숨김 — 아래 체크박스로 켜고 끌 수 있어요.
+• 자동 분류라 가끔 틀릴 수 있으니 참고용으로 보세요.
+• 방배정 요청은 '같은 방 요청' 탭에서 실제로 처리합니다.`}</HelpToggle>
                 <label className="flex items-center gap-2 bg-white rounded-2xl border border-[#f2f4f6] p-3 text-[12px] text-[#4e5968] cursor-pointer">
                   <input type="checkbox" checked={showNoise} onChange={(e) => setShowNoise(e.target.checked)} className="w-4 h-4" />
                   내용 없는 문의("없음/없습니다") 보기 <span className="text-[#8b95a1]">({noiseN}건 숨김)</span>

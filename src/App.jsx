@@ -1773,6 +1773,24 @@ function AdminApp() {
     setTimeout(() => setSaveMsg(''), 3000)
   }
 
+  // 현재 그룹(gid) 기준으로 배정방 일괄 정렬: 2명 이상 그룹만 배정방="{대표} 방"
+  // (과거 sv10 배포 전에 합치거나 시트 직접 수정해 방 싱크가 빠진 그룹 보정. 1인=개인은 건드리지 않음)
+  const syncAllRooms = async () => {
+    const byGid = {}
+    rows.filter((r) => r.route !== '중복').forEach((r) => { (byGid[r.gid] = byGid[r.gid] || []).push(r) })
+    const updates = []
+    Object.values(byGid).forEach((mem) => {
+      if (mem.length < 2) return
+      const label = `${mem[0].rep || mem[0].name} 방`
+      mem.forEach((r) => { if ((r.assigned || '') !== label) updates.push({ row: r.row, value: label }) })
+    })
+    if (!updates.length) { setMergeMsg('이미 모든 그룹이 방과 동기화돼 있습니다'); setTimeout(() => setMergeMsg(''), 3000); return }
+    setMergeMsg(`방 일괄 정렬 중… ${updates.length}명`)
+    const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
+    if (j.ok) { setMergeMsg(`✓ ${updates.length}명 배정방을 그룹 기준으로 맞췄습니다`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setMergeMsg(''), 4000)
+  }
+
   if (!auth) {
     return (
       <div className="min-h-screen bg-[#f2f4f6] flex items-center justify-center p-4">
@@ -1985,6 +2003,7 @@ function AdminApp() {
           // S3: 명단>제출(확인필요)
           const s3 = gidList.filter((gid) => groups[gid].some((r) => r.check === 'Y'))
           const selN = Object.keys(mergeSel).filter((g) => mergeSel[g]).length
+          const roomOutOfSync = gidList.filter((gid) => groups[gid].length >= 2).filter((gid) => { const lbl = `${repOf(groups[gid])} 방`; return groups[gid].some((r) => (r.assigned || '') !== lbl) })
           return (
             <div>
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
@@ -2009,6 +2028,16 @@ function AdminApp() {
                   </div>
                 ))}
               </Collapsible>
+
+              {/* 그룹 기준 방 일괄 맞춤 */}
+              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                <div className="text-[13px] font-bold text-[#191f28] mb-1">🛏️ 그룹 기준으로 방 맞추기</div>
+                <div className="text-[11px] text-[#8b95a1] mb-2">예전에 합치거나 시트에서 직접 수정한 그룹은 방이 안 따라왔을 수 있어요. 지금 묶인 그룹대로 배정방(=대표 방)을 한 번에 맞춥니다. (개인 1명은 안 건드림)</div>
+                <button onClick={syncAllRooms} disabled={!roomOutOfSync.length}
+                  className={`w-full py-2.5 rounded-xl font-bold text-[13px] ${roomOutOfSync.length ? 'bg-[#191f28] text-white' : 'bg-[#f2f4f6] text-[#b0b8c1]'}`}>
+                  {roomOutOfSync.length ? `방 안 맞는 ${roomOutOfSync.length}개 그룹 일괄 정렬` : '모든 그룹이 방과 동기화됨 ✓'}
+                </button>
+              </div>
 
               {/* 이름 검색 → 대상 그룹도 이름 검색 → 이동 */}
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">

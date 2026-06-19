@@ -1557,6 +1557,7 @@ function AdminApp() {
   const [movePick, setMovePick] = useState(null) // 선택된 옮길 사람
   const [moveTargetQ, setMoveTargetQ] = useState('') // 대상 그룹 이름 검색
   const [dismissed, setDismissed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_miss_dismiss') || '[]')) } catch { return new Set() } }) // 미제출명단 수동 제외
+  const [showNoise, setShowNoise] = useState(false) // 문의탭: '없음/없습니다' 표시 여부
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -2183,16 +2184,59 @@ function AdminApp() {
         {tab === '문의' && (
           (() => {
             const qs = rows.filter((r) => r.inquiry)
-            return qs.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#8b95a1]">문의사항 없음</p></div>
-            ) : (
-              <div className="space-y-2">
-                {qs.map((r) => (
-                  <div key={r.row} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                    <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
-                    <div className="text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed">{r.inquiry}</div>
+            // 맥락 분류
+            const classify = (t) => {
+              const s = (t || '').replace(/\s/g, '')
+              if (!s || /^(없음|없습니다|없어요|없네요|없습니당|x|X|\.|-|무|아니요|아니오)$/.test(s) || (/^없/.test(s) && s.length <= 6)) return 'none'
+              const isPay = /입금|송금|이체|납부|비용|금액|계좌|등록비|얼마|만원|원입니다|결제/.test(t)
+              const paid = /입금했|입금완료|입금하였|입금해|보냈|송금|이체했|납부했|완료했|했습니다|했어요|드렸|보냅니다|보냈습니다|이체|입금합니다/.test(s)
+              const isRoom = /방|배정|객실|투숙|숙소|인실|같은방|한방|동숙|룸메/.test(t)
+              const isReq = /해주|원합|부탁|배정해|넣어|함께|같이|원해|주세요|좋겠|희망/.test(t)
+              const isQ = /\?|나요|는지|인가요|될까|되나|어떻게|얼마|궁금|맞나|맞는지|가능한가|할까요|하나요|되겠|되는지|할지/.test(t)
+              if (isPay && paid && !isQ) return 'pay_report'
+              if (isRoom && isReq && !isQ) return 'room_req'
+              if (isPay) return 'pay_q'
+              if (isRoom) return 'room_q'
+              return 'etc'
+            }
+            const CATS = [
+              { key: 'pay_q', label: '💰 입금 관련 문의', hint: '("이렇게 맞나요?" 등)' },
+              { key: 'pay_report', label: '✅ 입금 보고', hint: '("입금했습니다" 등)' },
+              { key: 'room_req', label: '🛏️ 방배정 요청', hint: '("같은 방으로 해주세요")' },
+              { key: 'room_q', label: '❓ 방배정 질문', hint: '' },
+              { key: 'etc', label: '📌 기타', hint: '' },
+            ]
+            const grouped = {}; qs.forEach((r) => { const c = classify(r.inquiry); (grouped[c] = grouped[c] || []).push(r) })
+            const noiseN = (grouped.none || []).length
+            const Card = (r) => (
+              <div key={r.row} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+                <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
+                <div className="text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed">{r.inquiry}</div>
+              </div>
+            )
+            if (qs.length === 0) return <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#8b95a1]">문의사항 없음</p></div>
+            return (
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 bg-white rounded-2xl border border-[#f2f4f6] p-3 text-[12px] text-[#4e5968] cursor-pointer">
+                  <input type="checkbox" checked={showNoise} onChange={(e) => setShowNoise(e.target.checked)} className="w-4 h-4" />
+                  내용 없는 문의("없음/없습니다") 보기 <span className="text-[#8b95a1]">({noiseN}건 숨김)</span>
+                </label>
+                {CATS.map((cat) => {
+                  const items = grouped[cat.key] || []
+                  if (!items.length) return null
+                  return (
+                    <div key={cat.key}>
+                      <div className="text-[13px] font-bold text-[#191f28] mb-1.5 px-1">{cat.label} <span className="text-[11px] text-[#8b95a1] font-normal">{items.length}건 {cat.hint}</span></div>
+                      <div className="space-y-2">{items.map(Card)}</div>
+                    </div>
+                  )
+                })}
+                {showNoise && noiseN > 0 && (
+                  <div>
+                    <div className="text-[13px] font-bold text-[#8b95a1] mb-1.5 px-1">🗒️ 내용 없음 <span className="text-[11px] font-normal">{noiseN}건</span></div>
+                    <div className="space-y-2">{grouped.none.map(Card)}</div>
                   </div>
-                ))}
+                )}
               </div>
             )
           })()

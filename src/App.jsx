@@ -228,9 +228,9 @@ function Card({ title, badge, help, helpTitle, children }) {
     <section className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-5 mb-4">
       {title && (
         <div className="flex items-center gap-2 mb-4">
-          <h2 className="text-[15px] font-bold text-[#191f28] tracking-tight">{title}</h2>
+          <h2 className="text-[16px] font-bold text-[#191f28] tracking-tight">{title}</h2>
           {badge != null && (
-            <span className="bg-[#3182f6] text-white text-[11px] px-2 py-0.5 rounded-full font-bold">{badge}</span>
+            <span className="bg-[#3182f6] text-white text-[12px] px-2 py-0.5 rounded-full font-bold">{badge}</span>
           )}
           {help && <HelpIcon title={helpTitle || title} body={help} />}
         </div>
@@ -244,18 +244,18 @@ function OptionRow({ active, onClick, title, sub, right }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border text-left transition-all ${
+      className={`w-full flex items-center justify-between gap-3 px-4 py-4 rounded-2xl border text-left transition-all min-h-[52px] ${
         active
           ? 'border-2 border-[#3182f6] bg-[#f2f8ff]'
           : 'border border-[#e5e8eb] bg-white hover:bg-[#f9fafb]'
       }`}
     >
       <div className="min-w-0">
-        <div className={`text-[14px] font-bold ${active ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>{title}</div>
-        {sub && <div className="text-[11px] text-[#8b95a1] mt-0.5 leading-snug">{sub}</div>}
+        <div className={`text-[15px] font-bold ${active ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>{title}</div>
+        {sub && <div className="text-[13px] text-[#8b95a1] mt-0.5 leading-snug">{sub}</div>}
       </div>
       {right != null && (
-        <div className={`text-[13px] font-bold whitespace-nowrap ${active ? 'text-[#1b64da]' : 'text-[#8b95a1]'}`}>{right}</div>
+        <div className={`text-[14px] font-bold whitespace-nowrap ${active ? 'text-[#1b64da]' : 'text-[#8b95a1]'}`}>{right}</div>
       )}
     </button>
   )
@@ -265,18 +265,18 @@ function Toggle({ on, onChange, label, sub, price }) {
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all ${
+      className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl border transition-all min-h-[56px] ${
         on ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'
       }`}
     >
       <div className="text-left">
-        <div className={`text-[14px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>{label}</div>
-        {sub && <div className="text-[11px] text-[#8b95a1] mt-0.5">{sub}</div>}
+        <div className={`text-[15px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>{label}</div>
+        {sub && <div className="text-[13px] text-[#8b95a1] mt-0.5">{sub}</div>}
       </div>
       <div className="flex items-center gap-2">
-        {price && <span className={`text-[13px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#8b95a1]'}`}>{price}</span>}
-        <div className={`w-11 h-6 rounded-full p-0.5 transition-all ${on ? 'bg-[#3182f6]' : 'bg-[#d1d8e0]'}`}>
-          <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+        {price && <span className={`text-[14px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#8b95a1]'}`}>{price}</span>}
+        <div className={`w-12 h-7 rounded-full p-0.5 transition-all ${on ? 'bg-[#3182f6]' : 'bg-[#d1d8e0]'}`}>
+          <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
         </div>
       </div>
     </button>
@@ -288,7 +288,7 @@ function DeptSelect({ value, onChange }) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] font-semibold text-[#333d4b] focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
+      className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] font-semibold text-[#333d4b] focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]"
     >
       {DEPTS.map((d) => (
         <option key={d.name} value={d.name}>
@@ -301,12 +301,12 @@ function DeptSelect({ value, onChange }) {
 
 // ── 입력 필드 헬퍼 ─────────────────────────────────────────────
 const inputCls =
-  'w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none'
+  'w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]'
 
 function Field({ label, required, children }) {
   return (
-    <div className="mb-3 last:mb-0">
-      <label className="block text-[12px] font-semibold text-[#4e5968] mb-1.5">
+    <div className="mb-4 last:mb-0">
+      <label className="block text-[13px] font-semibold text-[#4e5968] mb-2">
         {label}{required && <span className="text-[#f04452]"> *</span>}
       </label>
       {children}
@@ -321,13 +321,79 @@ function SegPicker({ value, onChange, options, render }) {
         <button
           key={o}
           onClick={() => onChange(o)}
-          className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border transition-all ${
+          className={`flex-1 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
             value === o ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
           }`}
         >
           {render ? render(o) : o}
         </button>
       ))}
+    </div>
+  )
+}
+
+// ── 제출 전 확인 바텀시트 ──────────────────────────────────────
+function ConfirmSheet({ open, onClose, onConfirm, calc, subtitle, memberSummary, loading }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 animate-backdrop" />
+      <div
+        className="relative w-full max-w-[480px] bg-white rounded-t-[28px] max-h-[85vh] overflow-y-auto p-6 pb-8 animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 bg-[#e5e8eb] rounded-full mx-auto mb-5" />
+        <h3 className="text-[18px] font-extrabold text-[#191f28] mb-1">이 내용으로 신청하시나요?</h3>
+        <p className="text-[13px] text-[#8b95a1] mb-5">내용을 확인하고 제출해 주세요.</p>
+
+        {memberSummary && (
+          <div className="bg-[#f9fafb] rounded-2xl p-4 mb-4">
+            <div className="text-[13px] font-bold text-[#4e5968] mb-2">신청 인원</div>
+            {memberSummary}
+          </div>
+        )}
+
+        <div className="bg-[#f9fafb] rounded-2xl p-4 mb-4">
+          <div className="text-[13px] font-bold text-[#4e5968] mb-3">입금 항목</div>
+          <div className="space-y-2">
+            {calc.lines.map((l, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <span className="text-[13px] text-[#4e5968]">
+                  <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-1.5 py-0.5 rounded-md mr-1.5">{l.cat}</span>
+                  {l.payer}{l.note ? <span className="text-[#8b95a1]"> ({l.note})</span> : ''}
+                </span>
+                <span className="text-[14px] font-bold text-[#191f28]">{won(l.amt)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-[#e5e8eb] flex items-center justify-between">
+            <span className="text-[14px] font-bold text-[#191f28]">총 합계</span>
+            <span className="text-[22px] font-extrabold text-[#191f28]">{won(calc.total)}</span>
+          </div>
+          {calc.count > 1 && (
+            <div className="mt-1 text-right text-[13px] text-[#8b95a1]">1인 평균 {won(calc.perPerson)} · {calc.count}명</div>
+          )}
+        </div>
+
+        {subtitle && (
+          <div className="bg-[#fff9e6] border border-[#ffe082] rounded-xl px-4 py-3 mb-5">
+            <div className="text-[13px] font-bold text-[#b45309] mb-1">입금 안내</div>
+            <div className="text-[13px] text-[#78350f] leading-relaxed">{subtitle}</div>
+            <div className="text-[13px] font-bold text-[#191f28] mt-1">{ACCOUNT}</div>
+          </div>
+        )}
+
+        <button
+          onClick={onConfirm}
+          disabled={loading}
+          className="w-full py-4 rounded-2xl bg-[#191f28] text-white font-bold text-[16px] shadow-lg mb-2"
+        >
+          {loading ? '제출 중…' : '제출하기'}
+        </button>
+        <button onClick={onClose} className="w-full py-3 rounded-2xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">
+          돌아가서 수정하기
+        </button>
+      </div>
     </div>
   )
 }
@@ -344,6 +410,10 @@ function IndividualMode() {
   const [email, setEmail] = useState('')
   const [campus, setCampus] = useState('')
   const [inquiry, setInquiry] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitDone, setSubmitDone] = useState(null)
+  const [submitErr, setSubmitErr] = useState('')
 
   const d = DEPTS.find((x) => x.name === dept)
   const room = ROOMS[roomIdx]
@@ -354,6 +424,7 @@ function IndividualMode() {
   if (!contact.trim()) missing.push('연락처')
   if (!email.trim()) missing.push('이메일')
   if (!campus) missing.push('캠퍼스')
+
   const submission = {
     mode: '개인', email: email.trim(), contact: contact.trim(), campus, leader: name.trim(), inquiry: inquiry.trim(),
     roomLabel: room.label, occLabel: OCC_CHURCH, seorak, depositMode: 'leader', roster: '',
@@ -374,13 +445,61 @@ function IndividualMode() {
     return { total, perPerson: total, lines, count: 1 }
   }, [d, room, bus, seorak, name])
 
+  const doSubmit = async () => {
+    setSubmitLoading(true); setSubmitErr('')
+    try {
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(submission),
+      })
+      const j = await res.json()
+      if (j.ok) { setSubmitDone(j); setConfirmOpen(false) }
+      else { setSubmitErr(j.error || '제출 실패'); setConfirmOpen(false) }
+    } catch (e) { setSubmitErr(String(e)); setConfirmOpen(false) }
+    finally { setSubmitLoading(false) }
+  }
+
+  if (submitDone) {
+    return (
+      <Card title="신청 완료">
+        <div className="text-center py-4">
+          <div className="text-[48px] mb-3">✅</div>
+          <div className="text-[17px] font-bold text-[#191f28] mb-2">신청서가 제출되었습니다</div>
+          <div className="text-[14px] text-[#8b95a1]">
+            접수번호 {submitDone.groupId} · 총 {won(submitDone.total || 0)}
+          </div>
+          <p className="text-[14px] text-[#4e5968] mt-4 leading-relaxed">
+            입금까지 완료해야 등록이 확정됩니다.<br />아래 "입금 안내"대로 항목별로 입금해 주세요.
+          </p>
+        </div>
+        <ResultPanel calc={calc} subtitle={`※ 입금자명: ${name.trim()}`} />
+      </Card>
+    )
+  }
+
+  const memberSummary = (
+    <div className="text-[14px] text-[#191f28]">
+      <span className="font-bold">{name.trim() || '(이름 미입력)'}</span>
+      <span className="text-[#8b95a1] ml-2">{gender} · {dept} · {campus.replace(' 캠퍼스', '')} 캠퍼스</span>
+    </div>
+  )
+
   return (
     <>
-      <Card title="소속부서 (개인 등록비)" help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
+      <Card title="소속 부서" help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
+        <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">부서에 따라 1인 등록비가 달라집니다.</p>
         <DeptSelect value={dept} onChange={setDept} />
+        <div className="mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3">
+          <span className="text-[13px] text-[#4e5968]">선택한 등록비</span>
+          <span className="text-[17px] font-extrabold text-[#1b64da] ml-3">{won(d.fee)}</span>
+        </div>
       </Card>
 
-      <Card title="객실 종류 (개인 추가비용)" help={HELP.room} helpTitle="객실 종류 안내">
+      <Card title="방 선택" help={HELP.room} helpTitle="객실 종류 안내">
+        <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+          혼자 등록하시면 교회에서 방을 배정해 드립니다. 원하는 방이 있으면 선택하세요. (추가 비용 발생 가능)
+        </p>
         <div className="space-y-2">
           {ROOMS.map((r, i) => (
             <OptionRow
@@ -389,24 +508,33 @@ function IndividualMode() {
               onClick={() => setRoomIdx(i)}
               title={r.name}
               sub={r.desc}
-              right={r.indiv > 0 ? `+${won(r.indiv)}` : '추가없음'}
+              right={r.indiv > 0 ? `+${won(r.indiv)}` : '추가비용 없음'}
             />
           ))}
         </div>
-        <p className="text-[11px] text-[#8b95a1] mt-3 leading-relaxed">
-          * 가족/그룹을 따로 신청하지 않으면 교회에서 방배정을 해드립니다. (투숙인원 추가비용 없음)
-        </p>
       </Card>
 
-      <Card title="이동 / 뷰 (개인 추가비용)" help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
-        <div className="space-y-2">
-          <Toggle on={bus} onChange={setBus} label="버스 신청 (왕복)" sub="자차 이용 시 선택 안 함" price={`+${won(BUS_FEE)}`} />
-          <Toggle on={seorak} onChange={setSeorak} label="설악산 뷰 신청" sub="선착순 배정" price={`+${won(SEORAK_FEE)}`} />
+      <Card title="교통 / 설악산뷰" help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
+        <div className="space-y-3">
+          <Toggle
+            on={bus}
+            onChange={setBus}
+            label="버스 이용하겠습니다"
+            sub={`왕복 · 자차 이용 시 선택 안 함`}
+            price={`+${won(BUS_FEE)}`}
+          />
+          <Toggle
+            on={seorak}
+            onChange={setSeorak}
+            label="설악산 뷰 신청하겠습니다"
+            sub="선착순 배정"
+            price={`+${won(SEORAK_FEE)}`}
+          />
         </div>
       </Card>
 
-      <Card title="신청자 정보 (제출용)">
-        <Field label="등록자 이름" required>
+      <Card title="신청자 정보">
+        <Field label="이름" required>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} />
         </Field>
         <Field label="성별" required>
@@ -427,7 +555,35 @@ function IndividualMode() {
       </Card>
 
       <ResultPanel calc={calc} subtitle={`※ 입금자명: ${name.trim() || '이름'}`} />
-      <SubmitSection payload={submission} valid={missing.length === 0} missing={missing} />
+
+      <div className="mb-6">
+        {missing.length > 0 && (
+          <p className="text-[13px] text-[#f04452] font-semibold mb-3 leading-relaxed">입력 필요: {missing.join(', ')}</p>
+        )}
+        {submitErr && <p className="text-[13px] text-[#f04452] mb-3 leading-relaxed">제출 오류: {submitErr}</p>}
+        <button
+          onClick={() => setConfirmOpen(true)}
+          disabled={missing.length > 0}
+          className={`w-full py-4 rounded-2xl font-bold text-[16px] transition-all ${
+            missing.length === 0 ? 'bg-[#191f28] text-white hover:bg-black shadow-lg' : 'bg-[#e5e8eb] text-[#b0b8c1]'
+          }`}
+        >
+          신청 내용 확인하고 제출하기
+        </button>
+        <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed text-center">
+          * 제출 후 입금까지 완료해야 등록이 확정됩니다.
+        </p>
+      </div>
+
+      <ConfirmSheet
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={doSubmit}
+        calc={calc}
+        subtitle={`${name.trim() || '이름'} 이름으로 항목별 입금`}
+        memberSummary={memberSummary}
+        loading={submitLoading}
+      />
     </>
   )
 }
@@ -438,12 +594,17 @@ function GroupMode() {
   const [members, setMembers] = useState([{ name: '', dept: '장년부', bus: false, gender: '' }])
   const [roomIdx, setRoomIdx] = useState(1)
   const [occOverride, setOccOverride] = useState(null) // null = 자동(인원수 기준)
-  const [seorak, setSeorak] = useState(false) // 그룹 전체 적용
+  const [occOpen, setOccOpen] = useState(false) // 투숙인원 수동선택 영역 열기
+  const [seorak, setSeorak] = useState(false)
   const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
   const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
   const [campus, setCampus] = useState('')
   const [inquiry, setInquiry] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitDone, setSubmitDone] = useState(null)
+  const [submitErr, setSubmitErr] = useState('')
 
   const room = ROOMS[roomIdx]
   const count = members.length
@@ -465,6 +626,7 @@ function GroupMode() {
     if (!m.name.trim()) missing.push(`${i + 1}번 이름`)
     if (!m.gender) missing.push(`${i + 1}번 성별`)
   })
+
   const submission = {
     mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
     roomLabel: room.label, occLabel: effOcc.formLabel, seorak, depositMode, roster,
@@ -478,10 +640,9 @@ function GroupMode() {
     const roomGroup = room.group
     const occFee = effOcc.fee
     const busTotal = busCount * BUS_FEE
-    const seorakTotal = seorak ? count * SEORAK_FEE : 0 // 그룹 전원 적용
+    const seorakTotal = seorak ? count * SEORAK_FEE : 0
     const total = baseSum + roomGroup + occFee + busTotal + seorakTotal
 
-    // 등록비: depositMode에 따라 합산(대표자) 또는 각자(구성원 이름)
     const lines = []
     if (depositMode === 'split') {
       members.forEach((m, i) =>
@@ -490,36 +651,77 @@ function GroupMode() {
     } else {
       lines.push({ cat: '등록비', payer: who, amt: baseSum, note: `${count}명 합산` })
     }
-    // 공동비용은 항상 대표자 이름으로
     if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: room.name })
     if (occFee > 0) lines.push({ cat: '그룹', payer: who, amt: occFee, note: `${effOcc.label} 투숙` })
     if (busTotal > 0) lines.push({ cat: '버스비', payer: who, amt: busTotal, note: `${busCount}명` })
     if (seorakTotal > 0) lines.push({ cat: '설악산', payer: who, amt: seorakTotal, note: `${count}명 전원` })
 
-    return {
-      total,
-      perPerson: Math.round(total / count),
-      lines,
-      count,
-      overMax: count > room.max,
-    }
+    return { total, perPerson: Math.round(total / count), lines, count, overMax: count > room.max }
   }, [members, room, effOcc, count, seorak, depositMode, who])
 
   const subtitle =
     depositMode === 'split'
-      ? `※ 등록비는 각 구성원 이름으로, 공동비용은 대표자(${who}) 이름으로 입금`
-      : `※ 모든 항목 대표자(${who}) 이름으로 입금`
+      ? `등록비는 각 구성원 이름으로, 공동비용(객실·그룹비)은 대표자 ${who} 이름으로 입금`
+      : `모든 항목 대표자 ${who} 이름으로 입금`
+
+  const doSubmit = async () => {
+    setSubmitLoading(true); setSubmitErr('')
+    try {
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(submission),
+      })
+      const j = await res.json()
+      if (j.ok) { setSubmitDone(j); setConfirmOpen(false) }
+      else { setSubmitErr(j.error || '제출 실패'); setConfirmOpen(false) }
+    } catch (e) { setSubmitErr(String(e)); setConfirmOpen(false) }
+    finally { setSubmitLoading(false) }
+  }
+
+  if (submitDone) {
+    return (
+      <Card title="신청 완료">
+        <div className="text-center py-4">
+          <div className="text-[48px] mb-3">✅</div>
+          <div className="text-[17px] font-bold text-[#191f28] mb-2">신청서가 제출되었습니다</div>
+          <div className="text-[14px] text-[#8b95a1]">
+            접수번호 {submitDone.groupId} · {submitDone.rows}명 · 총 {won(submitDone.total || 0)}
+          </div>
+          <p className="text-[14px] text-[#4e5968] mt-4 leading-relaxed">
+            입금까지 완료해야 등록이 확정됩니다.<br />아래 "입금 안내"대로 항목별로 입금해 주세요.
+          </p>
+        </div>
+        <ResultPanel calc={calc} subtitle={`※ ${subtitle}`} />
+      </Card>
+    )
+  }
+
+  const memberSummary = (
+    <div className="space-y-1.5">
+      {members.map((m, i) => (
+        <div key={i} className="flex items-center gap-2 text-[14px]">
+          <span className="font-bold text-[#191f28]">{m.name.trim() || `(${i+1}번 이름 미입력)`}</span>
+          <span className="text-[#8b95a1]">{m.gender} · {m.dept}{m.bus ? ' · 버스' : ''}</span>
+          {i === 0 && <span className="text-[12px] text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 font-bold">대표</span>}
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <>
-      <Card title="대표자 정보 (제출용)">
-        <Field label="대표자 이름 (공동비용 입금자명)" required>
+      <Card title="대표자 정보">
+        <p className="text-[13px] text-[#8b95a1] mb-4 leading-relaxed">
+          가족·그룹을 대표해서 신청하는 분의 정보입니다. 공동비용 입금 시 이 이름으로 입금합니다.
+        </p>
+        <Field label="대표자 이름" required>
           <input value={leader} onChange={(e) => setLeader(e.target.value)} placeholder="예: 김바울" className={inputCls} />
         </Field>
-        <Field label="대표 연락처" required>
+        <Field label="연락처" required>
           <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
         </Field>
-        <Field label="대표 이메일" required>
+        <Field label="이메일" required>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
         </Field>
         <Field label="주로 예배드리는 캠퍼스" required>
@@ -528,31 +730,32 @@ function GroupMode() {
         <Field label="문의사항 (선택)">
           <textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} />
         </Field>
-        <p className="text-[11px] text-[#8b95a1] leading-relaxed">* 연락처·이메일은 가족/그룹 구성원 행에 공통으로 기록됩니다.</p>
       </Card>
 
       <Card title="구성원" badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
         <div className="space-y-3">
           {members.map((m, i) => (
-            <div key={i} className="bg-[#f9fafb] rounded-2xl p-3 border border-[#f2f4f6]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[12px] font-bold text-[#4e5968]">{i + 1}번 {i === 0 ? '(대표자)' : ''}</span>
+            <div key={i} className="bg-[#f9fafb] rounded-2xl p-4 border border-[#f2f4f6]">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[13px] font-bold text-[#4e5968]">
+                  {i + 1}번 구성원{i === 0 ? <span className="text-[#3182f6] ml-1">(대표자)</span> : ''}
+                </span>
                 {members.length > 1 && (
-                  <button onClick={() => removeMember(i)} className="text-[12px] font-bold text-[#f04452]">삭제</button>
+                  <button onClick={() => removeMember(i)} className="text-[13px] font-bold text-[#f04452] min-w-[44px] min-h-[44px] flex items-center justify-end">삭제</button>
                 )}
               </div>
               <input
                 value={m.name}
                 onChange={(e) => updateMember(i, { name: e.target.value })}
                 placeholder={i === 0 ? '이름 (대표자 본인이면 위와 동일하게)' : '이름'}
-                className="w-full bg-white border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2 focus:ring-2 focus:ring-[#3182f6] focus:outline-none"
+                className="w-full bg-white border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] mb-3 focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]"
               />
-              <div className="flex gap-2 mb-2">
+              <div className="flex gap-2 mb-3">
                 {['남', '여'].map((g) => (
                   <button
                     key={g}
                     onClick={() => updateMember(i, { gender: g })}
-                    className={`flex-1 py-2 rounded-xl text-[12px] font-bold border transition-all ${
+                    className={`flex-1 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
                       m.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
                     }`}
                   >
@@ -563,34 +766,24 @@ function GroupMode() {
               <DeptSelect value={m.dept} onChange={(v) => updateMember(i, { dept: v })} />
               <button
                 onClick={() => updateMember(i, { bus: !m.bus })}
-                className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border transition-all ${
+                className={`w-full mt-3 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
                   m.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
                 }`}
               >
-                버스 신청 {m.bus ? '✓' : ''} <span className="font-normal">(왕복 {won(BUS_FEE)})</span>
+                버스 이용하겠습니다{m.bus ? ' ✓' : ''} <span className="font-normal text-[13px]">(왕복 {won(BUS_FEE)})</span>
               </button>
             </div>
           ))}
         </div>
         <button
           onClick={addMember}
-          className="w-full mt-3 py-3 rounded-2xl text-[13px] font-bold text-[#3182f6] bg-[#f2f8ff] border-2 border-dashed border-[#3182f6]/30 hover:bg-[#e8f3ff]"
+          className="w-full mt-3 py-4 rounded-2xl text-[14px] font-bold text-[#3182f6] bg-[#f2f8ff] border-2 border-dashed border-[#3182f6]/30 hover:bg-[#e8f3ff] min-h-[52px]"
         >
           + 구성원 추가
         </button>
       </Card>
 
-      <Card title="설악산 뷰 (그룹 전체)" help={HELP.seorakGroup} helpTitle="설악산뷰 안내">
-        <Toggle
-          on={seorak}
-          onChange={setSeorak}
-          label="설악산 뷰 신청 (전원 적용)"
-          sub={`그룹은 함께 투숙 → 전원 적용 · ${count}명 × ${won(SEORAK_FEE)}`}
-          price={`+${won(count * SEORAK_FEE)}`}
-        />
-      </Card>
-
-      <Card title="객실 종류 (그룹 추가비용)" help={HELP.room} helpTitle="객실 종류 안내">
+      <Card title="방 선택" help={HELP.room} helpTitle="객실 종류 안내">
         <div className="space-y-2">
           {ROOMS.map((r, i) => (
             <OptionRow
@@ -599,78 +792,152 @@ function GroupMode() {
               onClick={() => setRoomIdx(i)}
               title={r.name}
               sub={r.desc}
-              right={r.group > 0 ? `+${won(r.group)}` : '추가없음'}
+              right={r.group > 0 ? `+${won(r.group)}` : '추가비용 없음'}
             />
           ))}
         </div>
         {calc.overMax && (
-          <p className="text-[12px] text-[#f04452] font-bold mt-3">
-            ⚠ 구성원 {count}명이 선택한 객실 최대 인원({room.max}인)을 초과합니다.
+          <p className="text-[13px] text-[#f04452] font-bold mt-3">
+            구성원 {count}명이 선택한 방 최대 인원({room.max}명)을 초과합니다.
           </p>
         )}
       </Card>
 
-      <Card title="투숙 인원 (그룹 추가비용)" help={HELP.occupancy} helpTitle="투숙 인원 / 방배정 안내">
-        <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">
-          한 객실에 몇 명이 투숙하는지에 따른 추가비용입니다. 기본값은 구성원 수 기준이며, 다르면 직접 선택하세요.
-          <br />7~8인 투숙 시 추가비용 없음.
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setOccOverride(null)}
-            className={`py-2.5 rounded-xl text-[12px] font-bold border transition-all ${
-              occOverride == null ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
-            }`}
-          >
-            자동 ({deriveOcc(count).label})
-          </button>
-          {OCCUPANCY.map((o) => (
+      <Card title="몇 분이 한 방을 쓰나요?" help={HELP.occupancy} helpTitle="투숙 인원 / 방배정 안내">
+        <div className="bg-[#f2f8ff] rounded-2xl px-4 py-4 mb-3 flex items-center justify-between">
+          <div>
+            <div className="text-[13px] text-[#4e5968] mb-0.5">현재 구성원 수 기준 자동 적용</div>
+            <div className="text-[17px] font-extrabold text-[#1b64da]">
+              {effOcc.label} 투숙
+              {effOcc.fee > 0
+                ? <span className="text-[14px] font-bold text-[#f04452] ml-2">+{won(effOcc.fee)}</span>
+                : <span className="text-[14px] font-bold text-[#15803d] ml-2">추가비용 없음</span>
+              }
+            </div>
+            {occOverride != null && (
+              <div className="text-[12px] text-[#8b95a1] mt-0.5">(수동 선택 중)</div>
+            )}
+          </div>
+          {occOverride != null && (
             <button
-              key={o.label}
-              onClick={() => setOccOverride(o.label)}
-              className={`py-2.5 rounded-xl text-[12px] font-bold border transition-all ${
-                occOverride === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
-              }`}
+              onClick={() => { setOccOverride(null); setOccOpen(false) }}
+              className="text-[12px] font-bold text-[#3182f6] min-w-[44px] min-h-[44px] flex items-center justify-end"
             >
-              {o.label} {o.fee > 0 ? `+${(o.fee / 10000)}만` : '0'}
+              자동으로
             </button>
-          ))}
+          )}
         </div>
-        <p className="text-[11px] text-[#8b95a1] mt-3 leading-relaxed">
-          * 부분 그룹을 원하시면 신청서 7번에 상세 내용을 적어주세요. (추가비용 추후 결정)
-        </p>
+
+        <button
+          onClick={() => setOccOpen((v) => !v)}
+          className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-[#f9fafb] border border-[#e5e8eb] text-[13px] font-bold text-[#4e5968] min-h-[48px]"
+        >
+          <span>직접 선택하기</span>
+          <span className={`text-[#8b95a1] text-[12px] transition-transform ${occOpen ? 'rotate-180' : ''}`}>▼</span>
+        </button>
+
+        {occOpen && (
+          <div className="mt-3">
+            <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+              방에 실제로 투숙하는 인원에 따라 추가비용이 달라집니다. 7~8명이면 추가비용 없음.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {OCCUPANCY.map((o) => (
+                <button
+                  key={o.label}
+                  onClick={() => { setOccOverride(o.label); setOccOpen(false) }}
+                  className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${
+                    occOverride === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'
+                  }`}
+                >
+                  {o.label}<br />
+                  <span className="text-[13px] font-normal text-[#8b95a1]">{o.fee > 0 ? `+${o.fee/10000}만원` : '추가없음'}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed">
+              * 일부만 함께 쓰는 경우는 문의사항에 적어주세요.
+            </p>
+          </div>
+        )}
       </Card>
 
-      <Card title="입금 방식" help={HELP.depositMode} helpTitle="입금 방식 안내">
-        <div className="grid grid-cols-2 gap-2">
+      <Card title="설악산 뷰" help={HELP.seorakGroup} helpTitle="설악산뷰 안내">
+        <Toggle
+          on={seorak}
+          onChange={setSeorak}
+          label="설악산 뷰 신청하겠습니다 (전원 적용)"
+          sub={`같은 방이라 모두 적용 · ${count}명 × ${won(SEORAK_FEE)}`}
+          price={seorak ? `+${won(count * SEORAK_FEE)}` : `+${won(count * SEORAK_FEE)}`}
+        />
+      </Card>
+
+      <Card title="등록비 입금은 어떻게 하실 건가요?" help={HELP.depositMode} helpTitle="입금 방식 안내">
+        <div className="space-y-2">
           <button
             onClick={() => setDepositMode('leader')}
-            className={`px-3 py-3 rounded-xl text-[13px] font-bold border text-left transition-all ${
-              depositMode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+            className={`w-full px-4 py-4 rounded-2xl text-left transition-all min-h-[64px] border ${
+              depositMode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'
             }`}
           >
-            대표자 일괄
-            <span className="block text-[11px] font-normal mt-0.5">전 항목 대표자 이름</span>
+            <div className={`text-[15px] font-bold ${depositMode === 'leader' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>
+              대표자가 한꺼번에 입금
+            </div>
+            <div className="text-[13px] text-[#8b95a1] mt-0.5">
+              모든 항목을 대표자({who}) 이름으로 입금
+            </div>
           </button>
           <button
             onClick={() => setDepositMode('split')}
-            className={`px-3 py-3 rounded-xl text-[13px] font-bold border text-left transition-all ${
-              depositMode === 'split' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+            className={`w-full px-4 py-4 rounded-2xl text-left transition-all min-h-[64px] border ${
+              depositMode === 'split' ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'
             }`}
           >
-            등록비 각자
-            <span className="block text-[11px] font-normal mt-0.5">등록비는 각 구성원 이름</span>
+            <div className={`text-[15px] font-bold ${depositMode === 'split' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>
+              각자 등록비를 본인 이름으로 입금
+            </div>
+            <div className="text-[13px] text-[#8b95a1] mt-0.5">
+              등록비만 각자, 공동비용(방·그룹비)은 대표자 이름
+            </div>
           </button>
         </div>
         {depositMode === 'split' && (
-          <p className="text-[11px] text-[#8b95a1] mt-3 leading-relaxed">
-            * 등록비 각자 선택 시 구성원별 이름이 입금자명에 들어갑니다. 위 구성원 이름을 정확히 입력해 주세요.
+          <p className="text-[13px] text-[#4e5968] mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3 leading-relaxed">
+            구성원 이름이 입금자명으로 사용됩니다. 위에 이름을 정확히 입력해 주세요.
           </p>
         )}
       </Card>
 
-      <ResultPanel calc={calc} subtitle={subtitle} />
-      <SubmitSection payload={submission} valid={missing.length === 0} missing={missing} />
+      <ResultPanel calc={calc} subtitle={`※ ${subtitle}`} />
+
+      <div className="mb-6">
+        {missing.length > 0 && (
+          <p className="text-[13px] text-[#f04452] font-semibold mb-3 leading-relaxed">입력 필요: {missing.join(', ')}</p>
+        )}
+        {submitErr && <p className="text-[13px] text-[#f04452] mb-3 leading-relaxed">제출 오류: {submitErr}</p>}
+        <button
+          onClick={() => setConfirmOpen(true)}
+          disabled={missing.length > 0}
+          className={`w-full py-4 rounded-2xl font-bold text-[16px] transition-all ${
+            missing.length === 0 ? 'bg-[#191f28] text-white hover:bg-black shadow-lg' : 'bg-[#e5e8eb] text-[#b0b8c1]'
+          }`}
+        >
+          신청 내용 확인하고 제출하기
+        </button>
+        <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed text-center">
+          * 제출 후 입금까지 완료해야 등록이 확정됩니다.
+        </p>
+      </div>
+
+      <ConfirmSheet
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={doSubmit}
+        calc={calc}
+        subtitle={subtitle}
+        memberSummary={memberSummary}
+        loading={submitLoading}
+      />
     </>
   )
 }
@@ -703,44 +970,55 @@ function ResultPanel({ calc, subtitle }) {
       {/* 총액 카드 */}
       <div className="bg-[#191f28] text-white rounded-[26px] shadow-xl p-6 mb-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-[80px]" />
-        <div className="text-[#adb5bd] text-[13px] font-bold mb-2">총 등록 금액</div>
-        <div className="text-[34px] font-extrabold tracking-tight leading-none">
+        <div className="text-[#adb5bd] text-[14px] font-bold mb-2">총 등록 금액</div>
+        <div className="text-[36px] font-extrabold tracking-tight leading-none">
           {calc.total.toLocaleString('ko-KR')}
-          <span className="text-xl font-medium text-[#adb5bd] ml-1">원</span>
+          <span className="text-[22px] font-medium text-[#adb5bd] ml-1">원</span>
         </div>
         {calc.count > 1 && (
-          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between text-[13px]">
+          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between text-[14px]">
             <span className="text-[#adb5bd]">1인 평균 ({calc.count}명)</span>
             <span className="font-bold text-[#3182f6]">{won(calc.perPerson)}</span>
           </div>
         )}
       </div>
 
-      {/* 입금 분할 */}
-      <Card title="입금 안내 (항목별 따로 입금)" help={HELP.deposit} helpTitle="입금 방법 안내">
-        {subtitle && <p className="text-[12px] text-[#1b64da] font-semibold mb-3 leading-relaxed">{subtitle}</p>}
-        <div className="space-y-2.5">
+      {/* 항목별 입금 안내 */}
+      <Card title="항목별 입금 안내" help={HELP.deposit} helpTitle="입금 방법 안내">
+        {subtitle && (
+          <div className="bg-[#f2f8ff] rounded-xl px-4 py-3 mb-4">
+            <p className="text-[13px] text-[#1b64da] font-semibold leading-relaxed">{subtitle}</p>
+          </div>
+        )}
+        <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+          아래 항목별로 <b>각각 따로</b> 입금해 주세요. 입금자명 형식: "항목 이름"
+        </p>
+        <div className="space-y-3">
           {calc.lines.map((l, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-[#f2f4f6] last:border-0">
               <div>
-                <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-2 py-0.5 rounded-lg mr-2">
+                <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[13px] font-bold px-2.5 py-1 rounded-lg mr-2">
                   {l.cat} {l.payer}
                 </span>
-                {l.note && <span className="text-[11px] text-[#8b95a1]">{l.note}</span>}
+                {l.note && <span className="text-[12px] text-[#8b95a1]">{l.note}</span>}
               </div>
-              <span className="text-[14px] font-bold text-[#191f28]">{won(l.amt)}</span>
+              <span className="text-[15px] font-bold text-[#191f28]">{won(l.amt)}</span>
             </div>
           ))}
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[14px] font-bold text-[#4e5968]">합계</span>
+            <span className="text-[18px] font-extrabold text-[#191f28]">{won(calc.total)}</span>
+          </div>
         </div>
 
         <div className="mt-4 bg-[#f9fafb] rounded-2xl p-4">
-          <div className="text-[12px] text-[#8b95a1] font-semibold mb-1">입금 계좌</div>
-          <div className="text-[14px] font-bold text-[#191f28]">{ACCOUNT}</div>
+          <div className="text-[13px] text-[#8b95a1] font-semibold mb-1">입금 계좌</div>
+          <div className="text-[15px] font-bold text-[#191f28]">{ACCOUNT}</div>
         </div>
 
         <button
           onClick={copy}
-          className="w-full mt-3 py-3.5 rounded-2xl bg-[#3182f6] hover:bg-[#1b64da] text-white font-bold text-[15px] transition-all shadow-lg"
+          className="w-full mt-3 py-4 rounded-2xl bg-[#3182f6] hover:bg-[#1b64da] text-white font-bold text-[15px] transition-all shadow-lg min-h-[52px]"
         >
           {copied ? '✓ 복사 완료' : '입금 안내 문구 복사하기'}
         </button>
@@ -850,19 +1128,65 @@ function EditCard({ data, onDelete }) {
     } catch (e) { setErr(String(e)) } finally { setSaving(false) }
   }
 
+  const isGroupRoom = /인이 투숙/.test(data.occLabel || '') || data.appType === '그룹'
+  const selfRoom = isGroupRoom ? 0 : roomIndivFee(data.roomLabel)
+  const common = data.common || 0
+  const isRep = common > 0 || data.groupTotal > 0
+  const deptF = DEPTS.find((d) => d.name === deptName)?.fee || 0
+  const selfFee = deptF + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0) + (isRep ? common : 0)
   const roomShort = (data.roomLabel || '').split(' (')[0]
+
+  const feeBreakdown = [
+    { label: '등록비', amt: deptF, note: deptName },
+    selfRoom > 0 && { label: '객실 추가', amt: selfRoom, note: roomShort },
+    bus && { label: '버스', amt: BUS_FEE, note: '왕복' },
+    seorak && { label: '설악산뷰', amt: SEORAK_FEE },
+    isRep && common > 0 && { label: '방·그룹비 (공동)', amt: common, note: '대표자 납부분' },
+  ].filter(Boolean)
+
   return (
     <div className="bg-[#f9fafb] rounded-2xl p-4 border border-[#f2f4f6] mb-3">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[14px] font-bold text-[#191f28]">
+        <span className="text-[16px] font-bold text-[#191f28]">
           {data.name}
-          {data.isSelf && <span className="ml-1.5 text-[10px] font-bold text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 align-middle">본인</span>}
+          {data.isSelf && <span className="ml-1.5 text-[11px] font-bold text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 align-middle">본인</span>}
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[#8b95a1]">대표 {data.rep || '-'}</span>
-          {onDelete && <button onClick={onDelete} className="text-[11px] font-bold text-[#f04452]">삭제</button>}
+          {data.rep && <span className="text-[12px] text-[#8b95a1]">대표 {data.rep}</span>}
+          {onDelete && (
+            <button onClick={onDelete} className="text-[13px] font-bold text-[#f04452] min-w-[44px] min-h-[44px] flex items-center justify-end">삭제</button>
+          )}
         </div>
       </div>
+
+      {/* 내가 내야 할 금액 요약 */}
+      <div className="bg-[#f2f8ff] rounded-2xl p-4 mb-4 border border-[#d8e8ff]">
+        <div className="flex justify-between items-baseline mb-2">
+          <span className="text-[14px] font-bold text-[#1b64da]">
+            {isRep ? '내가 입금할 금액 (공동비용 포함)' : '내가 입금할 금액'}
+          </span>
+          <span className="text-[26px] font-extrabold text-[#191f28] leading-none">{won(selfFee)}</span>
+        </div>
+        <div className="space-y-1">
+          {feeBreakdown.map((f, i) => (
+            <div key={i} className="flex items-center justify-between text-[13px]">
+              <span className="text-[#4e5968]">{f.label}{f.note ? <span className="text-[#8b95a1]"> ({f.note})</span> : ''}</span>
+              <span className="font-bold text-[#4e5968]">{won(f.amt)}</span>
+            </div>
+          ))}
+        </div>
+        {isGroupRoom && isRep && data.groupTotal > 0 && (
+          <div className="mt-2 pt-2 border-t border-[#c8deff] text-[13px] text-[#8b95a1]">
+            그룹 전체 총액: {won(data.groupTotal)}
+          </div>
+        )}
+        {isGroupRoom && !isRep && (
+          <div className="mt-2 pt-2 border-t border-[#c8deff] text-[13px] text-[#8b95a1]">
+            방·그룹비는 대표자({data.rep || '-'})가 납부
+          </div>
+        )}
+      </div>
+
       <Field label="성별"><SegPicker value={gender} onChange={setGender} options={['남', '여']} /></Field>
       <Field label="연락처"><input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} inputMode="tel" className={inputCls} /></Field>
       <Field label="이메일"><input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" className={inputCls} /></Field>
@@ -870,37 +1194,26 @@ function EditCard({ data, onDelete }) {
       <Field label="소속부서"><DeptSelect value={deptName} onChange={setDeptName} /></Field>
       <Field label="버스 / 설악산뷰">
         <div className="flex gap-2">
-          <button onClick={() => setBus(!bus)} className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border ${bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>버스 {bus ? '✓' : ''}</button>
-          <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>설악산뷰 {seorak ? '✓' : ''}</button>
+          <button onClick={() => setBus(!bus)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+            버스{bus ? ' ✓' : ''}
+          </button>
+          <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+            설악산뷰{seorak ? ' ✓' : ''}
+          </button>
         </div>
       </Field>
       <Field label="문의사항"><textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} /></Field>
-      {(() => {
-        const isGroupRoom = /인이 투숙/.test(data.occLabel || '') || data.appType === '그룹'
-        const selfRoom = isGroupRoom ? 0 : roomIndivFee(data.roomLabel)
-        const common = data.common || 0                       // 그룹공동비용(객실+투숙) — 대표 행에만 값
-        const isRep = common > 0 || data.groupTotal > 0        // 대표자 행
-        const deptF = DEPTS.find((d) => d.name === deptName)?.fee || 0
-        const selfFee = deptF + selfRoom + (bus ? BUS_FEE : 0) + (seorak ? SEORAK_FEE : 0) + (isRep ? common : 0)
-        return (
-          <div className="bg-[#f2f8ff] rounded-2xl p-4 mb-3 border border-[#d8e8ff]">
-            <div className="flex justify-between items-baseline">
-              <span className="text-[13px] font-bold text-[#1b64da]">{isRep ? '본인 부담 (공동비용 포함)' : '본인 부담 금액'}</span>
-              <span className="text-[24px] font-extrabold text-[#191f28] leading-none">{won(selfFee)}</span>
-            </div>
-            <div className="text-[12px] text-[#4e5968] mt-2 leading-snug">
-              등록비 {won(deptF)}{selfRoom > 0 ? ` · 객실 ${won(selfRoom)}` : ''}{bus ? ` · 버스 ${won(BUS_FEE)}` : ''}{seorak ? ` · 설악산 ${won(SEORAK_FEE)}` : ''}{isRep && common > 0 ? ` · 객실+투숙 그룹비 ${won(common)}` : ''}
-              {isGroupRoom && isRep && data.groupTotal > 0 && <><br /><span className="text-[#8b95a1]">* 대표자라 공동비용 포함. 그룹 전체 총액 {won(data.groupTotal)}</span></>}
-              {isGroupRoom && !isRep && <><br /><span className="text-[#8b95a1]">* 객실·투숙 그룹비용은 대표자({data.rep || '-'})가 납부</span></>}
-            </div>
-          </div>
-        )
-      })()}
-      <div className="text-[11px] text-[#8b95a1] bg-white rounded-xl p-3 mb-3 leading-relaxed">
-        객실: {roomShort || '-'} · 투숙/그룹/입금자명 변경은 별도로 문의 부탁드립니다.
+
+      <div className="text-[13px] text-[#8b95a1] bg-white rounded-xl p-3 mb-3 leading-relaxed">
+        선택한 방: {roomShort || '-'} · 방 종류·투숙인원·입금자명 변경은 별도 문의 바랍니다.
       </div>
-      {err && <p className="text-[12px] text-[#f04452] mb-2">{err}</p>}
-      <button onClick={save} disabled={saving} className={`w-full py-3 rounded-2xl font-bold text-[14px] ${saved ? 'bg-[#15803d] text-white' : 'bg-[#3182f6] text-white hover:bg-[#1b64da]'}`}>
+
+      {err && <p className="text-[13px] text-[#f04452] mb-3">{err}</p>}
+      <button
+        onClick={save}
+        disabled={saving}
+        className={`w-full py-4 rounded-2xl font-bold text-[15px] min-h-[52px] ${saved ? 'bg-[#15803d] text-white' : 'bg-[#3182f6] text-white hover:bg-[#1b64da]'}`}
+      >
         {saving ? '저장 중…' : saved ? '✓ 저장됨' : '이 내용으로 수정 저장'}
       </button>
     </div>
@@ -993,7 +1306,6 @@ function LookupDeposit({ results }) {
 
   const lines = []
   if (mode === 'leader' && multi) {
-    // 대표자 일괄: 모든 항목을 대표자 이름으로
     const regSum = results.reduce((s, r) => s + deptFeeOfLabel(r.deptLabel) + (isGroup ? 0 : roomIndivFee(r.roomLabel)), 0)
     lines.push({ cat: '등록비', payer: repName, amt: regSum })
     if (rg > 0) lines.push({ cat: '객실선택', payer: repName, amt: rg })
@@ -1001,7 +1313,6 @@ function LookupDeposit({ results }) {
     const busSum = results.filter((r) => r.bus).length * BUS_FEE; if (busSum) lines.push({ cat: '버스비', payer: repName, amt: busSum })
     const seoSum = results.filter((r) => r.seorak).length * SEORAK_FEE; if (seoSum) lines.push({ cat: '설악산', payer: repName, amt: seoSum })
   } else {
-    // 등록비 각자 (공동비용은 대표자)
     results.forEach((r) => {
       lines.push({ cat: '등록비', payer: r.name, amt: deptFeeOfLabel(r.deptLabel) })
       if (!isGroup) { const ri = roomIndivFee(r.roomLabel); if (ri > 0) lines.push({ cat: '객실선택', payer: r.name, amt: ri }) }
@@ -1021,31 +1332,46 @@ function LookupDeposit({ results }) {
   return (
     <Card title="입금 안내">
       {multi && (
-        <div className="flex gap-2 mb-3">
-          <button onClick={() => setMode('leader')} className={`flex-1 py-2 rounded-xl text-[13px] font-bold border ${mode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>대표자 일괄</button>
-          <button onClick={() => setMode('each')} className={`flex-1 py-2 rounded-xl text-[13px] font-bold border ${mode === 'each' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>등록비 각자</button>
+        <div className="space-y-2 mb-4">
+          <button
+            onClick={() => setMode('leader')}
+            className={`w-full px-4 py-4 rounded-2xl text-left transition-all min-h-[64px] border ${mode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'}`}
+          >
+            <div className={`text-[15px] font-bold ${mode === 'leader' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>대표자({repName})가 한꺼번에 입금</div>
+            <div className="text-[13px] text-[#8b95a1] mt-0.5">모든 항목을 대표자 이름으로</div>
+          </button>
+          <button
+            onClick={() => setMode('each')}
+            className={`w-full px-4 py-4 rounded-2xl text-left transition-all min-h-[64px] border ${mode === 'each' ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'}`}
+          >
+            <div className={`text-[15px] font-bold ${mode === 'each' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>각자 등록비를 본인 이름으로 입금</div>
+            <div className="text-[13px] text-[#8b95a1] mt-0.5">공동비용(방·그룹비)은 대표자 이름</div>
+          </button>
         </div>
       )}
-      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed">
-        {mode === 'leader' && multi ? <>대표자 <b>{repName}</b>님 이름으로 항목별 입금. 입금자명 "항목 {repName}".</> : <>각자 등록비는 본인 이름, 공동비용(객실·투숙)은 대표자 이름으로. 입금자명 "항목 이름".</>}
+      <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+        아래 항목별로 <b>각각 따로</b> 입금해 주세요.
       </p>
-      <div className="space-y-1.5 mb-3">
+      <div className="space-y-2 mb-4">
         {lines.map((l, i) => (
-          <div key={i} className="flex items-center justify-between py-1 border-b border-[#f7f8fa] last:border-0">
-            <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-2 py-0.5 rounded-lg">{l.cat} {l.payer}</span>
-            <span className="text-[14px] font-bold text-[#191f28]">{won(l.amt)}</span>
+          <div key={i} className="flex items-center justify-between py-2.5 border-b border-[#f7f8fa] last:border-0">
+            <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[13px] font-bold px-2.5 py-1 rounded-lg">{l.cat} {l.payer}</span>
+            <span className="text-[15px] font-bold text-[#191f28]">{won(l.amt)}</span>
           </div>
         ))}
         <div className="flex items-center justify-between pt-2">
-          <span className="text-[12px] font-bold text-[#8b95a1]">총 합계</span>
-          <span className="text-[16px] font-extrabold text-[#191f28]">{won(total)}</span>
+          <span className="text-[14px] font-bold text-[#4e5968]">총 합계</span>
+          <span className="text-[20px] font-extrabold text-[#191f28]">{won(total)}</span>
         </div>
       </div>
-      <div className="bg-[#f9fafb] rounded-xl p-3 mb-3">
-        <div className="text-[11px] text-[#8b95a1] font-semibold mb-0.5">입금 계좌</div>
-        <div className="text-[13px] font-bold text-[#191f28]">{ACCOUNT}</div>
+      <div className="bg-[#f9fafb] rounded-xl p-4 mb-3">
+        <div className="text-[13px] text-[#8b95a1] font-semibold mb-1">입금 계좌</div>
+        <div className="text-[15px] font-bold text-[#191f28]">{ACCOUNT}</div>
       </div>
-      <button onClick={copy} className="w-full py-3 rounded-2xl bg-[#3182f6] hover:bg-[#1b64da] text-white font-bold text-[14px]">
+      <button
+        onClick={copy}
+        className="w-full py-4 rounded-2xl bg-[#3182f6] hover:bg-[#1b64da] text-white font-bold text-[15px] min-h-[52px]"
+      >
         {copied ? '✓ 복사 완료' : '입금 안내 문구 복사하기'}
       </button>
     </Card>
@@ -1076,20 +1402,33 @@ function LookupMode() {
   return (
     <>
       <Card title="내 신청 조회">
-        <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">제출하신 이름과 연락처로 조회합니다. 가족 대표자는 본인 이름으로 조회하세요.</p>
-        <Field label="이름" required><input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} /></Field>
-        <Field label="연락처" required><input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} /></Field>
-        <button onClick={lookup} disabled={!name.trim() || !contact.trim() || status === 'loading'}
-          className={`w-full py-3.5 rounded-2xl font-bold text-[15px] ${name.trim() && contact.trim() && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>
+        <p className="text-[14px] text-[#4e5968] mb-4 leading-relaxed">
+          신청하실 때 입력한 이름과 연락처로 조회합니다.<br />
+          가족·그룹은 대표자 이름으로 조회하세요.
+        </p>
+        <Field label="이름" required>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} />
+        </Field>
+        <Field label="연락처" required>
+          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+        </Field>
+        <button
+          onClick={lookup}
+          disabled={!name.trim() || !contact.trim() || status === 'loading'}
+          className={`w-full py-4 rounded-2xl font-bold text-[16px] min-h-[52px] ${name.trim() && contact.trim() && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}
+        >
           {status === 'loading' ? '조회 중…' : '조회하기'}
         </button>
-        {status === 'error' && <p className="text-[12px] text-[#f04452] mt-3">{err}</p>}
+        {status === 'error' && <p className="text-[13px] text-[#f04452] mt-3">{err}</p>}
       </Card>
 
       {status === 'loaded' && (
         results.length === 0 ? (
           <Card title="조회 결과 없음">
-            <p className="text-[12px] text-[#8b95a1] leading-relaxed">해당 이름·연락처로 제출된 신청이 없습니다. 입력을 확인하시거나 안내데스크로 문의해 주세요.</p>
+            <p className="text-[14px] text-[#4e5968] leading-relaxed">
+              해당 이름과 연락처로 제출된 신청이 없습니다.<br />
+              입력 내용을 다시 확인하시거나, 안내데스크로 문의해 주세요.
+            </p>
           </Card>
         ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (
           <GroupEditor members={results} auth={{ verifyContact: contact.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
@@ -1696,10 +2035,10 @@ export default function App() {
           <h1 className="text-[22px] font-extrabold text-[#191f28] tracking-tight leading-tight">
             2026 전교인 리트릿<br />등록 및 조회·수정
           </h1>
-          <div className="mt-3 bg-white rounded-2xl border border-[#f2f4f6] p-4 text-[12px] text-[#4e5968] leading-relaxed">
-            📅 7/21(화)~23(목) · 델피노 리조트<br />
-            📝 등록기간 6/7~6/28 (선착순) · 문의 이흥배 목사 010-9584-7575<br />
-            <span className="text-[#8b95a1]">* 새가족 과정 수료자에 한해 등록 가능</span>
+          <div className="mt-3 bg-white rounded-2xl border border-[#f2f4f6] p-4 text-[14px] text-[#4e5968] leading-relaxed">
+            7/21(화)~23(목) · 델피노 리조트<br />
+            등록기간 6/7~6/28 (선착순) · 문의 이흥배 목사 010-9584-7575<br />
+            <span className="text-[#8b95a1] text-[13px]">* 새가족 과정 수료자에 한해 등록 가능</span>
             <GuideButton />
           </div>
         </header>
@@ -1714,7 +2053,7 @@ export default function App() {
             <button
               key={k}
               onClick={() => setMode(k)}
-              className={`flex-1 py-3 text-[13px] font-bold rounded-[12px] transition-all ${
+              className={`flex-1 py-3.5 text-[14px] font-bold rounded-[12px] transition-all min-h-[48px] ${
                 mode === k ? 'bg-white text-[#3182f6] shadow-md' : 'text-[#8b95a1]'
               }`}
             >
@@ -1725,10 +2064,10 @@ export default function App() {
 
         {mode === '개인' ? <IndividualMode /> : mode === '그룹' ? <GroupMode /> : <LookupMode />}
 
-        <p className="text-[11px] text-[#b0b8c1] text-center mt-6 leading-relaxed">
-          본 페이지에서 등록 신청과 조회·수정을 하실 수 있습니다.<br />
-          제출 후 <b>입금까지 완료</b>해야 등록이 확정되며, 환불은 등록기간 이후 어렵습니다.<br />
-          가족/그룹은 대표자가 구성원을 모두 입력해 한 번에 제출합니다.
+        <p className="text-[13px] text-[#8b95a1] text-center mt-6 leading-relaxed">
+          제출 후 <b>입금까지 완료</b>해야 등록이 확정됩니다.<br />
+          환불은 등록기간 이후 어렵습니다.<br />
+          가족·그룹은 대표자가 구성원을 모두 입력해 한 번에 제출합니다.
         </p>
       </div>
     </div>

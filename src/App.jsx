@@ -1603,6 +1603,69 @@ function AdminApp() {
     return { totalPeople, placeholderN, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing }
   }, [rows, assignDraft])
 
+  // 요청조합: 부분그룹·"○○와 같은 방" 요청을 파싱 → 그래프로 묶고 → 교차검증
+  // (비용은 그대로 두고 배정방만 지정. mergeGroups 호출 안 함 = 비용 중복부과 방지)
+  const reqCombine = useMemo(() => {
+    const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
+    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|님이|적|어요|니다|형제|자매|가능|방을|명은|저는|제가|모두|각각|먼저|보냅|원합|니까/
+    const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
+    const live = rows.filter((r) => r.route !== '중복')
+    const byName = {}
+    live.forEach((r) => { const k = norm(r.name); (byName[k] = byName[k] || []).push(r) })
+    const rowByNum = {}; live.forEach((r) => { rowByNum[r.row] = r })
+    const isPool = (r) => isChurchAssigned(r.occLabel)
+    const picksOf = (r) => [...new Set([...tok(r.list), ...tok(r.inquiry)].map(norm))].filter((k) => k && k !== norm(r.name))
+    const reqRows = live.filter((r) => isPool(r) && (picksOf(r).length > 0 || (r.note || '').indexOf('부분') >= 0))
+    if (!reqRows.length) return { clusters: [], count: 0 }
+    const parent = {}
+    const init = (x) => { if (parent[x] === undefined) parent[x] = x }
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+    const union = (a, b) => { init(a); init(b); const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
+    reqRows.forEach((r) => init(r.row))
+    const noteByRow = {}
+    reqRows.forEach((r) => {
+      noteByRow[r.row] = { unresolved: [], ambiguous: [], booked: [] }
+      picksOf(r).forEach((k) => {
+        const cand = byName[k] || []
+        if (!cand.length) { noteByRow[r.row].unresolved.push(k); return }
+        if (cand.length > 1) { noteByRow[r.row].ambiguous.push(k); return }
+        const p = cand[0]
+        if (!isPool(p)) { noteByRow[r.row].booked.push(p.name); return } // 이미 확정 그룹 소속
+        union(r.row, p.row)
+      })
+    })
+    const byGid = {}
+    reqRows.forEach((r) => { (byGid[r.gid] = byGid[r.gid] || []).push(r) })
+    Object.values(byGid).forEach((arr) => arr.slice(1).forEach((x) => union(arr[0].row, x.row)))
+    const comp = {}
+    Object.keys(parent).forEach((rw) => { const root = find(Number(rw)); (comp[root] = comp[root] || []).push(Number(rw)) })
+    const clusters = Object.values(comp).map((nums) => {
+      const members = [...new Set(nums)].map((x) => rowByNum[x]).filter(Boolean)
+      const genders = [...new Set(members.map((p) => p.gender).filter(Boolean))]
+      const campuses = [...new Set(members.map((p) => (p.campus || '').replace(' 캠퍼스', '')).filter(Boolean))]
+      const roomType = roomTypeOfMembers(members)
+      const cap = ROOM_CAP[roomType] || 8
+      const assigned = members.filter((p) => p.assigned)
+      const unresolved = [...new Set(members.flatMap((p) => noteByRow[p.row]?.unresolved || []))]
+      const ambiguous = [...new Set(members.flatMap((p) => noteByRow[p.row]?.ambiguous || []))]
+      const booked = [...new Set(members.flatMap((p) => noteByRow[p.row]?.booked || []))]
+      const conflicts = []
+      if (genders.length > 1) conflicts.push({ lv: 'block', msg: `남녀 같은 방 (${genders.join('·')}) — 가족이면 무시, 아니면 분리` })
+      if (members.length > cap) conflicts.push({ lv: 'block', msg: `정원 초과 (${members.length}/${cap}명) — 객실 변경 또는 분리` })
+      if (booked.length) conflicts.push({ lv: 'block', msg: `이미 그룹 소속: ${booked.join(', ')} (확정 그룹 우선)` })
+      if (assigned.length) conflicts.push({ lv: 'check', msg: `이미 배정됨: ${assigned.map((p) => `${p.name}→${p.assigned}`).join(', ')}` })
+      if (ambiguous.length) conflicts.push({ lv: 'check', msg: `동명이인: ${ambiguous.join(', ')} — 누구인지 확인` })
+      if (unresolved.length) conflicts.push({ lv: 'check', msg: '명단에 없는 사람', names: unresolved })
+      if (campuses.length > 1) conflicts.push({ lv: 'warn', msg: `캠퍼스 혼합: ${campuses.join('·')}` })
+      const block = conflicts.some((c) => c.lv === 'block')
+      const score = conflicts.reduce((s, c) => s + (c.lv === 'block' ? 100 : c.lv === 'check' ? 10 : 1), 0)
+      return { members, roomType, cap, conflicts, block, score, label: '' }
+    })
+    clusters.sort((a, b) => b.score - a.score)
+    clusters.forEach((c, i) => { c.label = `요청-${roomTypeShort(c.roomType)}-${i + 1}` })
+    return { clusters, count: clusters.length }
+  }, [rows])
+
   const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
 
   // 자동 배치: 메모 없는 교회배정자만, 캠퍼스+신청 객실옵션별로 옵션 정원만큼 채움
@@ -1684,6 +1747,22 @@ function AdminApp() {
     setTimeout(() => setPhMsg(''), 3000)
   }
 
+  // 요청조합 확정: 같은 방 라벨(배정방)만 부여 — 비용은 그대로(그룹 합치기 아님)
+  const assignRoom = async (rowList, label) => {
+    if (!rowList.length) return
+    setSaveMsg(`${label} 배정 중…`)
+    const updates = rowList.map((row) => ({ row, value: label }))
+    const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
+    if (j.ok) { setSaveMsg(`✓ ${label} ${updates.length}명 배정`); await reload() } else setSaveMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setSaveMsg(''), 3000)
+  }
+  const addPlaceholderName = async (name) => {
+    setSaveMsg(`${name} 추가 중…`)
+    const j = await post({ action: 'addPlaceholder', pin, name })
+    if (j.ok) { setSaveMsg(`✓ ${name} 미제출 추가`); await reload() } else setSaveMsg('오류: ' + (j.error || ''))
+    setTimeout(() => setSaveMsg(''), 3000)
+  }
+
   if (!auth) {
     return (
       <div className="min-h-screen bg-[#f2f4f6] flex items-center justify-center p-4">
@@ -1717,7 +1796,7 @@ function AdminApp() {
         </header>
 
         <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
-          {['요약', '방배정', '그룹정리', '리마인드', '버스명단', '문의'].map((t) => (
+          {['요약', '요청조합', '방배정', '그룹정리', '리마인드', '버스명단', '문의'].map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{t}</button>
           ))}
         </div>
@@ -1735,6 +1814,53 @@ function AdminApp() {
             {stat('캠퍼스', Object.entries(m.byCampus).map(([k, v]) => `${k.replace(' 캠퍼스', '')} ${v}`).join(' / '))}
           </div>
         )}
+
+        {tab === '요청조합' && (() => {
+          const { clusters } = reqCombine
+          return (
+            <div>
+              <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                <p className="text-[12px] text-[#4e5968] leading-relaxed">
+                  부분그룹·"○○와 같은 방" 요청을 모아 방으로 묶습니다. 🔴는 해소 후, 🟡는 확인 후 묶으세요.
+                  <b className="text-[#191f28]"> 방만 같이 쓰고 비용은 각자</b>라서, 그룹 합치기가 아니라 <b>배정방만</b> 지정됩니다.
+                </p>
+                {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
+              </div>
+              {!clusters.length && <p className="text-[13px] text-[#8b95a1] text-center py-10">처리할 방배정 요청이 없습니다.</p>}
+              {clusters.map((c, i) => (
+                <div key={i} className={`rounded-2xl border p-4 mb-2.5 ${c.block ? 'border-[#f04452] bg-[#fff5f5]' : c.conflicts.length ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[13px] font-bold text-[#191f28]">{c.block ? '🔴' : c.conflicts.length ? '🟡' : '🟢'} {c.members.map((p) => p.name).join(', ')}</span>
+                    <span className={`text-[12px] font-bold ${c.members.length > c.cap ? 'text-[#f04452]' : 'text-[#8b95a1]'}`}>{roomTypeShort(c.roomType)} {c.members.length}/{c.cap}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {c.members.map((p) => (
+                      <span key={p.row} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-bold border border-[#e5e8eb] bg-white">
+                        {p.name}<span className="text-[10px] text-[#8b95a1] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
+                        {p.assigned && <span className="text-[9px] text-[#1b64da] font-normal">📍{p.assigned}</span>}
+                      </span>
+                    ))}
+                  </div>
+                  {c.members.filter((p) => p.list || p.inquiry).map((p) => (
+                    <div key={'m' + p.row} className="text-[11px] text-[#8b95a1] leading-snug mb-0.5">📝 {p.name}: {p.list || p.inquiry}</div>
+                  ))}
+                  {c.conflicts.map((cf, j) => (
+                    <div key={j} className={`text-[12px] font-semibold mt-1 ${cf.lv === 'block' ? 'text-[#f04452]' : cf.lv === 'check' ? 'text-[#b45309]' : 'text-[#8b95a1]'}`}>
+                      {cf.lv === 'block' ? '🔴' : cf.lv === 'check' ? '🟡' : '⚪'} {cf.msg}
+                      {cf.names && cf.names.map((nm) => (
+                        <button key={nm} onClick={() => addPlaceholderName(nm)} className="ml-1 text-[11px] text-white bg-[#f04452] rounded px-1.5 py-0.5">+ {nm} 미제출 추가</button>
+                      ))}
+                    </div>
+                  ))}
+                  <button onClick={() => assignRoom(c.members.map((p) => p.row), c.label)} disabled={c.block}
+                    className={`w-full mt-3 py-2.5 rounded-xl font-bold text-[13px] ${c.block ? 'bg-[#e5e8eb] text-[#b0b8c1]' : 'bg-[#3182f6] text-white'}`}>
+                    {c.block ? '충돌 해소 후 묶기 가능' : `이 방으로 묶기 → ${c.label}`}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {tab === '방배정' && (() => {
           const roomMap = {}; m.pool.forEach((p) => { const l = eff(p); if (l) (roomMap[l] = roomMap[l] || []).push(p) })

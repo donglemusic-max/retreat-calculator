@@ -1916,7 +1916,7 @@ function AdminApp() {
                   <li><b>방배정</b> — 교회가 정해줄 사람을 방에 배치(자동배치 + 드래그)</li>
                   <li><b>입금·확인</b> — 입금 확인하고, 미제출자 연락</li>
                 </ol>
-                <p className="text-[12px] text-[#8b95a1] mt-1">요약 탭의 <b>'오늘 할 일'</b>을 위에서부터 누르면 해당 탭으로 갑니다.</p>
+                <p className="text-[12px] text-[#8b95a1] mt-1">요약 탭의 <b>'확인 리스트'</b>를 위에서부터 누르면 해당 탭으로 갑니다.</p>
               </div>
               <div>
                 <div className="font-bold text-[#191f28] mb-1">③ 자주 하는 일</div>
@@ -1924,6 +1924,8 @@ function AdminApp() {
                   <li><b>잘못 나뉜 가족 합치기</b>: 그룹정리 → 의심목록 '합치기' 또는 체크 후 합치기</li>
                   <li><b>사람 다른 그룹으로 옮기기</b>: 그룹정리 → '이름으로 이동'</li>
                   <li><b>같은 방 요청 처리</b>: 같은 방 요청 → 🟢/🟡 카드 '묶기'</li>
+                  <li><b>부분그룹 빈자리 채우기</b>: 같은 방 요청 카드의 '➕ 빈자리'에서 추천 인원 추가</li>
+                  <li><b>그룹대로 방 통일</b>: 방배정(또는 그룹정리) → '🛏️ 그룹 기준으로 방 맞추기'</li>
                   <li><b>미제출자 추가</b>: 요약 '미제출 추정 명단' 또는 방배정에서 추가</li>
                   <li><b>입금 확인</b>: 입금·확인 → 체크 후 '입금확인'</li>
                 </ul>
@@ -1934,7 +1936,7 @@ function AdminApp() {
                 <p className="mt-1 text-[12px] text-[#8b95a1]">합치기·이동·일괄저장은 누르면 <b>확인창</b>이 떠요. "비용이 바뀜/안 바뀜"을 보고 진행하세요.</p>
               </div>
               <div>
-                <div className="font-bold text-[#191f28] mb-1">⑤ 이럴 땐 담당자(임성현)에게</div>
+                <div className="font-bold text-[#191f28] mb-1">⑤ 이럴 땐 웹앱 제작자에게</div>
                 <p>비용이 이상하게 계산됨 · 오류 메시지가 뜸 · 화면이 안 바뀜(배포/시트 문제). 그 외 자유텍스트 분류(요청조합·미제출 명단)는 <b>어림짐작</b>이라 틀릴 수 있으니 사람이 확인하고 진행하세요.</p>
               </div>
               <button onClick={() => setShowGuide(false)} className="w-full py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[14px]">알겠습니다</button>
@@ -1985,7 +1987,7 @@ function AdminApp() {
               const left = todo.filter((t) => t.n > 0).length
               return (
                 <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
-                  <div className="text-[13px] font-bold text-[#191f28] mb-1">✅ 오늘 할 일 {left === 0 ? '— 다 끝났어요 🎉' : `(${left}가지)`}</div>
+                  <div className="text-[13px] font-bold text-[#191f28] mb-1">✅ 확인 리스트 {left === 0 ? '— 다 끝났어요 🎉' : `(${left}가지)`}</div>
                   <div className="text-[11px] text-[#8b95a1] mb-2">위에서부터 차례로 누르면 그 탭으로 갑니다.</div>
                   {todo.map((t, i) => (
                     <button key={i} onClick={() => t.n > 0 && goTab(t.tab)} disabled={t.n === 0}
@@ -2056,6 +2058,8 @@ function AdminApp() {
 • 🔴 = 먼저 풀어야 함(남녀 혼방·정원 초과·이미 다른 그룹 등) → 묶기 버튼 잠김
 • 🟡 = 확인 후 묶기(동명이인·미등록자 등)
 • 🟢/✅ = 바로 묶기 가능 / 이미 같은 방
+
+• ➕ '빈자리'가 뜨면 같은 성별·캠퍼스 미배정자를 추천해줍니다 → 확인 후 추가(조건 안 맞으면 조정 제안).
 
 ⚠ 여기서 '묶기'는 같은 방 번호만 붙입니다. 비용은 각자 그대로예요(가족처럼 돈도 합치려면 '그룹정리' 탭).
 이름이 아닌 단어가 잡히면 옆 '제외'를 누르세요.`}</HelpToggle>

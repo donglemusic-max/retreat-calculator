@@ -1625,7 +1625,9 @@ function AdminApp() {
     const busList = confirmed.filter((r) => r.bus)
     const seorakN = confirmed.filter((r) => r.seorak).length
     const unpaid = confirmed.filter((r) => r.paid !== 'Y')
-    const pool = notDup.filter((r) => isChurchAssigned(r.occLabel))  // 교회배정 풀(미제출 placeholder 포함→배정 가능)
+    // 그룹(gid)에 객실 예약(N인 투숙) 멤버가 하나라도 있으면 그 그룹은 '예약그룹' → 전원 풀에서 제외(한 그룹이 쪼개지지 않게)
+    const bookedGids = new Set(notDup.filter((r) => !isChurchAssigned(r.occLabel)).map((r) => r.gid))
+    const pool = notDup.filter((r) => isChurchAssigned(r.occLabel) && !bookedGids.has(r.gid))  // 교회배정 풀(미제출 placeholder 포함→배정 가능)
     const unassigned = pool.filter((r) => !(r.assigned || assignDraft[r.row]))
     const checkGroups = {}
     rows.forEach((r) => { if (r.check === 'Y') checkGroups[r.gid] = { rep: r.rep, gid: r.gid, note: r.note } })
@@ -2154,7 +2156,9 @@ function AdminApp() {
           const reqCheck = unassigned.filter((p) => p.list)   // 메모 있는 사람(수동 확인)
           const plain = unassigned.filter((p) => !p.list)
           // 이미 구성된 그룹(N인 투숙) = 읽기 전용 (재계산된 클러스터 기준)
-          const bookedGroups = {}; rows.forEach((r) => { if (!isChurchAssigned(r.occLabel)) (bookedGroups[r.gid] = bookedGroups[r.gid] || []).push(r) })
+          // 예약그룹: 멤버 중 N인 투숙이 하나라도 있는 그룹 → 그 그룹 전원(개인배정 멤버 포함, 중복 제외)을 함께 표시
+          const bookedGids = new Set(rows.filter((r) => r.route !== '중복' && !isChurchAssigned(r.occLabel)).map((r) => r.gid))
+          const bookedGroups = {}; rows.forEach((r) => { if (r.route !== '중복' && bookedGids.has(r.gid)) (bookedGroups[r.gid] = bookedGroups[r.gid] || []).push(r) })
           const bookedList = Object.entries(bookedGroups).map(([gid, mem]) => [gid, mem, mem[0].rep])
           return (
             <div>

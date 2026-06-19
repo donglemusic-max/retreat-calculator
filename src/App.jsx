@@ -1878,7 +1878,7 @@ function AdminApp() {
       pushUndo('그룹 기준 방 맞추기', 'assigned', updates.map((u) => u.row))
       setMergeMsg(`방 일괄 정렬 중… ${updates.length}명`)
       const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
-      if (j.ok) { setMergeMsg(`✓ ${updates.length}명 배정방을 그룹 기준으로 맞췄습니다`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+      if (j.ok) { setMergeMsg(`✓ ${updates.length}명 배정방을 그룹 기준으로 맞췄습니다`); setAssignDraft({}); setExtraRooms([]); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
       setTimeout(() => setMergeMsg(''), 4000)
     }, '맞추기')
   }

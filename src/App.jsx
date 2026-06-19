@@ -1868,8 +1868,9 @@ function AdminApp() {
     const updates = []; const groupLabels = []
     Object.values(byGid).forEach((mem) => {
       if (mem.length < 2) return
-      if (mem.some((r) => !isChurchAssigned(r.occLabel))) return // 객실 함께 예약한 가족(N인 투숙)은 '이미 구성된 그룹'으로 관리 → 건너뜀
-      if (new Set(mem.map((r) => r.gender).filter(Boolean)).size > 1) return // 남녀 혼합 그룹은 제외(요청조합에서 나눠 배정)
+      // 무관한 남녀 부분그룹(전원 개인배정 + 남녀 혼합)만 제외. 가족·강제그룹·예약그룹은 배정.
+      const pureChurch = mem.every((r) => isChurchAssigned(r.occLabel))
+      if (pureChurch && new Set(mem.map((r) => r.gender).filter(Boolean)).size > 1) return
       const label = `${mem[0].rep || mem[0].name} 방`
       const diff = mem.filter((r) => (r.assigned || '') !== label)
       if (diff.length) groupLabels.push(label)
@@ -2273,7 +2274,7 @@ function AdminApp() {
           const s3 = gidList.filter((gid) => groups[gid].some((r) => r.check === 'Y'))
           const selN = Object.keys(mergeSel).filter((g) => mergeSel[g]).length
           const roomOutOfSync = gidList.filter((gid) => groups[gid].length >= 2)
-            .filter((gid) => !groups[gid].some((r) => !isChurchAssigned(r.occLabel)) && new Set(groups[gid].map((r) => r.gender).filter(Boolean)).size <= 1)
+            .filter((gid) => { const pure = groups[gid].every((r) => isChurchAssigned(r.occLabel)); return !(pure && new Set(groups[gid].map((r) => r.gender).filter(Boolean)).size > 1) })
             .filter((gid) => { const lbl = `${repOf(groups[gid])} 방`; return groups[gid].some((r) => (r.assigned || '') !== lbl) })
           return (
             <div>

@@ -2162,6 +2162,9 @@ function AdminApp() {
 • 개인 = 교회 배정 단독.
 • ⚠ 의사결정 = 교회만 아는 정보(누가 한 가족인지 등) 확인 필요 항목.
 ※ 미제출 = 명단엔 있으나 본인 신청서 없는 사람.`}</HelpToggle>
+              <div className="bg-[#eef5ff] border border-[#d0e2ff] rounded-xl px-3 py-2 mb-3 text-[12px] text-[#1b64da]">
+                📅 <b>기준: 2026-06-19</b> 구글폼 원본 정리 · 그룹 41 · 부분 5 · 개인 23 · 중복 5 <span className="text-[#8b95a1] font-normal">(이후 신청·변경은 미반영 — 운영자 확정 스냅샷)</span>
+              </div>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {stat('그룹', G.length + '개')}
                 {stat('부분그룹', P.length + '개')}

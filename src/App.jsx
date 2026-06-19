@@ -1563,6 +1563,8 @@ function AdminApp() {
   const [moveTargetQ, setMoveTargetQ] = useState('') // 대상 그룹 이름 검색
   const [dismissed, setDismissed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_miss_dismiss') || '[]')) } catch { return new Set() } }) // 미제출명단 수동 제외
   const [showNoise, setShowNoise] = useState(false) // 문의탭: '없음/없습니다' 표시 여부
+  const [confirmBox, setConfirmBox] = useState(null) // 공용 확인 다이얼로그 {title, lines, onOk, okLabel}
+  const ask = (title, lines, onOk, okLabel = '진행') => setConfirmBox({ title, lines, onOk, okLabel })
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
@@ -1727,12 +1729,15 @@ function AdminApp() {
     setExtraRooms((r) => [...r, `방${i}`])
   }
 
-  const saveAssign = async () => {
-    const updates = m.pool.map((p) => ({ row: p.row, value: eff(p), assigned: eff(p) }))
-    setSaveMsg('저장 중…')
-    const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
-    if (j.ok) { setSaveMsg(`✓ ${updates.length}명 저장`); await reload(); setAssignDraft({}); setExtraRooms([]) } else setSaveMsg('오류: ' + (j.error || ''))
-    setTimeout(() => setSaveMsg(''), 3000)
+  const saveAssign = () => {
+    const changed = m.pool.filter((p) => eff(p) !== (p.assigned || '')).length
+    ask('방배정을 저장할까요?', `교회배정 대상 ${m.pool.length}명의 방배정을 시트에 저장합니다.${changed ? `\n(이번에 바뀐 사람: ${changed}명)` : '\n(바뀐 내용이 없습니다)'}`, async () => {
+      const updates = m.pool.map((p) => ({ row: p.row, value: eff(p), assigned: eff(p) }))
+      setSaveMsg('저장 중…')
+      const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
+      if (j.ok) { setSaveMsg(`✓ ${updates.length}명 저장`); await reload(); setAssignDraft({}); setExtraRooms([]) } else setSaveMsg('오류: ' + (j.error || ''))
+      setTimeout(() => setSaveMsg(''), 3000)
+    }, '저장')
   }
 
   const togglePaid = async (row, cur) => {
@@ -1741,30 +1746,38 @@ function AdminApp() {
     await post({ action: 'adminSet', pin, row, field: 'paid', value: val })
   }
 
-  const batchConfirmPaid = async () => {
+  const batchConfirmPaid = () => {
     const updates = Object.keys(sel).filter((r) => sel[r]).map((r) => ({ row: Number(r), value: 'Y' }))
     if (!updates.length) return
-    setRows((rs) => rs.map((r) => (sel[r.row] ? { ...r, paid: 'Y' } : r)))
-    setSel({})
-    await post({ action: 'adminBatch', pin, field: 'paid', updates })
+    ask('입금확인 처리할까요?', `선택한 ${updates.length}명을 '입금확인'으로 표시합니다. 실제로 입금된 분만 선택했는지 확인하세요.`, async () => {
+      setRows((rs) => rs.map((r) => (sel[r.row] ? { ...r, paid: 'Y' } : r)))
+      setSel({})
+      await post({ action: 'adminBatch', pin, field: 'paid', updates })
+    }, '입금확인')
   }
   const toggleSel = (row) => setSel((s) => ({ ...s, [row]: !s[row] }))
 
-  const mergeSelected = async () => {
+  const mergeSelected = () => {
     const gids = Object.keys(mergeSel).filter((g) => mergeSel[g])
     if (gids.length < 2) { setMergeMsg('2개 이상 선택하세요'); return }
-    setMergeMsg('합치는 중… (재계산 포함, 수 초 소요)')
-    const j = await post({ action: 'mergeGroups', pin, gids })
-    if (j.ok) { setMergeMsg(`✓ ${j.merged}명을 한 그룹으로 합침`); setMergeSel({}); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
-    setTimeout(() => setMergeMsg(''), 4000)
+    const names = rows.filter((r) => gids.includes(r.gid) && r.route !== '중복').map((r) => r.name)
+    ask('이 그룹들을 합칠까요?', `선택한 ${gids.length}개 그룹을 한 그룹(같은 비용 단위)으로 합칩니다.\n대상: ${names.join(', ')}\n\n⚠ 비용이 다시 계산됩니다(객실 그룹가 등). 되돌리려면 그룹정리에서 다시 나눠야 해요.`, async () => {
+      setMergeMsg('합치는 중… (재계산 포함, 수 초 소요)')
+      const j = await post({ action: 'mergeGroups', pin, gids })
+      if (j.ok) { setMergeMsg(`✓ ${j.merged}명을 한 그룹으로 합침`); setMergeSel({}); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+      setTimeout(() => setMergeMsg(''), 4000)
+    }, '합치기')
   }
   const toggleMerge = (gid) => setMergeSel((s) => ({ ...s, [gid]: !s[gid] }))
 
-  const moveMember = async (name, to) => {
-    setMergeMsg(`${name} 이동 중… (재계산 포함, 수 초)`)
-    const j = await post({ action: 'moveMember', pin, name, to })
-    if (j.ok) { setMergeMsg(`✓ ${name} 이동 완료`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
-    setTimeout(() => setMergeMsg(''), 3500)
+  const moveMember = (name, to, toLabel) => {
+    const dest = to === '__solo__' ? '단독(혼자) 그룹으로 분리' : `${toLabel || '선택한'} 그룹으로 이동`
+    ask('이동할까요?', `${name}님을 ${dest}합니다.\n\n⚠ 비용이 다시 계산되고, 방 배정도 같이 맞춰집니다.`, async () => {
+      setMergeMsg(`${name} 이동 중… (재계산 포함, 수 초)`)
+      const j = await post({ action: 'moveMember', pin, name, to })
+      if (j.ok) { setMergeMsg(`✓ ${name} 이동 완료`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+      setTimeout(() => setMergeMsg(''), 3500)
+    }, to === '__solo__' ? '분리' : '이동')
   }
 
   const addPlaceholder = async () => {
@@ -1785,11 +1798,13 @@ function AdminApp() {
     if (j.ok) { setSaveMsg(`✓ ${label} ${updates.length}명 배정`); await reload() } else setSaveMsg('오류: ' + (j.error || ''))
     setTimeout(() => setSaveMsg(''), 3000)
   }
-  const addPlaceholderName = async (name) => {
-    setSaveMsg(`${name} 추가 중…`)
-    const j = await post({ action: 'addPlaceholder', pin, name })
-    if (j.ok) { setSaveMsg(`✓ ${name} 미제출 추가`); await reload() } else setSaveMsg('오류: ' + (j.error || ''))
-    setTimeout(() => setSaveMsg(''), 3000)
+  const addPlaceholderName = (name) => {
+    ask('미제출 인원으로 추가할까요?', `'${name}'을(를) 미제출 인원으로 추가해 방배정 대상에 넣습니다.\n이름이 맞는지(오타·문장 일부가 아닌지) 확인하세요.`, async () => {
+      setSaveMsg(`${name} 추가 중…`)
+      const j = await post({ action: 'addPlaceholder', pin, name })
+      if (j.ok) { setSaveMsg(`✓ ${name} 미제출 추가`); await reload() } else setSaveMsg('오류: ' + (j.error || ''))
+      setTimeout(() => setSaveMsg(''), 3000)
+    }, '추가')
   }
 
   const dismissMissing = (name) => setDismissed((s) => { const n = new Set(s); n.add(name); try { localStorage.setItem('retreat_miss_dismiss', JSON.stringify([...n])) } catch {} return n })
@@ -1797,20 +1812,24 @@ function AdminApp() {
 
   // 현재 그룹(gid) 기준으로 배정방 일괄 정렬: 2명 이상 그룹만 배정방="{대표} 방"
   // (과거 sv10 배포 전에 합치거나 시트 직접 수정해 방 싱크가 빠진 그룹 보정. 1인=개인은 건드리지 않음)
-  const syncAllRooms = async () => {
+  const syncAllRooms = () => {
     const byGid = {}
     rows.filter((r) => r.route !== '중복').forEach((r) => { (byGid[r.gid] = byGid[r.gid] || []).push(r) })
-    const updates = []
+    const updates = []; const groupLabels = []
     Object.values(byGid).forEach((mem) => {
       if (mem.length < 2) return
       const label = `${mem[0].rep || mem[0].name} 방`
-      mem.forEach((r) => { if ((r.assigned || '') !== label) updates.push({ row: r.row, value: label }) })
+      const diff = mem.filter((r) => (r.assigned || '') !== label)
+      if (diff.length) groupLabels.push(label)
+      diff.forEach((r) => updates.push({ row: r.row, value: label }))
     })
     if (!updates.length) { setMergeMsg('이미 모든 그룹이 방과 동기화돼 있습니다'); setTimeout(() => setMergeMsg(''), 3000); return }
-    setMergeMsg(`방 일괄 정렬 중… ${updates.length}명`)
-    const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
-    if (j.ok) { setMergeMsg(`✓ ${updates.length}명 배정방을 그룹 기준으로 맞췄습니다`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
-    setTimeout(() => setMergeMsg(''), 4000)
+    ask('그룹 기준으로 방을 맞출까요?', `${groupLabels.length}개 그룹(${updates.length}명)의 배정방을 '대표 방'으로 통일합니다.\n바뀌는 방: ${groupLabels.slice(0, 8).join(', ')}${groupLabels.length > 8 ? ` 외 ${groupLabels.length - 8}개` : ''}\n\n※ 개인(1명)은 안 건드립니다. 방배정 보드에서 따로 지정한 라벨이 있으면 덮어써집니다.`, async () => {
+      setMergeMsg(`방 일괄 정렬 중… ${updates.length}명`)
+      const j = await post({ action: 'adminBatch', pin, field: 'assigned', updates })
+      if (j.ok) { setMergeMsg(`✓ ${updates.length}명 배정방을 그룹 기준으로 맞췄습니다`); await reload() } else setMergeMsg('오류: ' + (j.error || ''))
+      setTimeout(() => setMergeMsg(''), 4000)
+    }, '맞추기')
   }
 
   if (!auth) {
@@ -1837,26 +1856,68 @@ function AdminApp() {
     </div>
   )
 
+  const TAB_ORDER = ['요약', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단']
+  const TAB_LABEL = { 요약: '요약', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스' }
+  const goTab = (t) => { setTab(t); setMergeSel({}) } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
+
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12">
+      {confirmBox && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setConfirmBox(null)}>
+          <div className="bg-white w-full max-w-[420px] rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[15px] font-bold text-[#191f28] mb-2">{confirmBox.title}</div>
+            <div className="text-[13px] text-[#4e5968] leading-relaxed mb-4 max-h-[45vh] overflow-y-auto whitespace-pre-wrap">{confirmBox.lines}</div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmBox(null)} className="flex-1 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">취소</button>
+              <button onClick={() => { const fn = confirmBox.onOk; setConfirmBox(null); if (fn) fn() }} className="flex-1 py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[14px]">{confirmBox.okLabel}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-[720px] mx-auto px-4 pt-6">
-        <header className="flex items-center justify-between mb-4">
-          <h1 className="text-[20px] font-extrabold text-[#191f28]">리트릿 관리자</h1>
-          <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+        <header className="mb-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[20px] font-extrabold text-[#191f28]">리트릿 관리자</h1>
+            <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+          </div>
+          <p className="text-[12px] text-[#8b95a1] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
         </header>
 
         <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
-          {['요약', '요청조합', '방배정', '그룹정리', '리마인드', '버스명단', '문의'].map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{t}</button>
+          {TAB_ORDER.map((t) => (
+            <button key={t} onClick={() => goTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{TAB_LABEL[t]}</button>
           ))}
         </div>
 
         {tab === '요약' && (
           <div>
             {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mb-2">{saveMsg}</p>}
+            {(() => {
+              const todo = [
+                { n: m.checkGroups.length, label: '확인 필요한 그룹 점검', tab: '그룹정리' },
+                { n: reqCombine.clusters.filter((c) => !c.done).length, label: '같은 방 요청 처리', tab: '요청조합' },
+                { n: m.unassigned.length, label: '방배정 (아직 방 안 정해진 사람)', tab: '방배정' },
+                { n: m.unpaid.length, label: '미입금 확인', tab: '리마인드' },
+              ]
+              const left = todo.filter((t) => t.n > 0).length
+              return (
+                <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                  <div className="text-[13px] font-bold text-[#191f28] mb-1">✅ 오늘 할 일 {left === 0 ? '— 다 끝났어요 🎉' : `(${left}가지)`}</div>
+                  <div className="text-[11px] text-[#8b95a1] mb-2">위에서부터 차례로 누르면 그 탭으로 갑니다.</div>
+                  {todo.map((t, i) => (
+                    <button key={i} onClick={() => t.n > 0 && goTab(t.tab)} disabled={t.n === 0}
+                      className="w-full flex items-center gap-2 py-2 border-b border-[#f7f8fa] last:border-0 text-left">
+                      <span className="text-[14px]">{t.n > 0 ? '☐' : '✅'}</span>
+                      <span className={`text-[13px] flex-1 ${t.n > 0 ? 'text-[#191f28] font-semibold' : 'text-[#b0b8c1] line-through'}`}>{t.label}</span>
+                      {t.n > 0 ? <span className="text-[12px] font-bold text-[#3182f6] shrink-0">{t.n}건 →</span> : <span className="text-[11px] text-[#b0b8c1] shrink-0">완료</span>}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
             <div className="grid grid-cols-2 gap-2.5 mb-3">
               {stat('제출 인원 (확정)', m.totalPeople + '명', m.placeholderN > 0 ? `+ 미제출 ${m.placeholderN}명` : '중복 제외')}
-              {stat('명단 기준 예상', m.expected + '명', `미제출 추정 ${m.missing}명`)}
+              {stat('명단 기준 예상', m.expected + '명', `미제출 추정 ${m.missing}명 (어림수)`)}
               {stat('총 등록 금액', won(m.totalAmount))}
               {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
               {stat('방배정 필요', m.pool.length + '명', `미배정 ${m.unassigned.length}명`)}
@@ -1942,9 +2003,9 @@ function AdminApp() {
                       ))}
                     </div>
                   ))}
-                  <button onClick={() => assignRoom(c.members.map((p) => p.row), c.done ? c.room : c.label)} disabled={c.block}
-                    className={`w-full mt-3 py-2.5 rounded-xl font-bold text-[13px] ${c.block ? 'bg-[#e5e8eb] text-[#b0b8c1]' : c.done ? 'bg-white border border-[#e5e8eb] text-[#4e5968]' : 'bg-[#3182f6] text-white'}`}>
-                    {c.block ? '충돌 해소 후 묶기 가능' : c.done ? '이미 묶여 있음 (다시 저장)' : `이 방으로 묶기 → ${c.label}`}
+                  <button onClick={() => assignRoom(c.members.map((p) => p.row), c.label)} disabled={c.block || c.done}
+                    className={`w-full mt-3 py-2.5 rounded-xl font-bold text-[13px] ${c.block || c.done ? 'bg-[#e5e8eb] text-[#8b95a1]' : 'bg-[#3182f6] text-white'}`}>
+                    {c.block ? '충돌 해소 후 묶기 가능' : c.done ? '✓ 이미 같은 방으로 배정됨' : `이 방 같이 쓰기 (비용은 각자) → ${c.label}`}
                   </button>
                 </div>
               ))}
@@ -2079,7 +2140,7 @@ function AdminApp() {
                   <div key={'s1' + i} className="py-2 border-b border-[#f7f8fa]">
                     <div className="text-[12px] font-bold text-[#191f28] mb-1">📞 같은 번호인데 {s.gids.length}개 그룹으로 나뉨</div>
                     <div className="text-[11px] text-[#8b95a1] mb-1">{s.gids.map((g) => labelOf(g)).join(' / ')}</div>
-                    <button onClick={() => { setMergeMsg('합치는 중…'); post({ action: 'mergeGroups', pin, gids: s.gids }).then((j) => { setMergeMsg(j.ok ? `✓ ${j.merged}명 합침` : '오류'); reload() }) }}
+                    <button onClick={() => ask('이 그룹들을 합칠까요?', `같은 번호로 묶인 ${s.gids.length}개 그룹을 한 그룹으로 합칩니다.\n⚠ 비용이 다시 계산됩니다.`, () => { setMergeMsg('합치는 중…'); post({ action: 'mergeGroups', pin, gids: s.gids }).then((j) => { setMergeMsg(j.ok ? `✓ ${j.merged}명 합침` : '오류'); reload() }) }, '합치기')}
                       className="text-[12px] font-bold text-white bg-[#191f28] rounded-lg px-3 py-1.5">이 그룹들 합치기</button>
                   </div>
                 ))}
@@ -2137,7 +2198,7 @@ function AdminApp() {
                       hit.forEach((r) => { if (!seen[r.gid]) { seen[r.gid] = true; tgts.push(r.gid) } })
                       if (!tgts.length) return <p className="text-[12px] text-[#8b95a1]">일치하는 그룹 없음</p>
                       return tgts.slice(0, 12).map((g) => (
-                        <button key={g} onClick={() => { moveMember(movePick.name, g); setMovePick(null); setMoveQ(''); setMoveTargetQ('') }}
+                        <button key={g} onClick={() => { moveMember(movePick.name, g, labelOf(g)); setMovePick(null); setMoveQ(''); setMoveTargetQ('') }}
                           className="w-full flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 text-left">
                           <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{labelOf(g)}<span className="text-[10px] text-[#8b95a1] ml-1">{(groups[g] || []).length}명</span></span>
                           <span className="text-[12px] font-bold text-[#3182f6] shrink-0">여기로 이동 →</span>
@@ -2163,7 +2224,7 @@ function AdminApp() {
                   {groups[gid].map((p) => (
                     <div key={p.row} className="flex items-center gap-2 py-1 border-b border-[#f7f8fa] last:border-0">
                       <span className="text-[13px] text-[#191f28] flex-1">{p.name}<span className="text-[10px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{deptName(p.deptLabel)}</span></span>
-                      <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) moveMember(p.name, v) }}
+                      <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) moveMember(p.name, v, v === '__solo__' ? '' : labelOf(v)) }}
                         className="bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1 text-[11px] max-w-[130px]">
                         <option value="">이동 ▾</option>
                         <option value="__solo__">단독으로 분리</option>
@@ -2203,7 +2264,7 @@ function AdminApp() {
               {m.checkGroups.length === 0 ? <p className="text-[12px] text-[#8b95a1]">없음</p> :
                 m.checkGroups.map((g) => (
                   <div key={g.gid} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
-                    <div className="text-[13px] font-bold text-[#191f28]">{g.rep} <span className="text-[11px] text-[#8b95a1]">{g.gid}</span></div>
+                    <div className="text-[13px] font-bold text-[#191f28]">{g.rep} <span className="text-[11px] text-[#8b95a1] font-normal">그룹</span></div>
                     <div className="text-[11px] text-[#8b95a1] leading-snug">{g.note}</div>
                   </div>
                 ))}

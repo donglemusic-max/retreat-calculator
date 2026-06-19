@@ -2116,6 +2116,11 @@ function AdminApp() {
                 </div>
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
                 <div className="mt-3 pt-3 border-t border-[#f2f4f6]">
+                  <div className="text-[12px] text-[#4e5968] mb-2">같은 그룹(가족)인데 방이 따로면, <b>그룹대로 방 이름을 한 번에 통일</b>합니다. (개인 1명은 안 건드림)</div>
+                  <button onClick={syncAllRooms} className="w-full py-2.5 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px] border border-[#e5e8eb]">🛏️ 그룹 기준으로 방 맞추기</button>
+                  {mergeMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{mergeMsg}</p>}
+                </div>
+                <div className="mt-3 pt-3 border-t border-[#f2f4f6]">
                   <div className="text-[12px] font-bold text-[#191f28] mb-2">미제출 인원 추가 (이름만, 방배정용)</div>
                   <div className="flex gap-2">
                     <input value={ph.name} onChange={(e) => setPh({ ...ph, name: e.target.value })} placeholder="이름" className="flex-1 bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2 text-[13px]" />

@@ -1475,6 +1475,11 @@ const roomTypeOfMembers = (members) => {
   const cnt = {}; members.forEach((p) => { const t = reqRoomType(p.roomLabel); cnt[t] = (cnt[t] || 0) + 1 })
   let best = '소노벨 패밀리', bn = -1; Object.keys(cnt).forEach((t) => { if (cnt[t] > bn) { bn = cnt[t]; best = t } }); return best
 }
+
+// 자유텍스트(명단/문의)에서 '사람 이름' 토큰만 추출 — 문장/조사/객실용어/동사어미 제외
+const NAME_STOP = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|방도|방은|방만|님이|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|좋을|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|인원|인실|대표|정도|혹시|설악|뷰는|이렇게|그렇게|저렇게|어떻게|그래서|그러면|그리고|하지만|그런데|그냥|다시|같이|여러|아주|조금|많이|서로|이번|모여|모이|채워|제가|저는|저희|우리|확인|참여|참석|예정|관련|문의|답변|수정|변경|취소|괜찮|그게|명은|명이|명만|명과|명도|명들|여명|몇명|채워|모이|모여/
+const NAME_END = /(구요|구여|네요|어요|아요|에요|예요|세요|지면|으면|해서|하고|이고|되고|라서|래서|면서|는데|니다|니까|을까|겠어|겠습|드려|드림|어서|아서|시면|시는|시고|군요|거든|잖아|는걸|에서|에게|한테|부터|까지|마다|조차|구나|드릴|합니|입니|텐데|는지|을지|어용|아용)$/
+const nameTokens = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => /^[가-힣]{2,4}$/.test(x) && !NAME_STOP.test(x) && !NAME_END.test(x))
 // 금액 계산 헬퍼 (관리자 클라이언트 재계산용)
 const deptFeeOf = (label) => DEPTS.find((d) => d.label === label)?.fee || 0
 const roomGroupFee = (label) => ROOMS.find((r) => r.name === reqRoomType(label))?.group || 0
@@ -1599,27 +1604,32 @@ function AdminApp() {
     const allNames = new Set(notDup.map((r) => norm(r.name)))   // 제출 + 미제출(placeholder) 행 전체
     const baseNames = new Set(allNames)                          // + 동명이인 접미사(A/B/숫자) 뗀 형태도 등록으로 인정
     notDup.forEach((r) => { const b = norm(r.name).replace(/[A-Za-z0-9]+$/, ''); if (b.length >= 2) baseNames.add(b) })
-    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|방도|방은|방만|님이|어요|니다|니까|형제|자매|가능|모두|각각|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|객실|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명|인원|인실|대표|정도|혹시/
     const josa = /(와|과|은|는|이|가|을|를|도|만|의|님|씨|께|들|랑|이랑|에게|한테|에서|하고)$/
-    const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
     // 조사 보정은 "자른 결과가 실제 등록자일 때만" 적용 (이사랑→이사 같은 오절단 방지). 아니면 원본 유지
     const resolveNm = (k) => { if (baseNames.has(k)) return k; const s = k.replace(josa, ''); return (s.length >= 2 && baseNames.has(s)) ? s : k }
     const missMap = {}
-    rows.forEach((r) => { tok(r.list).forEach((nm) => { const k = resolveNm(norm(nm)); if (k.length >= 2 && !baseNames.has(k)) { (missMap[k] = missMap[k] || new Set()).add(r.rep || r.name) } }) })
+    rows.forEach((r) => { nameTokens(r.list).forEach((nm) => { const k = resolveNm(norm(nm)); if (k.length >= 2 && !baseNames.has(k)) { (missMap[k] = missMap[k] || new Set()).add(r.rep || r.name) } }) })
     const missingList = Object.keys(missMap).map((k) => ({ name: k, from: [...missMap[k]].slice(0, 3).join(', ') }))
     const missing = missingList.length
     const expected = notDup.length + missing
-    return { totalPeople, placeholderN, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing, missingList }
+    // 설악산뷰: 방 단위 집계 (확정 그룹=그룹, 배정 풀=배정방, 미배정 인원 분리). 인원보다 방 수가 실제 자원 단위
+    const seoMap = {}; const seoUnassigned = []
+    notDup.filter((r) => r.seorak).forEach((r) => {
+      const cs = (r.campus || '').replace(' 캠퍼스', '')
+      if (!isChurchAssigned(r.occLabel)) { const k = 'G:' + r.gid; (seoMap[k] = seoMap[k] || { label: `${r.rep || r.name} 그룹`, campus: cs, people: [] }).people.push(r.name) }
+      else if (r.assigned) { const k = 'R:' + r.assigned; (seoMap[k] = seoMap[k] || { label: r.assigned, campus: cs, people: [] }).people.push(r.name) }
+      else seoUnassigned.push(r)
+    })
+    const seoRooms = Object.values(seoMap)
+    return { totalPeople, placeholderN, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing, missingList, seoRooms, seoUnassigned }
   }, [rows, assignDraft])
 
   // 요청조합: 부분그룹·"○○와 같은 방" 요청을 파싱 → 그래프로 묶고 → 교차검증
   // (비용은 그대로 두고 배정방만 지정. mergeGroups 호출 안 함 = 비용 중복부과 방지)
   const reqCombine = useMemo(() => {
     const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
-    // 이름이 아닌 단어(객실/동사/관형어/오타) 광범위 제외
-    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|하도|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명|인원|인실|대표|정도|혹시/
     const josa = /(와|과|은|는|이|가|을|를|도|만|의|님|씨|께|들|랑|이랑|에게|한테|에서|하고)$/
-    const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
+    const tok = nameTokens // 공통 이름추출 함수 사용
     const live = rows.filter((r) => r.route !== '중복')
     const byName = {}
     live.forEach((r) => { const k = norm(r.name); (byName[k] = byName[k] || []).push(r) })
@@ -1665,7 +1675,7 @@ function AdminApp() {
       const rooms = [...new Set(members.map((p) => p.assigned).filter(Boolean))]
       const allSameRoom = rooms.length === 1 && members.every((p) => p.assigned)
       const done = allSameRoom
-      const unresolved = [...new Set(members.flatMap((p) => noteByRow[p.row]?.unresolved || []))]
+      const unresolved = [...new Set(members.flatMap((p) => noteByRow[p.row]?.unresolved || []))].filter((k) => !dismissed.has(k))
       const ambiguous = [...new Set(members.flatMap((p) => noteByRow[p.row]?.ambiguous || []))]
       const booked = [...new Set(members.flatMap((p) => noteByRow[p.row]?.booked || []))]
       const conflicts = []
@@ -1683,7 +1693,7 @@ function AdminApp() {
     clusters.sort((a, b) => b.score - a.score)
     clusters.forEach((c, i) => { c.label = `요청-${roomTypeShort(c.roomType)}-${i + 1}` })
     return { clusters, count: clusters.length }
-  }, [rows])
+  }, [rows, dismissed])
 
   const eff = (p) => (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || ''))
 
@@ -1851,10 +1861,27 @@ function AdminApp() {
               {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
               {stat('방배정 필요', m.pool.length + '명', `미배정 ${m.unassigned.length}명`)}
               {stat('버스 신청', m.busList.length + '명')}
-              {stat('설악산뷰', m.seorakN + '명')}
+              {stat('설악산뷰', m.seoRooms.length + '개 방', `신청 ${m.seorakN}명 · 미배정 ${m.seoUnassigned.length}명`)}
               {stat('확인필요 그룹', m.checkGroups.length + '건', '명단>제출')}
               {stat('캠퍼스', Object.entries(m.byCampus).map(([k, v]) => `${k.replace(' 캠퍼스', '')} ${v}`).join(' / '))}
             </div>
+            {(m.seoRooms.length > 0 || m.seoUnassigned.length > 0) && (
+              <Collapsible title="🏔️ 설악산뷰 방 현황" count={`확정 ${m.seoRooms.length}개 방`}>
+                <p className="text-[11px] text-[#8b95a1] mb-2">설악산뷰는 인원보다 <b>방 수</b>가 중요합니다. 확정된 방과 아직 방이 안 정해진 인원을 함께 봅니다.</p>
+                {m.seoRooms.map((rm, i) => (
+                  <div key={i} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[13px] font-bold text-[#191f28] shrink-0">{rm.label}</span>
+                    <span className="text-[11px] text-[#8b95a1] min-w-0">{rm.campus} · {rm.people.length}명 ({rm.people.join(', ')})</span>
+                  </div>
+                ))}
+                {m.seoUnassigned.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-[#f2f4f6]">
+                    <div className="text-[12px] font-bold text-[#b45309] mb-1">⚠ 미배정 {m.seoUnassigned.length}명 — 방 정하면 방 수가 늘어요</div>
+                    <div className="text-[11px] text-[#8b95a1] leading-relaxed">{m.seoUnassigned.map((r) => `${r.name}(${(r.campus || '').replace(' 캠퍼스', '')})`).join(', ')}</div>
+                  </div>
+                )}
+              </Collapsible>
+            )}
             {(() => {
               const vm = m.missingList.filter((x) => !dismissed.has(x.name))
               if (!vm.length && !dismissed.size) return null
@@ -1908,7 +1935,10 @@ function AdminApp() {
                     <div key={j} className={`text-[12px] font-semibold mt-1 ${cf.lv === 'block' ? 'text-[#f04452]' : cf.lv === 'check' ? 'text-[#b45309]' : 'text-[#8b95a1]'}`}>
                       {cf.lv === 'block' ? '🔴' : cf.lv === 'check' ? '🟡' : '⚪'} {cf.msg}
                       {cf.names && cf.names.map((nm) => (
-                        <button key={nm} onClick={() => addPlaceholderName(nm)} className="ml-1 text-[11px] text-white bg-[#f04452] rounded px-1.5 py-0.5">+ {nm} 미제출 추가</button>
+                        <span key={nm} className="inline-flex items-center gap-0.5 ml-1">
+                          <button onClick={() => addPlaceholderName(nm)} className="text-[11px] text-white bg-[#f04452] rounded px-1.5 py-0.5">+ {nm} 추가</button>
+                          <button onClick={() => dismissMissing(nm)} className="text-[11px] text-[#8b95a1] bg-[#f2f4f6] rounded px-1.5 py-0.5">제외</button>
+                        </span>
                       ))}
                     </div>
                   ))}

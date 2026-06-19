@@ -1909,8 +1909,8 @@ function AdminApp() {
     </div>
   )
 
-  const TAB_ORDER = ['요약', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단']
-  const TAB_LABEL = { 요약: '요약', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스' }
+  const TAB_ORDER = ['요약', '정리안', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단']
+  const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스' }
   const goTab = (t) => { setTab(t); setMergeSel({}) } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
 
   return (
@@ -2072,6 +2072,99 @@ function AdminApp() {
             })()}
           </div>
         )}
+
+        {tab === '정리안' && (() => {
+          const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
+          const live = rows.filter((r) => r.route !== '중복')
+          const dups = rows.filter((r) => r.route === '중복')
+          const subNames = new Set(live.map((r) => norm(r.name)))
+          const byGid = {}; live.forEach((r) => { (byGid[r.gid] = byGid[r.gid] || []).push(r) })
+          const groups = [], partials = [], singles = []
+          Object.values(byGid).forEach((mem) => {
+            const isBooked = mem.some((r) => /인이 투숙/.test(r.occLabel || ''))
+            const isPartial = !isBooked && mem.some((r) => /부분/.test(r.occLabel || ''))
+            const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
+            const roster = mem.map((r) => r.list).find(Boolean) || ''
+            const missing = [...new Set(nameTokens(roster).map(norm))].filter((n) => !subNames.has(n))
+            const roomType = roomTypeOfMembers(mem)
+            const roomMixed = new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1
+            const campuses = [...new Set(mem.map((r) => (r.campus || '').replace(' 캠퍼스', '')).filter(Boolean))]
+            const repIn = mem.some((r) => norm(r.name) === norm(rep))
+            const obj = { rep, mem, missing, roomType, roomMixed, campuses, repIn }
+            if (isPartial) partials.push(obj)
+            else if (isBooked || mem.length >= 2) groups.push(obj)
+            else singles.push(mem[0])
+          })
+          groups.sort((a, b) => b.mem.length - a.mem.length)
+          const emailReps = {}; live.forEach((r) => { if (r.email) { (emailReps[r.email] = emailReps[r.email] || new Set()).add(norm(r.rep || r.name)) } })
+          const sharedEmail = Object.keys(emailReps).filter((e) => emailReps[e].size > 1).map((e) => ({ email: e, names: [...new Set(live.filter((r) => r.email === e).map((r) => r.name))] }))
+          const decRoom = groups.filter((g) => g.roomMixed)
+          const decRep = groups.filter((g) => !g.repIn)
+          const decMiss = groups.filter((g) => g.missing.length >= 2)
+          const won3 = (n) => n + '명'
+          const Chip = (txt, cls) => <span className={`inline-block text-[10px] font-bold rounded px-1.5 py-0.5 text-white ${cls}`}>{txt}</span>
+          const GroupRow = (g, i) => (
+            <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[13px] font-bold text-[#191f28]">{g.rep}</span>
+                <span className="text-[11px] text-[#8b95a1]">{roomTypeShort(g.roomType)} · {g.mem.length}{g.missing.length ? `/${g.mem.length + g.missing.length}` : ''}명{g.campuses.length ? ' · ' + g.campuses.join('/') : ''}</span>
+                {g.missing.length === 0 ? Chip('전원', 'bg-[#12b886]') : Chip(`${g.mem.length}/${g.mem.length + g.missing.length}`, 'bg-[#f59f00]')}
+                {g.roomMixed && Chip('객실 불일치', 'bg-[#f04452]')}
+                {!g.repIn && Chip('대표 미제출', 'bg-[#f04452]')}
+              </div>
+              <div className="text-[12px] text-[#4e5968] mt-0.5">{g.mem.map((p) => p.name).join(' · ')}</div>
+              {g.missing.length > 0 && <div className="text-[11px] text-[#f04452] mt-0.5">미제출: {g.missing.join(' · ')}</div>}
+            </div>
+          )
+          return (
+            <div>
+              <HelpToggle>{`구글폼 원본을 지금 데이터 기준으로 자동 분류한 정리안입니다.
+• 그룹 = 비용 함께 내는 묶음(가족·예약그룹). '전원'=명단 전원 제출, 'N/M'=일부 미제출.
+• 부분그룹 = "다른 성도와 같은 방" 요청(추가 배정 예정).
+• 개인 = 교회 배정 단독.
+• ⚠ 의사결정 = 객실 불일치·대표 미제출·같은 이메일에 여러 사람 등 사람이 확인할 항목.
+숫자는 '제출자 수'이며, 명단엔 있으나 신청서 없는 사람은 '미제출'로 표시.`}</HelpToggle>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {stat('그룹', groups.length + '개', live.length + '명 제출')}
+                {stat('부분그룹', partials.length + '개', '추가 배정 예정')}
+                {stat('개인', singles.length + '명', '교회 배정')}
+              </div>
+
+              <Collapsible title="① 그룹 (가족·예약그룹)" count={`${groups.length}개`} defaultOpen>
+                {groups.map(GroupRow)}
+              </Collapsible>
+
+              <Collapsible title="② 부분그룹 (추가 배정 예정)" count={`${partials.length}개`}>
+                {partials.map((g, i) => (
+                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[13px] font-bold text-[#191f28]">{g.rep}</span>
+                    <span className="text-[11px] text-[#8b95a1] ml-1">{roomTypeShort(g.roomType)} · {g.mem.length}명{g.campuses.length ? ' · ' + g.campuses.join('/') : ''}</span>
+                    <div className="text-[12px] text-[#4e5968] mt-0.5">{g.mem.map((p) => p.name).join(' · ')}</div>
+                  </div>
+                ))}
+                {!partials.length && <p className="text-[12px] text-[#8b95a1]">없음</p>}
+              </Collapsible>
+
+              <Collapsible title="③ 개인 (교회 배정)" count={`${singles.length}명`}>
+                <div className="text-[12px] text-[#4e5968] leading-relaxed">{singles.map((p) => `${p.name}(${deptName(p.deptLabel)}${p.bus ? '·버스' : ''})`).join(', ')}</div>
+              </Collapsible>
+
+              <Collapsible title="④ 중복 (집계 제외)" count={`${dups.length}건`}>
+                {dups.length ? dups.map((r) => (
+                  <div key={r.row} className="text-[12px] text-[#4e5968] py-0.5">{r.name} <span className="text-[11px] text-[#8b95a1]">{r.note || '중복 재제출'}</span></div>
+                )) : <p className="text-[12px] text-[#8b95a1]">없음</p>}
+              </Collapsible>
+
+              <Collapsible title="⑤ ⚠ 의사결정 필요" count={`${sharedEmail.length + decRoom.length + decRep.length + decMiss.length}건`} defaultOpen>
+                {sharedEmail.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">같은 이메일에 여러 사람({sharedEmail.length})</div>{sharedEmail.map((s, i) => <div key={i} className="text-[11px] text-[#4e5968]">{s.email} → {s.names.join(', ')}</div>)}</div>}
+                {decRoom.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">객실 종류 불일치 그룹({decRoom.length})</div><div className="text-[11px] text-[#4e5968]">{decRoom.map((g) => g.rep).join(', ')}</div></div>}
+                {decRep.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">대표 미제출 그룹({decRep.length})</div><div className="text-[11px] text-[#4e5968]">{decRep.map((g) => g.rep).join(', ')}</div></div>}
+                {decMiss.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">명단 다수 미제출({decMiss.length})</div><div className="text-[11px] text-[#4e5968]">{decMiss.map((g) => `${g.rep}(${g.missing.length}명)`).join(', ')}</div></div>}
+                <p className="text-[11px] text-[#8b95a1] mt-2">※ '누가 한 가족인지' 등은 교회만 아는 정보라, 위 항목은 운영자 확인 후 그룹정리/요청조합에서 정정하세요.</p>
+              </Collapsible>
+            </div>
+          )
+        })()}
 
         {tab === '요청조합' && (() => {
           const { clusters } = reqCombine

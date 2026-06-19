@@ -1594,13 +1594,17 @@ function AdminApp() {
     // 명단 기준 예상: 제출 인원 + "명단에 적혔지만 아무도 제출 안 한 이름"(전체 1회씩)
     // → 그룹이 쪼개져도 이중계산 안 됨. 이름 정규화(공백/"가족/" 제거)로 매칭 정확도 ↑
     const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
-    const subNames = new Set(submittedRows.map((r) => norm(r.name)))
-    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없음|캠퍼스|함께|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|님이|적|어요|니다/
+    const allNames = new Set(notDup.map((r) => norm(r.name)))   // 제출 + 미제출(placeholder) 행 전체
+    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|객실|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명/
+    const josa = /(와|과|은|는|이|가|을|를|도|만|의|님|씨|께|들|랑|이랑|에게|한테|에서|하고)$/
     const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
-    const seenMiss = new Set(); let missing = 0
-    rows.forEach((r) => { tok(r.list).forEach((nm) => { const k = norm(nm); if (!subNames.has(k) && !seenMiss.has(k)) { seenMiss.add(k); missing++ } }) })
-    const expected = totalPeople + missing
-    return { totalPeople, placeholderN, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing }
+    const resolveNm = (k) => allNames.has(k) ? k : k.replace(josa, '')
+    const missMap = {}
+    rows.forEach((r) => { tok(r.list).forEach((nm) => { const k = resolveNm(norm(nm)); if (k.length >= 2 && !allNames.has(k)) { (missMap[k] = missMap[k] || new Set()).add(r.rep || r.name) } }) })
+    const missingList = Object.keys(missMap).map((k) => ({ name: k, from: [...missMap[k]].slice(0, 3).join(', ') }))
+    const missing = missingList.length
+    const expected = notDup.length + missing
+    return { totalPeople, placeholderN, totalAmount, byCampus, busList, seorakN, unpaid, pool, unassigned, checkGroups: Object.values(checkGroups), expected, missing, missingList }
   }, [rows, assignDraft])
 
   // 요청조합: 부분그룹·"○○와 같은 방" 요청을 파싱 → 그래프로 묶고 → 교차검증
@@ -1830,16 +1834,30 @@ function AdminApp() {
         </div>
 
         {tab === '요약' && (
-          <div className="grid grid-cols-2 gap-2.5">
-            {stat('제출 인원 (확정)', m.totalPeople + '명', m.placeholderN > 0 ? `+ 미제출 ${m.placeholderN}명` : '중복 제외')}
-            {stat('명단 기준 예상', m.expected + '명', `미제출 추정 ${m.missing}명`)}
-            {stat('총 등록 금액', won(m.totalAmount))}
-            {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
-            {stat('방배정 필요', m.pool.length + '명', `미배정 ${m.unassigned.length}명`)}
-            {stat('버스 신청', m.busList.length + '명')}
-            {stat('설악산뷰', m.seorakN + '명')}
-            {stat('확인필요 그룹', m.checkGroups.length + '건', '명단>제출')}
-            {stat('캠퍼스', Object.entries(m.byCampus).map(([k, v]) => `${k.replace(' 캠퍼스', '')} ${v}`).join(' / '))}
+          <div>
+            {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mb-2">{saveMsg}</p>}
+            <div className="grid grid-cols-2 gap-2.5 mb-3">
+              {stat('제출 인원 (확정)', m.totalPeople + '명', m.placeholderN > 0 ? `+ 미제출 ${m.placeholderN}명` : '중복 제외')}
+              {stat('명단 기준 예상', m.expected + '명', `미제출 추정 ${m.missing}명`)}
+              {stat('총 등록 금액', won(m.totalAmount))}
+              {stat('미입금', m.unpaid.length + '명', '입금확인 안 된 인원')}
+              {stat('방배정 필요', m.pool.length + '명', `미배정 ${m.unassigned.length}명`)}
+              {stat('버스 신청', m.busList.length + '명')}
+              {stat('설악산뷰', m.seorakN + '명')}
+              {stat('확인필요 그룹', m.checkGroups.length + '건', '명단>제출')}
+              {stat('캠퍼스', Object.entries(m.byCampus).map(([k, v]) => `${k.replace(' 캠퍼스', '')} ${v}`).join(' / '))}
+            </div>
+            {m.missingList.length > 0 && (
+              <Collapsible title="📋 미제출 추정 명단" count={`${m.missingList.length}명`}>
+                <p className="text-[11px] text-[#8b95a1] mb-2">명단에는 적혔으나 아직 본인 신청서가 없는 사람입니다. 확인 후 '미제출 추가'하면 방배정 대상이 됩니다.</p>
+                {m.missingList.map((x, i) => (
+                  <div key={i} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{x.name}<span className="text-[10px] text-[#8b95a1] ml-1">{x.from} 명단</span></span>
+                    <button onClick={() => addPlaceholderName(x.name)} className="text-[11px] font-bold text-white bg-[#3182f6] rounded-lg px-2.5 py-1 shrink-0">미제출 추가</button>
+                  </div>
+                ))}
+              </Collapsible>
+            )}
           </div>
         )}
 

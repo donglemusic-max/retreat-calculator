@@ -1702,10 +1702,28 @@ function AdminApp() {
       if (campuses.length > 1) conflicts.push({ lv: 'warn', msg: `캠퍼스 혼합: ${campuses.join('·')}` })
       const block = conflicts.some((c) => c.lv === 'block')
       const score = (done ? -10 : 0) + conflicts.reduce((s, c) => s + (c.lv === 'block' ? 100 : c.lv === 'check' ? 10 : 1), 0)
-      return { members, roomType, cap, conflicts, block, done, room: allSameRoom ? rooms[0] : '', score, label: '' }
+      return { members, roomType, cap, conflicts, block, done, room: allSameRoom ? rooms[0] : '', score, label: '', genders, campuses }
     })
     clusters.sort((a, b) => b.score - a.score)
     clusters.forEach((c, i) => { c.label = `요청-${roomTypeShort(c.roomType)}-${i + 1}` })
+    // 빈자리 자동 매칭 / 조정 제안: 더 채우려는(부분) 묶음에 조건 맞는 미배정자를 추천
+    const clusteredRows = new Set(clusters.flatMap((c) => c.members.map((p) => p.row)))
+    const gidCount = {}; live.forEach((r) => { gidCount[r.gid] = (gidCount[r.gid] || 0) + 1 })
+    const pool = live.filter((r) => isPool(r))
+    const fillIntent = /외|다른|채우|채워|더|남는|배정해|함께|같이|명\s*방|6명|7명|8명|7~8|7-8/
+    clusters.forEach((c) => {
+      const open = c.cap - c.members.length
+      const intent = c.members.some((p) => fillIntent.test(p.list || '') || fillIntent.test(p.inquiry || ''))
+      c.openSlots = open
+      c.wantsMore = open > 0 && intent && !c.block
+      c.fillRoom = c.done ? c.room : c.label // 이미 방 있으면 그 방으로, 아니면 새 라벨
+      if (!c.wantsMore) return
+      const cand = pool.filter((p) => !p.assigned && !clusteredRows.has(p.row) && gidCount[p.gid] === 1
+        && (c.genders.length !== 1 || p.gender === c.genders[0])
+        && (c.campuses.length !== 1 || (p.campus || '').replace(' 캠퍼스', '') === c.campuses[0]))
+      c.fillCandidates = cand.slice(0, open)
+      c.fillMore = cand.length
+    })
     return { clusters, count: clusters.length }
   }, [rows, dismissed])
 
@@ -2077,6 +2095,20 @@ function AdminApp() {
                       ))}
                     </div>
                   ))}
+                  {c.wantsMore && (
+                    <div className="mt-2 pt-2 border-t border-[#eef0f2]">
+                      <div className="text-[12px] font-bold text-[#1b64da] mb-1">➕ 빈자리 {c.openSlots}석 — 같은 방에 더 넣을 수 있어요</div>
+                      {c.fillCandidates && c.fillCandidates.length > 0 ? (
+                        <>
+                          <div className="text-[11px] text-[#4e5968] mb-1.5">추천(같은 성별·캠퍼스·미배정): {c.fillCandidates.map((p) => `${p.name}(${deptName(p.deptLabel)})`).join(', ')}{c.fillMore > c.fillCandidates.length ? ` · 후보 ${c.fillMore}명 중` : ''}</div>
+                          <button onClick={() => ask('이 방에 추가할까요?', `${c.fillCandidates.map((p) => p.name).join(', ')}님을 '${c.fillRoom}' 방에 같이 배정합니다.\n(방만 같이 쓰고 비용은 각자입니다)`, () => assignRoom([...c.members.map((p) => p.row), ...c.fillCandidates.map((p) => p.row)], c.fillRoom), '추가')}
+                            className="text-[12px] font-bold text-white bg-[#1b64da] rounded-lg px-3 py-1.5">추천 {c.fillCandidates.length}명 이 방에 추가</button>
+                        </>
+                      ) : (
+                        <div className="text-[11px] text-[#8b95a1]">조정 제안: 조건(같은 성별·캠퍼스) 맞는 미배정자가 없어요. → 객실을 {c.members.length}인으로 줄이거나, 빈자리로 두거나, 다른 부분그룹과 합치세요.</div>
+                      )}
+                    </div>
+                  )}
                   <button onClick={() => assignRoom(c.members.map((p) => p.row), c.label)} disabled={c.block || c.done}
                     className={`w-full mt-3 py-2.5 rounded-xl font-bold text-[13px] ${c.block || c.done ? 'bg-[#e5e8eb] text-[#8b95a1]' : 'bg-[#3182f6] text-white'}`}>
                     {c.block ? '충돌 해소 후 묶기 가능' : c.done ? '✓ 이미 같은 방으로 배정됨' : `이 방 같이 쓰기 (비용은 각자) → ${c.label}`}

@@ -2074,93 +2074,138 @@ function AdminApp() {
         )}
 
         {tab === '정리안' && (() => {
-          const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
-          const live = rows.filter((r) => r.route !== '중복')
-          const dups = rows.filter((r) => r.route === '중복')
-          const subNames = new Set(live.map((r) => norm(r.name)))
-          const byGid = {}; live.forEach((r) => { (byGid[r.gid] = byGid[r.gid] || []).push(r) })
-          const groups = [], partials = [], singles = []
-          Object.values(byGid).forEach((mem) => {
-            const isBooked = mem.some((r) => /인이 투숙/.test(r.occLabel || ''))
-            const isPartial = !isBooked && mem.some((r) => /부분/.test(r.occLabel || ''))
-            const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
-            const roster = mem.map((r) => r.list).find(Boolean) || ''
-            const missing = [...new Set(nameTokens(roster).map(norm))].filter((n) => !subNames.has(n))
-            const roomType = roomTypeOfMembers(mem)
-            const roomMixed = new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1
-            const campuses = [...new Set(mem.map((r) => (r.campus || '').replace(' 캠퍼스', '')).filter(Boolean))]
-            const repIn = mem.some((r) => norm(r.name) === norm(rep))
-            const obj = { rep, mem, missing, roomType, roomMixed, campuses, repIn }
-            if (isPartial) partials.push(obj)
-            else if (isBooked || mem.length >= 2) groups.push(obj)
-            else singles.push(mem[0])
-          })
-          groups.sort((a, b) => b.mem.length - a.mem.length)
-          const emailReps = {}; live.forEach((r) => { if (r.email) { (emailReps[r.email] = emailReps[r.email] || new Set()).add(norm(r.rep || r.name)) } })
-          const sharedEmail = Object.keys(emailReps).filter((e) => emailReps[e].size > 1).map((e) => ({ email: e, names: [...new Set(live.filter((r) => r.email === e).map((r) => r.name))] }))
-          const decRoom = groups.filter((g) => g.roomMixed)
-          const decRep = groups.filter((g) => !g.repIn)
-          const decMiss = groups.filter((g) => g.missing.length >= 2)
-          const won3 = (n) => n + '명'
-          const Chip = (txt, cls) => <span className={`inline-block text-[10px] font-bold rounded px-1.5 py-0.5 text-white ${cls}`}>{txt}</span>
-          const GroupRow = (g, i) => (
-            <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[13px] font-bold text-[#191f28]">{g.rep}</span>
-                <span className="text-[11px] text-[#8b95a1]">{roomTypeShort(g.roomType)} · {g.mem.length}{g.missing.length ? `/${g.mem.length + g.missing.length}` : ''}명{g.campuses.length ? ' · ' + g.campuses.join('/') : ''}</span>
-                {g.missing.length === 0 ? Chip('전원', 'bg-[#12b886]') : Chip(`${g.mem.length}/${g.mem.length + g.missing.length}`, 'bg-[#f59f00]')}
-                {g.roomMixed && Chip('객실 불일치', 'bg-[#f04452]')}
-                {!g.repIn && Chip('대표 미제출', 'bg-[#f04452]')}
-              </div>
-              <div className="text-[12px] text-[#4e5968] mt-0.5">{g.mem.map((p) => p.name).join(' · ')}</div>
-              {g.missing.length > 0 && <div className="text-[11px] text-[#f04452] mt-0.5">미제출: {g.missing.join(' · ')}</div>}
-            </div>
-          )
+          // 원본(구글폼) 전수 분류 — 운영자 확정 정리안(정적 스냅샷). 앱 자동 그룹과 별개의 기준.
+          const G = [
+            ['송재혁','패밀리·5','송재혁·조안나·송주하·송은하·송선주','','분당','전원'],
+            ['조형만','소노캄·4 (설악)','조형만·조영렬·김미정·조윤정','','부산(조영렬 분당오기)','전원'],
+            ['김영표','소노캄·6','김영표·선현미·김건우·김지후·김찬우·김현우','','부산','전원'],
+            ['김민구','소노벨스위트·6','김민구·이유란·김예소·김요한·김다니엘·김요엘','','분당','전원'],
+            ['문경모','패밀리·4','문경모·윤수정·문지호·문태준','','분당','전원'],
+            ['홍규화','패밀리·4','홍규화·홍라희·홍요셉','홍민정','분당','3/4'],
+            ['방호근','패밀리·4','방호근·김혜진·방세아·방상연','','분당(김혜진 연락처오기)','전원'],
+            ['김진명','패밀리·3','김진명','최경진·김이안','분당','1/3'],
+            ['김경민A','소노벨스위트·3','김경민A·임채순·김준','','분당','전원'],
+            ['여용구','패밀리·3','여용구·심은희·여하임','','분당','전원'],
+            ['최미수','소노벨스위트·4','최미수·권한준·권예서·권시원','','분당','전원'],
+            ['백요한','패밀리·4','백요한·김귀리·백지민·백아윤','','분당','전원'],
+            ['이상미','소노캄·5','이상미·이경미·조이한·조요한·조영광','','분당','구버전·중복확인'],
+            ['임창은','소노벨스위트·5','임창은·이시우·이리사·이주회·이한나B','','분당','전원'],
+            ['김상아','패밀리·6','김상아·이종만·이사랑B·이다니엘·이새롬·이솔로몬','','분당(구버전2 중복)','전원'],
+            ['임성현','소노캄·4 (설악)','임성현·윤예영·최데이빗·이지윤','','분당','전원'],
+            ['안성일','소노벨스위트·4','안성일','양영애·안예원·안희원','분당','1/4'],
+            ['이부희','소노벨스위트·6 (버스)','이부희·박금영·강수자·최은정·임정은·이은영','','분당','전원'],
+            ['심우영','소노벨스위트·5','심우영·최은지·심온유·심예준·심예은','','분당','전원'],
+            ['박현철','소노캄·6 (버스)','박현철·박양정','박은후·남경주·박종근·박일렴','분당','2/6'],
+            ['임재윤','소노벨스위트·4','임재윤·조은하·임라엘·조은샘','','분당','전원'],
+            ['김종명','소노벨스위트·3','김종명','김성은·김찬영','분당','1/3'],
+            ['김미선B','소노벨스위트·6 (부산,버스)','김미선B·김미선A·임채경·김미경','박영수·박민경','부산','4/6'],
+            ['김효진','패밀리·3','김효진·최병준·최시안','','분당','전원'],
+            ['김은학','소노캄·7~8 (청년,버스)','김은학·강주원·김지민B·김경은','고은비·신채희·김현지','분당','4/7'],
+            ['박윤정(첼로09)','소노벨스위트·6 (버스)','박윤정(첼로09)','이수향·오주연·김보영·박지영·김순자','분당','1/6'],
+            ['강봉환','소노벨스위트·4','강봉환·김주연·강다윗·강모세','','분당','전원'],
+            ['박노진','소노벨스위트·5','박노진·한유나·박노아·박에스더·박주빌리','','분당','전원'],
+            ['박민수','패밀리·5','박민수·김동환·김예주·김여호수아·김데이빗','','분당','전원'],
+            ['노재용','패밀리·4','노재용·김주애·노누엘·노누시','','분당','전원'],
+            ['강혜연','패밀리·4','강혜연·이창원·이선우·이시은','','분당','전원'],
+            ['김승희','소노캄·4','김승희·김정연·김영균·김서연','','분당','전원'],
+            ['전은혜','패밀리·4','전은혜·김순우·김지유','김지안','분당','중복행 확인'],
+            ['정석현','패밀리·4 (부산)','정석현·홍은희·정해이·정시하','','부산','전원'],
+            ['민준규','패밀리·4','민준규·강미희·민세윤·민세진','','분당','전원'],
+            ['유건희','소노캄·6 (청년)','유건희·김지호·이원균·김예성·강현민','천은빈','분당','5/6'],
+            ['김태희+정나리련','소노벨스위트 (6~8 희망)','김태희·정나리련','윤현수·임진수·리아·김현경','분당','부분→그룹'],
+            ['성호민/석현수','청년 7~8 (객실불일치)','성호민·석현수·이주형','박준영·전동현·전성민·김찬','분당','대표/객실'],
+            ['함보라/박혜영','7~8 (객실불일치)','함보라·박혜영·선정희','이동신·안혜천·김소은·박윤숙','분당','대표/객실'],
+            ['김연지','소노캄·7~8 (청년)','신원영·차윤선·차윤주·이한나(청년)','김연지·전혜리 + 김윤하(?)','부산/분당','대표 미제출'],
+            ['김민선','소노벨스위트·6 (청년)','지유림','김민선·차영민·김혜민·김예은·이예원','분당','1/6'],
+          ]
+          const P = [
+            ['이선희','이선희·안현진','외 2명 추가 (소노캄)','분당'],
+            ['조형원','조형원·최윤선 (부부)','다른 성도와 4명 방','분당'],
+            ['강창모','강창모·강현우','다른 성도와 패밀리','분당'],
+            ['김남현','김남현·길태형·문상철','부산청년 6인방','부산'],
+            ['박은미','박은미·이사랑A','다른 성도와 7~8명 (6인도 가능)','분당'],
+          ]
+          const SOLO = [
+            ['버스+설악 (4)','이재민·강승미·김민욱·김민수'],
+            ['버스 (9)','이병곤·김혜영·김진원·허영숙·김유하·전성훈·이승원·박수림·김말숙(6/16 소노캄)'],
+            ['자차 (6)','정종진·김세화·김수연·이경희·김창준·이은희'],
+            ['확인 요망 (4)','성원준·성시우·문옥진·김윤하 (→ 의사결정 참조)'],
+          ]
+          const DUP = [
+            ['김상아','구버전 2건 + 본인 → 7:46 1건만'],
+            ['김말숙','6/14 소노벨스위트 + 6/16 소노캄 → 최신'],
+            ['전은혜','장년·초등 2행 → 초등행 = 김지안 오기 의심'],
+            ['이경미','구버전 가족/이경미 + 본인 → 1명'],
+            ['이주형','명단 중복 + 본인 단독 → 1명'],
+          ]
+          const DEC = [
+            '1. cjkimhope 이메일에 3명(김창준·이은희·김윤하) 각자 개인 신청. 김윤하는 김연지 청년그룹 명단에도 있음 → 개인? 김연지 그룹?',
+            '2. 김연지 그룹: 대표 김연지·전혜리 미제출, 청년 이한나는 임창은네 이한나B와 동명이인. 실제 제출=신원영·차윤선·차윤주·이한나.',
+            '3. 성호민/석현수 청년: 대표 둘로 갈림 + 객실 소노벨스위트 vs 소노캄 불일치, 미제출 4명. 대표·객실 확정.',
+            '4. 함보라/박혜영/선정희: 같은 7~8인 그룹? 객실 소노벨스위트(선정희) vs 소노캄 불일치. 대표 확정.',
+            '5. 김태희+정나리련: 김태희 부분→7~8명 희망, 정나리련 6인 그룹. 같은 그룹인지 + 미제출 4명.',
+            '6. 이혜란 그룹(8인): 7명 미제출 + "각 가족당 비용 따로" 문의 → 비용 분리 방침.',
+            '7. 문옥진: 6인 그룹 선택했으나 명단 공란 → 개인으로 볼지.',
+            '8. 전은혜 초등부 행 = 김지안 오기 추정. 확인.',
+            '9. 이상미 그룹: 이상미·조이한·조요한은 구버전에만 존재(본인 재제출 없음), 이경미만 재제출 → 유효 처리?',
+            '10. 성원준+성시우: 같은 이메일(부자 추정), 둘 다 개인 → 가족 2인으로 묶을지.',
+            '11. 박윤정·김민선·안성일·김진명·김종명: 대표/일부만 제출, 명단 다수 미제출 → 미제출자 등록 받을지.',
+            '12. 동명이인 표시이름 확정: 이한나A/B, 이사랑A/B, 김미선A/B, 김지민B, 김경민A.',
+            '13. 오기 정정: 조영렬 캠퍼스(분당↔부산), 김혜진 연락처(=방호근), 문상철 연락처 자리수.',
+          ]
+          const statusCls = (s) => s === '전원' ? 'bg-[#12b886]' : /^\d+\/\d+$/.test(s) ? 'bg-[#f59f00]' : 'bg-[#f04452]'
           return (
             <div>
-              <HelpToggle>{`구글폼 원본을 지금 데이터 기준으로 자동 분류한 정리안입니다.
-• 그룹 = 비용 함께 내는 묶음(가족·예약그룹). '전원'=명단 전원 제출, 'N/M'=일부 미제출.
+              <HelpToggle>{`구글폼 원본을 전수 검토해 만든 '확정 정리안'입니다. (앱 자동 그룹과 별개의 기준 스냅샷)
+• 그룹 = 비용 함께 내는 묶음. 초록 '전원'=명단 전원 제출, 주황 'N/M'=일부 미제출.
 • 부분그룹 = "다른 성도와 같은 방" 요청(추가 배정 예정).
 • 개인 = 교회 배정 단독.
-• ⚠ 의사결정 = 객실 불일치·대표 미제출·같은 이메일에 여러 사람 등 사람이 확인할 항목.
-숫자는 '제출자 수'이며, 명단엔 있으나 신청서 없는 사람은 '미제출'로 표시.`}</HelpToggle>
+• ⚠ 의사결정 = 교회만 아는 정보(누가 한 가족인지 등) 확인 필요 항목.
+※ 미제출 = 명단엔 있으나 본인 신청서 없는 사람.`}</HelpToggle>
               <div className="grid grid-cols-3 gap-2 mb-3">
-                {stat('그룹', groups.length + '개', live.length + '명 제출')}
-                {stat('부분그룹', partials.length + '개', '추가 배정 예정')}
-                {stat('개인', singles.length + '명', '교회 배정')}
+                {stat('그룹', G.length + '개')}
+                {stat('부분그룹', P.length + '개')}
+                {stat('개인', '23명')}
               </div>
-
-              <Collapsible title="① 그룹 (가족·예약그룹)" count={`${groups.length}개`} defaultOpen>
-                {groups.map(GroupRow)}
-              </Collapsible>
-
-              <Collapsible title="② 부분그룹 (추가 배정 예정)" count={`${partials.length}개`}>
-                {partials.map((g, i) => (
+              <Collapsible title="① 그룹 (가족·예약그룹)" count={`${G.length}개`} defaultOpen>
+                {G.map((g, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
-                    <span className="text-[13px] font-bold text-[#191f28]">{g.rep}</span>
-                    <span className="text-[11px] text-[#8b95a1] ml-1">{roomTypeShort(g.roomType)} · {g.mem.length}명{g.campuses.length ? ' · ' + g.campuses.join('/') : ''}</span>
-                    <div className="text-[12px] text-[#4e5968] mt-0.5">{g.mem.map((p) => p.name).join(' · ')}</div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[13px] font-bold text-[#191f28]">{g[0]}</span>
+                      <span className="text-[11px] text-[#8b95a1]">{g[1]} · {g[4]}</span>
+                      <span className={`inline-block text-[10px] font-bold rounded px-1.5 py-0.5 text-white ${statusCls(g[5])}`}>{g[5]}</span>
+                    </div>
+                    <div className="text-[12px] text-[#4e5968] mt-0.5">{g[2]}</div>
+                    {g[3] && <div className="text-[11px] text-[#f04452] mt-0.5">미제출: {g[3]}</div>}
                   </div>
                 ))}
-                {!partials.length && <p className="text-[12px] text-[#8b95a1]">없음</p>}
               </Collapsible>
-
-              <Collapsible title="③ 개인 (교회 배정)" count={`${singles.length}명`}>
-                <div className="text-[12px] text-[#4e5968] leading-relaxed">{singles.map((p) => `${p.name}(${deptName(p.deptLabel)}${p.bus ? '·버스' : ''})`).join(', ')}</div>
+              <Collapsible title="② 부분그룹 (추가 배정 예정)" count={`${P.length}개`}>
+                {P.map((g, i) => (
+                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[13px] font-bold text-[#191f28]">{g[0]}</span>
+                    <span className="text-[11px] text-[#8b95a1] ml-1">{g[3]}</span>
+                    <div className="text-[12px] text-[#4e5968] mt-0.5">{g[1]} <span className="text-[11px] text-[#1b64da]">— {g[2]}</span></div>
+                  </div>
+                ))}
               </Collapsible>
-
-              <Collapsible title="④ 중복 (집계 제외)" count={`${dups.length}건`}>
-                {dups.length ? dups.map((r) => (
-                  <div key={r.row} className="text-[12px] text-[#4e5968] py-0.5">{r.name} <span className="text-[11px] text-[#8b95a1]">{r.note || '중복 재제출'}</span></div>
-                )) : <p className="text-[12px] text-[#8b95a1]">없음</p>}
+              <Collapsible title="③ 개인 (교회 배정)" count="23명">
+                {SOLO.map((s, i) => (
+                  <div key={i} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[12px] font-bold text-[#191f28]">{s[0]}</span>
+                    <div className="text-[12px] text-[#4e5968]">{s[1]}</div>
+                  </div>
+                ))}
               </Collapsible>
-
-              <Collapsible title="⑤ ⚠ 의사결정 필요" count={`${sharedEmail.length + decRoom.length + decRep.length + decMiss.length}건`} defaultOpen>
-                {sharedEmail.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">같은 이메일에 여러 사람({sharedEmail.length})</div>{sharedEmail.map((s, i) => <div key={i} className="text-[11px] text-[#4e5968]">{s.email} → {s.names.join(', ')}</div>)}</div>}
-                {decRoom.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">객실 종류 불일치 그룹({decRoom.length})</div><div className="text-[11px] text-[#4e5968]">{decRoom.map((g) => g.rep).join(', ')}</div></div>}
-                {decRep.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">대표 미제출 그룹({decRep.length})</div><div className="text-[11px] text-[#4e5968]">{decRep.map((g) => g.rep).join(', ')}</div></div>}
-                {decMiss.length > 0 && <div className="mb-2"><div className="text-[12px] font-bold text-[#e03131] mb-1">명단 다수 미제출({decMiss.length})</div><div className="text-[11px] text-[#4e5968]">{decMiss.map((g) => `${g.rep}(${g.missing.length}명)`).join(', ')}</div></div>}
-                <p className="text-[11px] text-[#8b95a1] mt-2">※ '누가 한 가족인지' 등은 교회만 아는 정보라, 위 항목은 운영자 확인 후 그룹정리/요청조합에서 정정하세요.</p>
+              <Collapsible title="④ 중복 (집계 제외)" count={`${DUP.length}건`}>
+                {DUP.map((d, i) => (
+                  <div key={i} className="text-[12px] text-[#4e5968] py-0.5">{d[0]} <span className="text-[11px] text-[#8b95a1]">— {d[1]}</span></div>
+                ))}
+              </Collapsible>
+              <Collapsible title="⑤ ⚠ 의사결정 필요" count={`${DEC.length}건`} defaultOpen>
+                {DEC.map((d, i) => (
+                  <div key={i} className="text-[12px] text-[#4e5968] py-1.5 border-b border-[#f7f8fa] last:border-0 leading-relaxed">{d}</div>
+                ))}
               </Collapsible>
             </div>
           )

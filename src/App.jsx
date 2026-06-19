@@ -1868,14 +1868,9 @@ function AdminApp() {
     const updates = []; const groupLabels = []
     Object.values(byGid).forEach((mem) => {
       if (mem.length < 2) return
-      const hasBooked = mem.some((r) => !isChurchAssigned(r.occLabel)) // 객실 함께 예약(N인투숙) 멤버 포함?
-      const label = `${mem[0].rep || mem[0].name} 방`
+      const label = `${mem[0].rep || mem[0].name} 방` // 보이는 그룹 그대로: 전원 "{대표} 방"
       let touched = false
-      mem.forEach((r) => {
-        // 예약가족과 섞인 '개인배정' 멤버는 외톨이 방을 막기 위해 미배정(빈값)으로
-        const desired = (hasBooked && isChurchAssigned(r.occLabel)) ? '' : label
-        if ((r.assigned || '') !== desired) { updates.push({ row: r.row, value: desired }); touched = true }
-      })
+      mem.forEach((r) => { if ((r.assigned || '') !== label) { updates.push({ row: r.row, value: label }); touched = true } })
       if (touched) groupLabels.push(label)
     })
     if (!updates.length) { setMergeMsg('이미 모든 그룹이 방과 동기화돼 있습니다'); setTimeout(() => setMergeMsg(''), 3000); return }
@@ -2275,10 +2270,8 @@ function AdminApp() {
           // S3: 명단>제출(확인필요)
           const s3 = gidList.filter((gid) => groups[gid].some((r) => r.check === 'Y'))
           const selN = Object.keys(mergeSel).filter((g) => mergeSel[g]).length
-          const roomOutOfSync = gidList.filter((gid) => groups[gid].length >= 2).filter((gid) => {
-            const mem = groups[gid]; const hasBooked = mem.some((r) => !isChurchAssigned(r.occLabel)); const lbl = `${repOf(mem)} 방`
-            return mem.some((r) => { const desired = (hasBooked && isChurchAssigned(r.occLabel)) ? '' : lbl; return (r.assigned || '') !== desired })
-          })
+          const roomOutOfSync = gidList.filter((gid) => groups[gid].length >= 2)
+            .filter((gid) => { const lbl = `${repOf(groups[gid])} 방`; return groups[gid].some((r) => (r.assigned || '') !== lbl) })
           return (
             <div>
               <HelpToggle>{`그룹 = 비용을 함께 내는 단위(가족 등)입니다. 잘못 나뉘거나 합쳐진 그룹을 바로잡습니다.

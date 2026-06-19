@@ -1608,7 +1608,7 @@ function AdminApp() {
   const reqCombine = useMemo(() => {
     const norm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
     // 이름이 아닌 단어(객실/동사/관형어/오타) 광범위 제외
-    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|하도|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|함깨|좋을/
+    const stopW = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|님이|어요|니다|니까|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|주시|부탁|드림|드려|되겠|하도|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|좋을|명은|명이|명만|명과|명도|명들|여명|몇명/
     const josa = /(와|과|은|는|이|가|을|를|도|만|의|님|씨|께|들|랑|이랑|에게|한테|에서|하고)$/
     const tok = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => x && /^[가-힣]{2,4}$/.test(x) && !stopW.test(x))
     const live = rows.filter((r) => r.route !== '중복')
@@ -1638,9 +1638,8 @@ function AdminApp() {
         if (!cand.length) { noteByRow[r.row].unresolved.push(k); return }
         if (cand.length > 1) { noteByRow[r.row].ambiguous.push(k); return }
         const p = cand[0]
-        if (p.gid === r.gid) return // 본인 그룹원 지목 → 요청 아님
         if (!isPool(p)) { noteByRow[r.row].booked.push(p.name); return } // 타 확정 그룹 소속
-        union(r.row, p.row)
+        union(r.row, p.row) // 같은 그룹/타 그룹 모두 한 방 후보로 묶기
       })
     })
     const byGid = {}

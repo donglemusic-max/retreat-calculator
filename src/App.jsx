@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 
 // ── 요금 데이터 (2026 전교인 리트릿) ───────────────────────────
@@ -1054,10 +1054,9 @@ function depositGuideText(calc, subtitle) {
 
 // #3 입금자명 예시 이미지 (Claude Design에서 받은 디자인을 자체포함 iframe으로 — pulseRing 애니메이션 유지)
 const DEPOSIT_EXAMPLE_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
-*{box-sizing:border-box;margin:0}html,body{margin:0;overflow:hidden;background:#e3ecfa}
+*{box-sizing:border-box;margin:0}html,body{margin:0;width:1080px;height:1350px;overflow:hidden;background:#e3ecfa}
 @keyframes pulseRing{0%{transform:scale(0.94);opacity:0.55}70%{transform:scale(1.06);opacity:1}100%{transform:scale(0.94);opacity:0.55}}
-#scaler{width:1080px;height:1350px;transform-origin:top left;transform:scale(calc(100vw / 1080))}
-</style></head><body><div id="scaler">
+</style></head><body><div>
 <div style="width:1080px;height:1350px;background:linear-gradient(170deg,#eef3fb 0%,#e3ecfa 55%,#dbe7f8 100%);font-family:'Noto Sans KR',-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;padding:60px 80px 56px;position:relative;overflow:hidden;">
 <div style="position:absolute;top:-120px;right:-100px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,0.10),rgba(37,99,235,0) 70%);"></div>
 <div style="position:absolute;bottom:-140px;left:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,0.08),rgba(37,99,235,0) 70%);"></div>
@@ -1083,6 +1082,17 @@ const DEPOSIT_EXAMPLE_HTML = `<!doctype html><html><head><meta charset="utf-8"><
 
 function DepositExample() {
   const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+  const [scale, setScale] = useState(0)
+  useEffect(() => {
+    if (!open) return
+    const measure = () => { const w = wrapRef.current ? wrapRef.current.clientWidth : 0; if (w) setScale(w / 1080) }
+    measure()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    if (ro && wrapRef.current) ro.observe(wrapRef.current)
+    window.addEventListener('resize', measure)
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', measure) }
+  }, [open])
   return (
     <div className="mb-3">
       <button
@@ -1093,13 +1103,18 @@ function DepositExample() {
         <span className={`text-[12px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
       {open && (
-        <iframe
-          title="입금자명 예시"
-          srcDoc={DEPOSIT_EXAMPLE_HTML}
-          className="w-full mt-2 rounded-2xl border border-[#e5e8eb]"
-          style={{ aspectRatio: '1080 / 1350', display: 'block' }}
-          scrolling="no"
-        />
+        <div
+          ref={wrapRef}
+          className="mt-2 rounded-2xl border border-[#e5e8eb] overflow-hidden"
+          style={{ position: 'relative', width: '100%', height: scale ? Math.round(1350 * scale) : 0 }}
+        >
+          <iframe
+            title="입금자명 예시"
+            srcDoc={DEPOSIT_EXAMPLE_HTML}
+            scrolling="no"
+            style={{ position: 'absolute', top: 0, left: 0, width: '1080px', height: '1350px', transformOrigin: 'top left', transform: `scale(${scale || 0.0001})`, border: 0 }}
+          />
+        </div>
       )}
     </div>
   )

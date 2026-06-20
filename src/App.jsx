@@ -1851,6 +1851,158 @@ function LookupMode() {
 }
 
 // 헤더 "등록 안내 전체보기" 버튼
+// 비용 안내 예시 (Claude Design '비용 안내.dc.html' 이식) — 탭형 예시 + 모달
+const COST_DEPTS = [
+  ['장년부·청년부', '27.8'], ['중고등부', '26.8'], ['소년부', '25.8'], ['초등부', '24.8'],
+  ['유년부', '22.8'], ['유치부', '20.8'], ['영유아부', '19.8'], ['영아부(돌 전)', '17.8'],
+]
+const COST_EXAMPLES = [
+  {
+    tab: '청년부', tab2: '혼자', badgeText: '예시 1 · 청년부 혼자 등록 (개인)', badgeBg: '#eff6ff', badgeColor: '#1d4ed8',
+    situation: '“혼자 등록해요. 방 멤버는 따로 정하지 않았고, 소노벨 스위트에 설악산 뷰·버스도 신청합니다.”',
+    lines: [
+      { label: '기본 등록비 (청년부)', calc: '27.8 × 1명', amount: '27.8' },
+      { label: '버스', calc: '3.8 × 1명', amount: '3.8' },
+      { label: '설악산 뷰', calc: '1 × 1명', amount: '1' },
+      { label: '객실 선택비 (소노벨 스위트)', calc: '1 × 1명', amount: '1' },
+    ],
+    total: '33.6만원', payNote: '본인 이름으로 항목별(등록비·버스비·설악산·객실선택)로 나눠 입금해요.',
+  },
+  {
+    tab: '4인', tab2: '가족', badgeText: '예시 2 · 4인 가족 등록', badgeBg: '#ecfdf5', badgeColor: '#047857',
+    situation: '“4식구(아빠·엄마·아들·딸)가 소노벨 스위트 한 방. 버스·설악산 뷰도 전원 신청합니다.”',
+    lines: [
+      { label: '기본 등록비 (4명)', calc: '27.8+27.8+26.8+22.8', amount: '105.2' },
+      { label: '버스', calc: '3.8 × 4명', amount: '15.2' },
+      { label: '설악산 뷰', calc: '1 × 4명', amount: '4' },
+      { label: '객실 선택비 (소노벨 스위트)', calc: '1 × 4명', amount: '4' },
+    ],
+    total: '128.6만원', payNote: '가족 비용을 모아 대표자(예: 아빠 김바울) 한 사람 이름으로, 항목별로 묶어서 입금해요.',
+  },
+  {
+    tab: '셀·성도', tab2: '그룹', badgeText: '예시 3 · 셀·성도 모아 등록 (그룹)', badgeBg: '#eef2ff', badgeColor: '#4338ca',
+    situation: '“장년부 셀 5명이 소노캄 스위트 한 방을 같이 써요. 버스도 함께, 설악산 뷰는 없어도 됩니다.”',
+    lines: [
+      { label: '기본 등록비 (5명)', calc: '27.8 × 5명', amount: '139.0' },
+      { label: '버스', calc: '3.8 × 5명', amount: '19.0' },
+      { label: '객실 선택비 (소노캄 스위트 · 5인 한 방)', calc: '그룹당 1개', amount: '24' },
+    ],
+    total: '182.0만원', payNote: '등록비·버스비는 1인당 비용을 모아 대표자 이름으로 항목별 입금. 객실 선택비는 방 하나당 비용이므로 대표자 이름으로 한 번만 입금해요.',
+  },
+  {
+    tab: '부분', tab2: '등록', badgeText: '예시 4 · 부분 등록', badgeBg: '#fef2f2', badgeColor: '#b91c1c',
+    situation: '“아들과 둘이 같은 방을 쓰고 싶어요. 소노벨 스위트, 설악산 뷰는 필요 없고 버스는 같이 타요.”',
+    lines: [
+      { label: '기본 등록비 (2명)', calc: '27.8 + 26.8', amount: '54.6' },
+      { label: '버스', calc: '3.8 × 2명', amount: '7.6' },
+      { label: '객실 선택비 (소노벨 스위트)', calc: '1 × 2명', amount: '2' },
+    ],
+    total: '64.2만원', payNote: '방만 같이 쓰고 비용은 각자예요. 대표자 이름으로 항목별로 묶어 입금하면 됩니다.',
+  },
+]
+function CostExamples() {
+  const [tab, setTab] = useState(0)
+  const card = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, marginBottom: 14 }
+  const secLabel = { fontSize: 13, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.02em', marginBottom: 14 }
+  const chip = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', borderRadius: 10, padding: '12px 14px' }
+  const ex = COST_EXAMPLES[tab]
+  return (
+    <div style={{ fontFamily: "'Pretendard',-apple-system,sans-serif" }}>
+      <div style={{ marginBottom: 22 }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 22, lineHeight: 1.3, fontWeight: 800, color: '#111827', letterSpacing: '-0.02em' }}>등록비는 이렇게 구성돼요</h2>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#4b5563' }}>기본 등록비에 원하는 선택을 더하는 방식이에요. 아래 <strong style={{ color: '#1d4ed8' }}>내 상황과 비슷한 예시</strong>를 보면 한눈에 이해돼요. <span style={{ color: '#6b7280' }}>(단위: 만원)</span></p>
+      </div>
+      <div style={card}>
+        <div style={secLabel}>1 · 기본 등록비 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(부서별 · 1인당)</span></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+          {COST_DEPTS.map(([n, v]) => (
+            <div key={n} style={{ ...chip, alignItems: 'baseline' }}><span style={{ fontSize: 14, color: '#374151' }}>{n}</span><span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{v}</span></div>
+          ))}
+        </div>
+      </div>
+      <div style={card}>
+        <div style={secLabel}>2 · 원하면 더하는 선택 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(1인당)</span></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>🚌 버스 <span style={{ color: '#9ca3af', fontSize: 13 }}>(자차는 0)</span></span><span style={{ fontSize: 15, fontWeight: 700, color: '#1d4ed8' }}>+3.8</span></div>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>🏔 설악산 뷰</span><span style={{ fontSize: 15, fontWeight: 700, color: '#1d4ed8' }}>+1</span></div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', margin: '16px 0 10px' }}>객실 선택비 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(개인 신청 시 1인당)</span></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>소노벨 패밀리 <span style={{ color: '#9ca3af', fontSize: 13 }}>(기본)</span></span><span style={{ fontSize: 15, fontWeight: 700, color: '#6b7280' }}>+0</span></div>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>소노벨 스위트</span><span style={{ fontSize: 15, fontWeight: 700, color: '#1d4ed8' }}>+1</span></div>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>소노캄 스위트</span><span style={{ fontSize: 15, fontWeight: 700, color: '#1d4ed8' }}>+4</span></div>
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', gap: 9, alignItems: 'flex-start', background: '#eff6ff', borderRadius: 10, padding: '11px 13px' }}>
+          <span style={{ flex: 'none', fontSize: 14 }}>💡</span>
+          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#1e40af' }}>셀·성도들이 <strong>한 방을 통째로</strong> 쓰는 그룹 신청이면, 객실비는 1인당이 아니라 <strong>방 하나당(그룹당)</strong>으로 계산돼요. (예: 소노캄 스위트 5인 한 방 = 24)</span>
+        </div>
+      </div>
+      <div style={{ margin: '26px 0 14px' }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em' }}>내 상황과 비슷한 예시를 골라보세요</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 7, marginBottom: 14 }}>
+        {COST_EXAMPLES.map((e, i) => {
+          const active = tab === i
+          return (
+            <button key={i} onClick={() => setTab(i)} style={{
+              border: active ? 'none' : '1px solid #e5e7eb', borderRadius: 11, padding: '11px 4px',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, lineHeight: 1.3, cursor: 'pointer', transition: 'all .15s',
+              background: active ? '#1d4ed8' : '#fff', color: active ? '#fff' : '#4b5563',
+              boxShadow: active ? '0 4px 12px rgba(29,78,216,0.28)' : '0 1px 2px rgba(0,0,0,0.05)',
+            }}>{e.tab}<br />{e.tab2}</button>
+          )
+        })}
+      </div>
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 22, marginBottom: 14 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: ex.badgeBg, color: ex.badgeColor, borderRadius: 999, padding: '5px 12px', fontSize: 12.5, fontWeight: 700, marginBottom: 14 }}>{ex.badgeText}</div>
+        <p style={{ margin: '0 0 18px', fontSize: 15, lineHeight: 1.6, color: '#374151' }}>{ex.situation}</p>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.02em', marginBottom: 10 }}>비용 구성</div>
+        <div style={{ border: '1px solid #eef0f3', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+          {ex.lines.map((row, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
+              <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, color: '#111827', fontWeight: 600 }}>{row.label}</div><div style={{ fontSize: 12.5, color: '#9ca3af', marginTop: 2 }}>{row.calc}</div></div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap' }}>{row.amount}</div>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 14, background: '#eff6ff' }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#1e3a8a' }}>총 등록 금액</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{ex.total}</span>
+          </div>
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.02em', marginBottom: 10 }}>입금은 이렇게</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '13px 15px' }}>
+          <span style={{ flex: 'none', fontSize: 16 }}>💳</span>
+          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#92400e' }}>{ex.payNote}</p>
+        </div>
+      </div>
+      <p style={{ margin: '16px 4px 0', fontSize: 12.5, lineHeight: 1.6, color: '#9ca3af' }}>※ 그룹(방 전체) 객실 선택비는 투숙 인원·객실 종류에 따라 달라집니다. 위 예시 금액은 원본 ‘비용 예시’ 문서를 기준으로 했어요.</p>
+    </div>
+  )
+}
+function CostGuideButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#eff6ff] text-[#1d4ed8] font-bold text-[12px] hover:bg-[#e3eeff] transition-colors">
+        🧮 비용 예시 보기
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setOpen(false)}>
+          <div className="absolute inset-0 bg-black/40 animate-backdrop" />
+          <div className="relative w-full max-w-[480px] bg-[#f3f4f6] rounded-t-[26px] max-h-[88vh] overflow-y-auto p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-3">
+              <div className="w-6" />
+              <div className="w-10 h-1 bg-[#d1d5db] rounded-full" />
+              <button onClick={() => setOpen(false)} className="text-[#9ca3af] text-[20px] leading-none w-6 text-right">✕</button>
+            </div>
+            <CostExamples />
+            <button onClick={() => setOpen(false)} className="w-full mt-4 py-3 rounded-2xl bg-white border border-[#e5e7eb] text-[#4b5563] font-bold text-[14px]">닫기</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 function GuideButton() {
   const [open, setOpen] = useState(false)
   return (
@@ -3288,6 +3440,7 @@ export default function App() {
             등록기간 6/7~6/28 (선착순) · 문의 이흥배 목사 010-9584-7575<br />
             <span className="text-[#5f6b7a] text-[13px]">* 새가족 과정 수료자에 한해 등록 가능</span>
             <GuideButton />
+            <CostGuideButton />
           </div>
         </header>
 

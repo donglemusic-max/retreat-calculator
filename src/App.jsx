@@ -1546,7 +1546,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const [occSel, setOccSel] = useState(occInit)
   const [occStatus, setOccStatus] = useState(/인이 투숙/.test(cur.occLabel || '') ? 'confirmed' : 'pending') // #15 확정/미정
   const [seorakAll, setSeorakAll] = useState(members.some((m) => m.seorak)) // #11 설악 그룹 공통
-  const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false })
+  const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false, campus: '' })
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
 
@@ -1571,11 +1571,11 @@ function GroupEditor({ members, auth, onRefresh, title }) {
     if (!add.name.trim() || !add.gender) { setMsg('추가할 분의 이름·성별을 입력해 주세요.'); return }
     setBusy('add'); setMsg('')
     const deptLabel = DEPTS.find((d) => d.name === add.dept).label
-    const j = await post({ action: 'memberAdd', gid, member: { name: add.name.trim(), gender: add.gender, deptLabel, bus: add.bus } })
+    const j = await post({ action: 'memberAdd', gid, member: { name: add.name.trim(), gender: add.gender, deptLabel, bus: add.bus, campus: add.campus || cur.campus || '' } })
     setBusy('')
     if (j.ok) {
       if (occStatus === 'confirmed') { setOccSel(occLabelFor(members.length + 1)); setMsg('투숙 인원이 ' + occLabelFor(members.length + 1) + '으로 맞춰졌어요. "저장"을 눌러 반영하세요.') } // #20
-      setAdd({ name: '', gender: '', dept: DEPTS[0].name, bus: false }); onRefresh && onRefresh()
+      setAdd({ name: '', gender: '', dept: DEPTS[0].name, bus: false, campus: '' }); onRefresh && onRefresh()
     } else setMsg('오류: ' + (j.error || ''))
   }
 
@@ -1631,6 +1631,14 @@ function GroupEditor({ members, auth, onRefresh, title }) {
           ))}
         </div>
         <DeptSelect value={add.dept} onChange={(v) => setAdd({ ...add, dept: v })} />
+        <div className="flex gap-2 mt-2">
+          {CAMPUSES.map((c) => {
+            const active = (add.campus || cur.campus) === c
+            return (
+              <button key={c} onClick={() => setAdd({ ...add, campus: c })} className={`flex-1 py-2 rounded-xl text-[12px] font-bold border ${active ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>{c.replace(' 캠퍼스', '')}</button>
+            )
+          })}
+        </div>
         <button onClick={() => setAdd({ ...add, bus: !add.bus })} className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border ${add.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>버스 신청 {add.bus ? '✓' : ''}</button>
         <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#fff5f5] text-[#f04452] border-2 border-dashed border-[#f04452]/40 hover:bg-[#ffecec] font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '+ 구성원 추가'}</button>
       </div>

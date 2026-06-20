@@ -2013,9 +2013,10 @@ function CostExamples() {
         </div>
       </div>
       <div style={card} className="no-print">
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', marginBottom: 4 }}>전체 비용표 한 장으로 보기</div>
-        <p style={{ margin: '0 0 14px', fontSize: 13.5, lineHeight: 1.6, color: '#6b7280' }}>표로 한눈에 보거나 단톡방에 공유하고 싶으실 때. 아래 버튼으로 이 안내 전체를 <strong>PDF로 저장하거나 인쇄</strong>하실 수 있고, 화면을 그대로 캡처해 공유하셔도 됩니다.</p>
-        <button onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, padding: 14, borderRadius: 11, cursor: 'pointer' }}>🖨 비용표 PDF로 저장 · 인쇄</button>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', marginBottom: 4 }}>원본 비용표 한 장으로 보기</div>
+        <p style={{ margin: '0 0 14px', fontSize: 13.5, lineHeight: 1.6, color: '#6b7280' }}>표로 한눈에 보거나 단톡방에 공유하고 싶으실 때. 아래에서 <strong>원본 비용표(PDF)</strong>를 저장하실 수 있습니다.</p>
+        <a href="cost-example.pdf" download="2026 전교인 리트릿 - 비용 예시.pdf" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', background: '#1d4ed8', color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 700, padding: 14, borderRadius: 11 }}>⬇ 원본 비용표 PDF 저장하기</a>
+        <a href="cost-example.pdf" target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 8, background: '#fff', color: '#1d4ed8', textDecoration: 'none', fontSize: 14, fontWeight: 700, padding: 13, borderRadius: 11, border: '1.5px solid #c7d2fe' }}>📄 새 탭에서 열어보기</a>
       </div>
       <p style={{ margin: '16px 4px 0', fontSize: 12.5, lineHeight: 1.6, color: '#9ca3af' }}>※ 그룹(방 전체) 객실 선택비는 투숙 인원·객실 종류에 따라 달라집니다.</p>
     </div>

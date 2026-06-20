@@ -3378,28 +3378,29 @@ function AdminApp() {
               <>
                 {(() => {
                   const set = (k, v) => setMailTpl({ ...mailTpl, [k]: v })
-                  const Reset = ({ k }) => mailDef[k] != null && mailTpl[k] !== mailDef[k] ? <button onClick={() => set(k, mailDef[k])} className="text-[11px] font-bold text-[#f04452]">기본값으로</button> : null
-                  const Body = ({ k, rows = 6 }) => <textarea value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} rows={rows} className={inputCls + ' resize-y text-[12px] leading-relaxed font-mono'} />
-                  const Subj = ({ k }) => <input value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} className={inputCls + ' text-[13px] mb-2'} />
+                  // ⚠️ 컴포넌트로 정의하면 키 입력마다 remount되어 포커스가 풀림 → 일반 함수로 인라인 요소 반환
+                  const reset = (k) => mailDef[k] != null && mailTpl[k] !== mailDef[k] ? <button onClick={() => set(k, mailDef[k])} className="text-[11px] font-bold text-[#f04452]">기본값으로</button> : null
+                  const body = (k, rows = 6) => <textarea value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} rows={rows} className={inputCls + ' resize-y text-[12px] leading-relaxed font-mono'} />
+                  const subj = (k) => <input value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} className={inputCls + ' text-[13px] mb-2'} />
                   const MAILS = [['submit', '접수 메일 (신규 신청)'], ['update', '수정 메일 (본인 정보)'], ['add', '구성원 추가 메일'], ['delete', '구성원 취소 메일'], ['groupset', '그룹설정 변경 메일 (객실/인원/설악)']]
                   return (
                     <>
                       <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                        <div className="flex items-center justify-between mb-1"><div className="text-[13px] font-bold text-[#191f28]">✨ 비전·영적 기대 문구 (#30)</div><Reset k="vision" /></div>
+                        <div className="flex items-center justify-between mb-1"><div className="text-[13px] font-bold text-[#191f28]">✨ 비전·영적 기대 문구 (#30)</div>{reset('vision')}</div>
                         <p className="text-[11px] text-[#5f6b7a] mb-2">비워두면 안 나오고, 적으면 모든 안내 메일 끝(마무리 위)에 들어갑니다.</p>
-                        <Body k="vision" rows={4} />
+                        {body('vision', 4)}
                       </div>
                       <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                        <div className="flex items-center justify-between mb-1"><div className="text-[13px] font-bold text-[#191f28]">공통 마무리 문구</div><Reset k="foot" /></div>
-                        <Body k="foot" rows={4} />
+                        <div className="flex items-center justify-between mb-1"><div className="text-[13px] font-bold text-[#191f28]">공통 마무리 문구</div>{reset('foot')}</div>
+                        {body('foot', 4)}
                       </div>
                       {MAILS.map(([k, label]) => (
                         <div key={k} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                          <div className="flex items-center justify-between mb-2"><div className="text-[13px] font-bold text-[#191f28]">{label}</div><Reset k={k + '_body'} /></div>
+                          <div className="flex items-center justify-between mb-2"><div className="text-[13px] font-bold text-[#191f28]">{label}</div>{reset(k + '_body')}</div>
                           <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">제목</div>
-                          <Subj k={k + '_subject'} />
+                          {subj(k + '_subject')}
                           <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">본문</div>
-                          <Body k={k + '_body'} rows={7} />
+                          {body(k + '_body', 7)}
                         </div>
                       ))}
                       <div className="sticky bottom-2 bg-white rounded-2xl border border-[#e5e8eb] shadow-lg p-3 flex items-center gap-2">

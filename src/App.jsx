@@ -2771,6 +2771,8 @@ function AdminApp() {
           // 원본(구글폼) 전수 분류 — 운영자 확정 정리안(정적 스냅샷). 앱 자동 그룹과 별개의 기준.
           // 라이브 응답 데이터로 정리안 자동 생성 (route '중복' 제외, void/테스트는 이미 제외됨) — 항상 최신
           const _norm = (s) => (s || '').replace(/\s/g, '')
+          const _key = (s) => (s || '').replace(/\s/g, '').replace(/[A-Za-z0-9]+$/, '') // 표시이름 접미사(A/B/숫자) 무시: 이사랑B↔이사랑
+          const _josa = (s) => (s || '').replace(/(와|과|은|는|이|가|도|만|의|들|님|랑|하고)$/, '') // 문장형 명단의 조사 제거: 박은미와→박은미
           const _real = rows.filter((r) => r.route !== '중복')
           const _byG = {}; _real.forEach((r) => { (_byG[r.gid] = _byG[r.gid] || []).push(r) })
           const _roomShort = (l) => /소노캄/.test(l || '') ? '소노캄' : /소노벨\s?스위트/.test(l || '') ? '소노벨스위트' : '패밀리'
@@ -2783,9 +2785,9 @@ function AdminApp() {
             const members = grp.map((r) => r.name)
             const isPartial = grp.some((r) => /나머지는 교회에서 배정|부분적으로/.test(r.occLabel || ''))
             const hasGroupOcc = grp.some((r) => /인이 투숙/.test(r.occLabel || ''))
-            const listNames = []; grp.forEach((r) => nameTokens(r.list).forEach((n) => { if (!listNames.includes(n)) listNames.push(n) }))
-            const subSet = new Set(members.map(_norm))
-            const missing = listNames.filter((n) => !subSet.has(_norm(n)))
+            const listNames = []; grp.forEach((r) => nameTokens(r.list).forEach((n) => { const t = _josa(n); if (t.length >= 2 && !listNames.includes(t)) listNames.push(t) }))
+            const subSet = new Set(members.map(_key))
+            const missing = listNames.filter((n) => !subSet.has(_key(n)))
             const noteM = (grp.map((r) => r.note || '').find((t) => /명단 \d+명/.test(t)) || '').match(/명단 (\d+)명/)
             const listN = Math.max(members.length + missing.length, noteM ? +noteM[1] : 0)
             const campus = (repRow.campus || '').replace(' 캠퍼스', '')

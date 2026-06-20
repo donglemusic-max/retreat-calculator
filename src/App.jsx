@@ -2192,6 +2192,93 @@ function Collapsible({ title, count, defaultOpen, children }) {
   )
 }
 
+// 운영자(=Claude) 전수 분석 정리안 — 2026-06-21 신청 데이터 기준. (새 신청은 미반영 스냅샷 / AI 갱신·새 데이터 주면 갱신)
+const CURATED_SORT = {
+  at: '6/21 분석',
+  groups: [
+    { rep: '송재혁', room: '패밀리·5', campus: '분당', members: ['송재혁', '조안나', '송주하', '송은하', '송선주'], missing: [], status: '전원' },
+    { rep: '조형만', room: '소노캄·4', flags: '설악', campus: '부산', members: ['조형만', '조영렬', '김미정', '조윤정'], missing: [], status: '전원' },
+    { rep: '김영표', room: '소노캄·6', campus: '부산', members: ['김영표', '선현미', '김건우', '김지후', '김찬우', '김현우'], missing: [], status: '전원' },
+    { rep: '김민구', room: '소노벨스위트·6', campus: '분당', members: ['김민구', '이유란', '김예소', '김요한', '김다니엘', '김요엘'], missing: [], status: '전원' },
+    { rep: '문경모', room: '패밀리·4', campus: '분당', members: ['문경모', '윤수정', '문지호', '문태준'], missing: [], status: '전원' },
+    { rep: '홍규화', room: '패밀리·4', campus: '분당', members: ['홍규화', '홍라희', '홍요셉', '홍민정'], missing: [], status: '전원' },
+    { rep: '방호근', room: '패밀리·4', campus: '분당', members: ['방호근', '김혜진', '방세아', '방상연'], missing: [], status: '전원' },
+    { rep: '김경민A', room: '소노벨스위트·3', campus: '분당', members: ['김경민A', '임채순', '김준'], missing: [], status: '전원' },
+    { rep: '여용구', room: '패밀리·3', campus: '분당', members: ['여용구', '심은희', '여하임'], missing: [], status: '전원' },
+    { rep: '최미수', room: '소노벨스위트·4', campus: '분당', members: ['최미수', '권한준', '권예서', '권시원'], missing: [], status: '전원' },
+    { rep: '백요한', room: '패밀리·4', campus: '분당', members: ['백요한', '김귀리', '백지민', '백아윤'], missing: [], status: '전원' },
+    { rep: '임창은', room: '소노벨스위트·5', campus: '분당', members: ['임창은', '이시우', '이리사', '이주회', '이한나B'], missing: [], status: '전원' },
+    { rep: '김상아', room: '패밀리·6', campus: '분당', members: ['김상아', '이종만', '이사랑B', '이다니엘', '이새롬', '이솔로몬'], missing: [], status: '전원' },
+    { rep: '임성현', room: '소노캄·4', flags: '설악', campus: '분당', members: ['임성현', '윤예영', '최데이빗', '이지윤'], missing: [], status: '전원' },
+    { rep: '이부희', room: '소노벨스위트·6', flags: '버스', campus: '분당', members: ['이부희', '박금영', '강수자', '최은정', '임정은', '이은영'], missing: [], status: '전원' },
+    { rep: '심우영', room: '소노벨스위트·5', campus: '분당', members: ['심우영', '최은지', '심온유', '심예준', '심예은'], missing: [], status: '전원' },
+    { rep: '임재윤', room: '소노벨스위트·4', campus: '분당', members: ['임재윤', '조은하', '임라엘', '조은샘'], missing: [], status: '전원' },
+    { rep: '김효진', room: '패밀리·3', campus: '분당', members: ['김효진', '최병준', '최시안'], missing: [], status: '전원' },
+    { rep: '강봉환', room: '소노벨스위트·4', campus: '분당', members: ['강봉환', '김주연', '강다윗', '강모세'], missing: [], status: '전원' },
+    { rep: '박노진', room: '소노벨스위트·5', campus: '분당', members: ['박노진', '한유나', '박노아', '박에스더', '박주빌리'], missing: [], status: '전원' },
+    { rep: '박민수', room: '패밀리·5', campus: '분당', members: ['박민수', '김동환', '김예주', '김여호수아', '김데이빗'], missing: [], status: '전원' },
+    { rep: '노재용', room: '패밀리·4', campus: '분당', members: ['노재용', '김주애', '노누엘', '노누시'], missing: [], status: '전원' },
+    { rep: '민준규', room: '패밀리·4', campus: '분당', members: ['민준규', '강미희', '민세윤', '민세진'], missing: [], status: '전원' },
+    { rep: '강혜연', room: '패밀리·4', campus: '분당', members: ['강혜연', '이창원', '이선우', '이시은'], missing: [], status: '전원' },
+    { rep: '김승희', room: '소노캄·4', campus: '분당', members: ['김승희', '김정연', '김영균', '김서연'], missing: [], status: '전원' },
+    { rep: '정석현', room: '패밀리·4', campus: '부산', members: ['정석현', '홍은희', '정해이', '정시하'], missing: [], status: '전원' },
+    { rep: '장성태', room: '소노벨스위트·5', campus: '분당', members: ['장성태', '김보희', '장수아', '장루아', '장사무엘'], missing: [], status: '전원' },
+    { rep: '김진명', room: '패밀리·3', campus: '분당', members: ['김진명'], missing: ['최경진', '김이안'], status: '1/3' },
+    { rep: '유건희', room: '소노캄·6', flags: '청년·버스', campus: '분당', members: ['유건희', '김지호', '이원균', '김예성', '강현민'], missing: ['천은빈'], status: '5/6' },
+    { rep: '안성일', room: '소노벨스위트·4', campus: '분당', members: ['안성일'], missing: ['양영애', '안예원', '안희원'], status: '1/4' },
+    { rep: '박현철', room: '소노캄·6', flags: '버스', campus: '분당', members: ['박현철', '박양정'], missing: ['박은후', '남경주', '박종근', '박일렴'], status: '2/6' },
+    { rep: '김종명', room: '소노벨스위트·3', campus: '분당', members: ['김종명'], missing: ['김성은', '김찬영'], status: '1/3' },
+    { rep: '김미선B', room: '소노벨스위트·6', flags: '부산·버스', campus: '부산', members: ['김미선B', '김미선A', '임채경', '김미경'], missing: ['박영수', '박민경'], status: '4/6' },
+    { rep: '김은학', room: '소노캄·7~8', flags: '청년·버스', campus: '분당', members: ['김은학', '강주원', '김지민B', '김경은'], missing: ['고은비', '신채희', '김현지'], status: '4/7' },
+    { rep: '박윤정', room: '소노벨스위트·6', flags: '버스', campus: '분당', members: ['박윤정'], missing: ['이수향', '오주연', '김보영', '박지영', '김순자'], status: '1/6' },
+    { rep: '함보라', room: '소노캄·7~8', flags: '버스·객실불일치', campus: '분당', members: ['선정희', '함보라', '박혜영'], missing: ['이동신', '안혜천', '김소은', '박윤숙'], status: '3/7' },
+    { rep: '석현수', room: '소노캄·7~8', flags: '청년·대표/객실', campus: '분당', members: ['성호민', '석현수'], missing: ['박준영', '이주형', '전동현', '전성민', '김찬'], status: '2/7' },
+    { rep: '김연지', room: '소노캄·7~8', flags: '청년·버스·대표미제출', campus: '부산/분당', members: ['신원영', '차윤선', '차윤주', '이한나(청년)', '김윤하'], missing: ['김연지', '전혜리'], status: '5/7' },
+    { rep: '김민선', room: '소노벨스위트·6', flags: '청년·버스·대표미제출', campus: '분당', members: ['지유림', '차영민'], missing: ['김민선', '김예은', '김혜민', '이예원'], status: '2/6' },
+    { rep: '이경미', room: '소노캄·5', flags: '구버전확인', campus: '분당', members: ['이경미'], missing: ['이상미', '조이한', '조요한', '조영광'], status: '1/5' },
+    { rep: '전은혜', room: '패밀리·4', flags: '중복행확인', campus: '분당', members: ['전은혜', '김순우', '김지유'], missing: ['김지안'], status: '3/4' },
+    { rep: '이혜란', room: '소노캄·7~8', flags: '버스·설악·비용분리문의', campus: '부산', members: ['이혜란'], missing: ['허준석', '심윤지', '허모세', '허갈렙', '허준영', '안소영', '허온유'], status: '1/8' },
+  ],
+  partial: [
+    { rep: '이선희', members: ['이선희', '안현진'], desc: '외 2명 교회배정 (소노캄)', campus: '분당' },
+    { rep: '조형원', members: ['조형원', '최윤선'], desc: '다른 성도와 4명 방', campus: '분당' },
+    { rep: '강창모', members: ['강창모', '강현우'], desc: '다른 성도와 패밀리 (둘 다 개인행 제출)', campus: '분당' },
+    { rep: '김남현', members: ['김남현', '길태형', '문상철'], desc: '부산청년, 다른 성도와 6명 방', campus: '부산' },
+    { rep: '박은미', members: ['박은미', '이사랑A'], desc: '다른 성도와 7~8명 (6인도 가능)', campus: '분당' },
+    { rep: '김태희', members: ['김태희', '정나리련'], desc: '+4명 모아 7~8명 희망 (정나리련=6인 신청)', campus: '분당' },
+  ],
+  individual: [
+    { name: '이재민', bus: true, seorak: true }, { name: '강승미', bus: true, seorak: true }, { name: '김민욱', bus: true, seorak: true }, { name: '김민수', bus: true, seorak: true },
+    { name: '이병곤', bus: true, seorak: false }, { name: '김혜영', bus: true, seorak: false }, { name: '김진원', bus: true, seorak: false }, { name: '허영숙', bus: true, seorak: false },
+    { name: '김유하', bus: true, seorak: false }, { name: '전성훈', bus: true, seorak: false }, { name: '이승원', bus: true, seorak: false }, { name: '박수림', bus: true, seorak: false },
+    { name: '황상화', bus: true, seorak: false }, { name: '이정태', bus: true, seorak: false }, { name: '이주형', bus: true, seorak: false }, { name: '문옥진', bus: true, seorak: false },
+    { name: '정종진', bus: false, seorak: false }, { name: '김세화', bus: false, seorak: false }, { name: '성원준', bus: false, seorak: false }, { name: '김수연', bus: false, seorak: false },
+    { name: '성시우', bus: false, seorak: false }, { name: '이경희', bus: false, seorak: false }, { name: '김창준', bus: false, seorak: false }, { name: '이은희', bus: false, seorak: false }, { name: '강현우', bus: false, seorak: false },
+  ],
+  duplicates: [
+    { name: '김상아', reason: '구버전 2건 → 7:46 1건만 유효' },
+    { name: '김말숙', reason: '6/14 소노벨스위트 + 6/16 소노캄 → 최신만' },
+    { name: '전은혜', reason: '장년·초등 2행 → 초등행 = 김지안 오기 의심' },
+    { name: '이상미 가족', reason: '구버전(koinonewjj)만 존재, 이경미만 재제출' },
+    { name: '박테스트1·3·4 / 김마리 / 최베드로 / 테스트2', reason: '테스트 행(집계 제외)' },
+    { name: '임성현 테스트', reason: '앱에서 삭제신청' },
+  ],
+  decisions: [
+    '1. 김연지 청년그룹: 대표 김연지·전혜리 미제출. 청년 이한나는 임창은네 이한나B와 동명이인. 실제 제출 = 신원영·차윤선·차윤주·이한나·김윤하.',
+    '2. 김윤하: cjkimhope 이메일로 개인 신청인데 김연지 그룹 명단에도 있음 → 개인? 김연지 그룹?',
+    '3. 성호민/석현수 청년: 대표 둘로 갈림 + 객실 소노벨스위트(성호민) vs 소노캄(석현수) 불일치, 미제출 4명. 이주형은 개인으로도 제출.',
+    '4. 함보라/박혜영/선정희: 같은 7~8 그룹? 객실 소노벨스위트(선정희) vs 소노캄(함보라·박혜영) 불일치. 대표 확정.',
+    '5. 김태희+정나리련: 김태희 부분→7~8 희망, 정나리련 6인 그룹. 같은 그룹인지 + 미제출 4명.',
+    '6. 이상미 그룹: 이상미·조이한·조요한은 구버전에만(재제출 X), 이경미만 재제출 → 유효 처리?',
+    '7. 박은미·이사랑A: 7~8 또는 6인 가능. 버스 편도/왕복 비용 문의.',
+    '8. 문옥진: 6인 그룹 선택했으나 명단 공란 → 개인으로 볼지.',
+    '9. 강창모·강현우: 서로 다른 개인 행으로 "둘이 패밀리 배정" 요청 → 2인 부분그룹으로 묶을지.',
+    '10. 이혜란 그룹(8인): 7명 미제출 + "각 가족당 비용 따로" 문의 → 비용 분리 방침.',
+    '11. 이부희 그룹: 출퇴근으로 식사·객실 일부 미이용 문의 → 비용 처리.',
+    '12. 동명이인 표시이름: 이한나A(청년·김연지)/B(임창은네), 이사랑A(박은미)/B(김상아네), 김미선A/B, 김지민B, 김경민A.',
+    '13. 오기 정정: 조영렬 캠퍼스(부산↔분당), 김혜진 연락처(=방호근), 문상철 연락처 자리수, 함보라 연락처(특수문자).',
+  ],
+}
 function AdminApp() {
   const [pin, setPin] = useState('')
   const [auth, setAuth] = useState(false)
@@ -2840,8 +2927,9 @@ function AdminApp() {
             '12. 동명이인 표시이름 확정: 이한나A/B, 이사랑A/B, 김미선A/B, 김지민B, 김경민A.',
             '13. 오기 정정: 조영렬 캠퍼스(분당↔부산), 김혜진 연락처(=방호근), 문상철 연락처 자리수.',
           ]
-          // AI 정리안 결과가 있고 켜져 있으면 그 결과를, 아니면 규칙기반 결과를 사용
-          const aiR = (aiSort && aiSort.result && !aiOff) ? aiSort.result : null
+          // AI 결과(버튼)가 있으면 그걸, 아니면 운영자 분석본(CURATED_SORT)을 기본으로 사용
+          const isAi = !!(aiSort && aiSort.result && !aiOff)
+          const aiR = isAi ? aiSort.result : CURATED_SORT
           const _aib = (pred) => (aiR ? aiR.individual || [] : []).filter(pred).map((p) => p.name)
           const G = aiR ? (aiR.groups || []).map((x) => [x.rep, (x.room || '') + (x.flags ? ` (${x.flags})` : ''), (x.members || []).join('·'), (x.missing || []).join('·'), x.campus || '', x.status || '전원']) : _G
           const P = aiR ? (aiR.partial || []).map((x) => [x.rep, (x.members || []).join('·') || x.rep, x.desc || '추가 배정 예정', x.campus || '']) : _P
@@ -2853,7 +2941,7 @@ function AdminApp() {
           const gPeople = (g) => g[2].split('·').filter(Boolean).length + (g[3] ? g[3].split('·').filter(Boolean).length : 0) // 명단+미제출 인원
           return (
             <div>
-              <HelpToggle>{`현재 응답 데이터를 그룹ID 기준으로 자동 정리한 화면입니다. (새로고침하면 최신으로 갱신 · 중복/삭제/테스트 행 제외)
+              <HelpToggle>{`운영자가 전체 신청 데이터를 직접 분석해 정리한 화면입니다. (스냅샷 · 새 신청은 미반영 → 데이터 주시면 갱신, 또는 '🤖 AI 정리안 갱신')
 • 그룹 = 비용 함께 내는 묶음. 초록 '전원'=명단 전원 제출, 주황 'N/M'=일부 미제출.
 • 부분그룹 = "다른 성도와 같은 방" 요청(추가 배정 예정).
 • 개인 = 교회 배정 단독.
@@ -2861,13 +2949,13 @@ function AdminApp() {
 ※ 미제출 = 명단엔 있으나 본인 신청서 없는 사람. 명단 글자가 이름과 달라(예: 이한나B) 미제출로 보일 수 있어요.`}</HelpToggle>
               <div className="bg-white border border-[#f2f4f6] rounded-xl px-3 py-2.5 mb-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-bold text-[#191f28]">{aiR ? '🤖 AI 정리안' : '📡 규칙기반 정리'}<span className="text-[11px] font-normal text-[#5f6b7a] ml-1">{aiR && aiSort.at ? `· ${aiSort.at} 분석` : '· 새로고침 시 갱신'}</span></span>
+                  <span className="text-[12px] font-bold text-[#191f28]">{isAi ? '🤖 AI 정리안' : '📋 정리안 (운영자 분석)'}<span className="text-[11px] font-normal text-[#5f6b7a] ml-1">{isAi ? `· ${aiSort.at} 분석` : `· ${CURATED_SORT.at}`}</span></span>
                   <button onClick={runAiSort} disabled={aiBusy} className={`text-[11px] font-bold px-3 py-1.5 rounded-lg whitespace-nowrap ${aiBusy ? 'bg-[#e5e8eb] text-[#b0b8c1]' : 'bg-[#1b64da] text-white'}`}>{aiBusy ? 'AI 분석 중…' : '🤖 AI 정리안 갱신'}</button>
                 </div>
                 {aiMsg && <p className="text-[11px] text-[#1b64da] font-semibold mt-1.5">{aiMsg}</p>}
                 <div className="flex items-center gap-2 mt-1.5 text-[12px] text-[#1b64da]">
                   <span>그룹 {G.length} · 부분 {P.length} · 개인 {indivLen} · 중복 {DUP.length}</span>
-                  {aiSort && aiSort.result && <button onClick={() => setAiOff((v) => !v)} className="ml-auto text-[11px] font-bold text-[#5f6b7a] underline">{aiOff ? 'AI 결과 보기' : '규칙기반 보기'}</button>}
+                  {aiSort && aiSort.result && <button onClick={() => setAiOff((v) => !v)} className="ml-auto text-[11px] font-bold text-[#5f6b7a] underline">{aiOff ? 'AI 결과 보기' : '운영자 정리안 보기'}</button>}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2 mb-3">

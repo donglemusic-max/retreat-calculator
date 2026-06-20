@@ -1174,7 +1174,7 @@ function GroupMode() {
 // ── 결과 / 입금 안내 ──────────────────────────────────────────
 // 입금 안내 복사 문구 (ResultPanel / ConfirmSheet 공용). 첫 줄에 컬럼 범례(#2).
 function depositGuideText(calc, subtitle) {
-  const legend = '▸ [항목]  입금자명   금액   (설명)'
+  const legend = '▸ 입금자명   금액   (설명)'
   const lines = calc.lines
     .map((l) => `▸ ${l.cat}  ${l.payer}   ${won(l.amt)}${l.note ? `   (${l.note})` : ''}`)
     .join('\n')
@@ -1730,7 +1730,7 @@ function LookupDeposit({ results }) {
   }
   const total = lines.reduce((s, l) => s + l.amt, 0)
 
-  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n방식: ${mode === 'leader' && multi ? '대표자 일괄' : '항목별/각자'}\n\n▸ [항목]  입금자명   금액\n` +
+  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n방식: ${mode === 'leader' && multi ? '대표자 일괄' : '항목별/각자'}\n\n▸ 입금자명   금액\n` +
     lines.map((l) => `▸ ${l.cat}  ${l.payer}   ${won(l.amt)}`).join('\n') +
     `\n─────────────────\n총 합계: ${won(total)}\n\n* 원활한 등록 관리를 위하여, 위 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.`
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { alert('복사 실패 — 길게 눌러 복사해 주세요.') } }

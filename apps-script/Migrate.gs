@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v15-groupkey'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v16-testrow'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -260,7 +260,7 @@ function enrichSheet() {
     // 중복 재제출 제거: 같은 이름은 1명만 집계 (구버전 행은 후순위로 밀어 비집계). #17 '삭제' 행은 집계 제외.
     var ordered = members.slice().sort(function (a, b) { return (get(a, 'ver') === '구' ? 1 : 0) - (get(b, 'ver') === '구' ? 1 : 0); });
     var seenNm = {}, counted = {}, memberCount = 0;
-    ordered.forEach(function (r) { if (/삭제/.test(get(r, 'ver'))) return; var nm = get(r, 'name'); if (nm && !seenNm[nm]) { seenNm[nm] = true; counted[r] = true; memberCount++; } });
+    ordered.forEach(function (r) { if (/삭제|테스트/.test(get(r, 'ver'))) return; var nm = get(r, 'name'); if (nm && !seenNm[nm]) { seenNm[nm] = true; counted[r] = true; memberCount++; } }); // '테스트' 행은 집계 제외(조회엔 보임)
 
     // 대표자 추정: 대표자칸 → 입금자명 토큰(멤버이름 일치) → 장년부 → 첫행
     var rep = '';
@@ -317,8 +317,9 @@ function enrichSheet() {
 
     members.forEach(function (r) {
       var dup = !counted[r];
+      var isTest = /테스트/.test(get(r, 'ver'));
       out[r] = {
-        '제출경로': dup ? '중복' : '기존폼',
+        '제출경로': isTest ? '테스트' : dup ? '중복' : '기존폼',
         '그룹ID': gidStr,
         '그룹대표(추정)': rep,
         '그룹인원(제출)': memberCount,
@@ -332,7 +333,7 @@ function enrichSheet() {
         '침구추가': (isGrp && r === repRow) ? bedding : '',
         '확인필요': dup ? '' : (needCheck ? 'Y' : ''),
         '비고': (function () {
-          var base = dup ? '중복 재제출(집계 제외)' : (needCheck ? ('명단 ' + listN + '명 / 집계 ' + memberCount + '명 — 명단: ' + listRaw) : '');
+          var base = isTest ? '테스트 행(집계 제외, 조회 노출)' : dup ? '중복 재제출(집계 제외)' : (needCheck ? ('명단 ' + listN + '명 / 집계 ' + memberCount + '명 — 명단: ' + listRaw) : '');
           var mo = ovByRow[r] && ovByRow[r].memo;
           return mo ? (base ? base + ' / ' + mo : mo) : base;
         })(),

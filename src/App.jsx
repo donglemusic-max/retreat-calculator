@@ -2229,6 +2229,19 @@ function AdminApp() {
   const [mailPrev, setMailPrev] = useState({}) // 메일별 전체 미리보기 펼침
   const loadMailTpl = async () => { setMailMsg('불러오는 중…'); const j = await post({ action: 'mailTplGet', pin }); if (j.ok) { setMailTpl(j.tpl); setMailDef(j.defaults || {}); setMailMsg('') } else setMailMsg('오류: ' + (j.error || '')) }
   const saveMailTpl = async () => { setMailMsg('저장 중…'); const j = await post({ action: 'mailTplSet', pin, tpl: mailTpl }); setMailMsg(j.ok ? '✓ 저장되었습니다 (이후 발송부터 적용)' : '오류: ' + (j.error || '')) }
+  // 🤖 AI 정리안
+  const [aiSort, setAiSort] = useState(() => { try { return JSON.parse(localStorage.getItem('retreat_ai_sort') || 'null') } catch { return null } })
+  const [aiOff, setAiOff] = useState(false) // 규칙기반으로 보기 토글
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiMsg, setAiMsg] = useState('')
+  const runAiSort = async () => {
+    setAiBusy(true); setAiMsg('AI가 시트를 읽고 분석 중… (몇 초 걸려요)')
+    try {
+      const j = await post({ action: 'aiSort', pin })
+      if (j.ok) { const v = { at: j.at, result: j.result }; setAiSort(v); setAiOff(false); try { localStorage.setItem('retreat_ai_sort', JSON.stringify(v)) } catch (e) {} setAiMsg('') }
+      else setAiMsg('오류: ' + (j.error || ''))
+    } catch (e) { setAiMsg('오류: ' + String(e)) } finally { setAiBusy(false) }
+  }
   const [undoStack, setUndoStack] = useState([]) // 실행 취소: 방/입금 컬럼 작업의 직전 값 스냅샷
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -2762,7 +2775,7 @@ function AdminApp() {
           const _byG = {}; _real.forEach((r) => { (_byG[r.gid] = _byG[r.gid] || []).push(r) })
           const _roomShort = (l) => /소노캄/.test(l || '') ? '소노캄' : /소노벨\s?스위트/.test(l || '') ? '소노벨스위트' : '패밀리'
           const _occN = (o) => /나머지는 교회에서 배정|부분적으로/.test(o || '') ? '' : /7~8/.test(o || '') ? '7~8' : ((o || '').match(/(\d)인/) || [, ''])[1]
-          const G = [], P = [], indiv = []
+          const _G = [], _P = [], _indiv = []
           Object.keys(_byG).forEach((gid) => {
             const grp = _byG[gid]
             const rep = (grp.find((r) => (r.gtotal || 0) > 0) || grp[0]).rep || grp[0].name
@@ -2780,18 +2793,18 @@ function AdminApp() {
             const ocn = _occN(repRow.occLabel)
             const roomOcc = _roomShort(repRow.roomLabel) + (ocn ? '·' + ocn : '') + flags
             if (isPartial) {
-              P.push([rep, members.join('·') || rep, missing.length ? `+${missing.length}명 추가 예정` : '추가 배정 예정', campus])
+              _P.push([rep, members.join('·') || rep, missing.length ? `+${missing.length}명 추가 예정` : '추가 배정 예정', campus])
             } else if (members.length >= 2 || hasGroupOcc || listN >= 2) {
-              G.push([rep, roomOcc, members.join('·'), missing.join('·'), campus, missing.length === 0 ? '전원' : `${members.length}/${listN}`])
+              _G.push([rep, roomOcc, members.join('·'), missing.join('·'), campus, missing.length === 0 ? '전원' : `${members.length}/${listN}`])
             } else {
-              indiv.push(repRow)
+              _indiv.push(repRow)
             }
           })
-          const _ib = (pred) => indiv.filter(pred).map((r) => r.name)
-          const SOLO = [['버스+설악', _ib((r) => r.bus && r.seorak)], ['버스', _ib((r) => r.bus && !r.seorak)], ['자차', _ib((r) => !r.bus && !r.seorak)], ['설악만', _ib((r) => !r.bus && r.seorak)]]
+          const _ib = (pred) => _indiv.filter(pred).map((r) => r.name)
+          const _SOLO = [['버스+설악', _ib((r) => r.bus && r.seorak)], ['버스', _ib((r) => r.bus && !r.seorak)], ['자차', _ib((r) => !r.bus && !r.seorak)], ['설악만', _ib((r) => !r.bus && r.seorak)]]
             .filter((x) => x[1].length).map((x) => [`${x[0]} (${x[1].length})`, x[1].join(', ')])
-          const DUP = rows.filter((r) => r.route === '중복').map((r) => [r.name, r.note || '중복 재제출(집계 제외)'])
-          const DEC = [
+          const _DUP = rows.filter((r) => r.route === '중복').map((r) => [r.name, r.note || '중복 재제출(집계 제외)'])
+          const _DEC = [
             '1. cjkimhope 이메일에 3명(김창준·이은희·김윤하) 각자 개인 신청. 김윤하는 김연지 청년그룹 명단에도 있음 → 개인? 김연지 그룹?',
             '2. 김연지 그룹: 대표 김연지·전혜리 미제출, 청년 이한나는 임창은네 이한나B와 동명이인. 실제 제출=신원영·차윤선·차윤주·이한나.',
             '3. 성호민/석현수 청년: 대표 둘로 갈림 + 객실 소노벨스위트 vs 소노캄 불일치, 미제출 4명. 대표·객실 확정.',
@@ -2806,6 +2819,15 @@ function AdminApp() {
             '12. 동명이인 표시이름 확정: 이한나A/B, 이사랑A/B, 김미선A/B, 김지민B, 김경민A.',
             '13. 오기 정정: 조영렬 캠퍼스(분당↔부산), 김혜진 연락처(=방호근), 문상철 연락처 자리수.',
           ]
+          // AI 정리안 결과가 있고 켜져 있으면 그 결과를, 아니면 규칙기반 결과를 사용
+          const aiR = (aiSort && aiSort.result && !aiOff) ? aiSort.result : null
+          const _aib = (pred) => (aiR ? aiR.individual || [] : []).filter(pred).map((p) => p.name)
+          const G = aiR ? (aiR.groups || []).map((x) => [x.rep, (x.room || '') + (x.flags ? ` (${x.flags})` : ''), (x.members || []).join('·'), (x.missing || []).join('·'), x.campus || '', x.status || '전원']) : _G
+          const P = aiR ? (aiR.partial || []).map((x) => [x.rep, (x.members || []).join('·') || x.rep, x.desc || '추가 배정 예정', x.campus || '']) : _P
+          const SOLO = aiR ? [['버스+설악', _aib((p) => p.bus && p.seorak)], ['버스', _aib((p) => p.bus && !p.seorak)], ['자차', _aib((p) => !p.bus && !p.seorak)], ['설악만', _aib((p) => !p.bus && p.seorak)]].filter((x) => x[1].length).map((x) => [`${x[0]} (${x[1].length})`, x[1].join(', ')]) : _SOLO
+          const DUP = aiR ? (aiR.duplicates || []).map((x) => [x.name, x.reason || '']) : _DUP
+          const DEC = aiR ? (aiR.decisions || []) : _DEC
+          const indivLen = aiR ? (aiR.individual || []).length : _indiv.length
           const statusCls = (s) => s === '전원' ? 'bg-[#12b886]' : /^\d+\/\d+$/.test(s) ? 'bg-[#f59f00]' : 'bg-[#f04452]'
           const gPeople = (g) => g[2].split('·').filter(Boolean).length + (g[3] ? g[3].split('·').filter(Boolean).length : 0) // 명단+미제출 인원
           return (
@@ -2816,13 +2838,21 @@ function AdminApp() {
 • 개인 = 교회 배정 단독.
 • ⚠ 의사결정 = 교회만 아는 정보(누가 한 가족인지 등) 확인 필요 항목 — 이 부분은 수기로 관리합니다.
 ※ 미제출 = 명단엔 있으나 본인 신청서 없는 사람. 명단 글자가 이름과 달라(예: 이한나B) 미제출로 보일 수 있어요.`}</HelpToggle>
-              <div className="bg-[#eef5ff] border border-[#d0e2ff] rounded-xl px-3 py-2 mb-3 text-[12px] text-[#1b64da]">
-                📡 <b>실시간 자동 정리</b> · 그룹 {G.length} · 부분 {P.length} · 개인 {indiv.length} · 중복 {DUP.length} <span className="text-[#5f6b7a] font-normal">(조회 시점 데이터 기준 · 새로고침하면 갱신)</span>
+              <div className="bg-white border border-[#f2f4f6] rounded-xl px-3 py-2.5 mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-bold text-[#191f28]">{aiR ? '🤖 AI 정리안' : '📡 규칙기반 정리'}<span className="text-[11px] font-normal text-[#5f6b7a] ml-1">{aiR && aiSort.at ? `· ${aiSort.at} 분석` : '· 새로고침 시 갱신'}</span></span>
+                  <button onClick={runAiSort} disabled={aiBusy} className={`text-[11px] font-bold px-3 py-1.5 rounded-lg whitespace-nowrap ${aiBusy ? 'bg-[#e5e8eb] text-[#b0b8c1]' : 'bg-[#1b64da] text-white'}`}>{aiBusy ? 'AI 분석 중…' : '🤖 AI 정리안 갱신'}</button>
+                </div>
+                {aiMsg && <p className="text-[11px] text-[#1b64da] font-semibold mt-1.5">{aiMsg}</p>}
+                <div className="flex items-center gap-2 mt-1.5 text-[12px] text-[#1b64da]">
+                  <span>그룹 {G.length} · 부분 {P.length} · 개인 {indivLen} · 중복 {DUP.length}</span>
+                  {aiSort && aiSort.result && <button onClick={() => setAiOff((v) => !v)} className="ml-auto text-[11px] font-bold text-[#5f6b7a] underline">{aiOff ? 'AI 결과 보기' : '규칙기반 보기'}</button>}
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {stat('그룹', G.length + '개')}
                 {stat('부분그룹', P.length + '개')}
-                {stat('개인', indiv.length + '명')}
+                {stat('개인', indivLen + '명')}
               </div>
               <Collapsible title="① 그룹 (가족·예약그룹)" count={`${G.length}개`} defaultOpen>
                 <div className="flex gap-2 mb-2">
@@ -2865,7 +2895,7 @@ function AdminApp() {
                   </div>
                 ))}
               </Collapsible>
-              <Collapsible title="③ 개인 (교회 배정)" count={`${indiv.length}명`}>
+              <Collapsible title="③ 개인 (교회 배정)" count={`${indivLen}명`}>
                 {SOLO.map((s, i) => (
                   <div key={i} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
                     <span className="text-[12px] font-bold text-[#191f28]">{s[0]}</span>

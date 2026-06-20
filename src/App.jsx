@@ -586,54 +586,8 @@ function IndividualMode() {
 
   return (
     <>
-      <StepGuide steps={[{ id: 'sec-dept', label: '부서' }, { id: 'sec-room', label: '방' }, { id: 'sec-move', label: '이동' }, { id: 'sec-info', label: '정보' }]} />
-      <Card title="소속 부서" id="sec-dept" step={1} help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
-        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">부서에 따라 1인 등록비가 달라집니다.</p>
-        <DeptSelect value={dept} onChange={setDept} />
-        <div className="mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3">
-          <span className="text-[13px] text-[#4e5968]">선택한 등록비</span>
-          <span className="text-[17px] font-extrabold text-[#1b64da] ml-3">{won(d.fee)}</span>
-        </div>
-      </Card>
-
-      <Card title="방 선택" id="sec-room" step={2} help={HELP.room} helpTitle="객실 종류 안내">
-        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
-          혼자 등록하시면 교회에서 방을 배정해 드립니다. 원하는 방이 있으면 선택하세요. (추가 비용 발생 가능)
-        </p>
-        <div className="space-y-2">
-          {ROOMS.map((r, i) => (
-            <OptionRow
-              key={r.name}
-              active={roomIdx === i}
-              onClick={() => setRoomIdx(i)}
-              title={r.name}
-              sub={r.desc}
-              right={r.indiv > 0 ? `+${won(r.indiv)}` : '추가비용 없음'}
-            />
-          ))}
-        </div>
-      </Card>
-
-      <Card title="교통 / 설악산뷰" id="sec-move" step={3} help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
-        <div className="space-y-3">
-          <Toggle
-            on={bus}
-            onChange={setBus}
-            label="버스 이용하겠습니다"
-            sub={`왕복 · 자차 이용 시 선택 안 함`}
-            price={`+${won(BUS_FEE)}`}
-          />
-          <Toggle
-            on={seorak}
-            onChange={setSeorak}
-            label="설악산 뷰 신청하겠습니다"
-            sub="선착순 배정"
-            price={`+${won(SEORAK_FEE)}`}
-          />
-        </div>
-      </Card>
-
-      <Card title="신청자 정보" id="sec-info" step={4}>
+      <StepGuide steps={[{ id: 'sec-info', label: '정보' }, { id: 'sec-dept', label: '부서' }, { id: 'sec-room', label: '방' }, { id: 'sec-move', label: '이동' }]} />
+      <Card title="신청자 정보" id="sec-info" step={1}>
         <Field label="이름" required id="f-name" error={showErr && !name.trim() ? '이름을 입력해 주세요.' : ''}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={errCls(!name.trim())} />
         </Field>
@@ -652,6 +606,52 @@ function IndividualMode() {
         <Field label="문의사항 (선택)">
           <textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} />
         </Field>
+      </Card>
+
+      <Card title="소속 부서" id="sec-dept" step={2} help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
+        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">부서에 따라 1인 등록비가 달라집니다.</p>
+        <DeptSelect value={dept} onChange={setDept} />
+        <div className="mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3">
+          <span className="text-[13px] text-[#4e5968]">선택한 등록비</span>
+          <span className="text-[17px] font-extrabold text-[#1b64da] ml-3">{won(d.fee)}</span>
+        </div>
+      </Card>
+
+      <Card title="방 선택" id="sec-room" step={3} help={HELP.room} helpTitle="객실 종류 안내">
+        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
+          혼자 등록하시면 교회에서 방을 배정해 드립니다. 원하는 방이 있으면 선택하세요. (추가 비용 발생 가능)
+        </p>
+        <div className="space-y-2">
+          {ROOMS.map((r, i) => (
+            <OptionRow
+              key={r.name}
+              active={roomIdx === i}
+              onClick={() => setRoomIdx(i)}
+              title={r.name}
+              sub={r.desc}
+              right={r.indiv > 0 ? `+${won(r.indiv)}` : '추가비용 없음'}
+            />
+          ))}
+        </div>
+      </Card>
+
+      <Card title="교통 / 설악산뷰" id="sec-move" step={4} help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
+        <div className="space-y-3">
+          <Toggle
+            on={bus}
+            onChange={setBus}
+            label="버스 이용하겠습니다"
+            sub={`왕복 · 자차 이용 시 선택 안 함`}
+            price={`+${won(BUS_FEE)}`}
+          />
+          <Toggle
+            on={seorak}
+            onChange={setSeorak}
+            label="설악산 뷰 신청하겠습니다"
+            sub="선착순 배정"
+            price={`+${won(SEORAK_FEE)}`}
+          />
+        </div>
       </Card>
 
       <LiveSummary calc={calc} subtitle={subtitle} />

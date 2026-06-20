@@ -1549,6 +1549,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false, campus: '' })
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
+  const [confirmDel, setConfirmDel] = useState(null) // 삭제 확인 대상 {row, name}
 
   const occLabelFor = (n) => (OCCUPANCY.find((o) => o.people === n || (n >= 7 && o.people === 8)) || OCCUPANCY[0]).label
   const post = (p) => fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...p, ...auth }) }).then((r) => r.json())
@@ -1620,7 +1621,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
       {msg && <p className="text-[12px] text-[#1b64da] font-semibold my-2">{msg}</p>}
 
       <div className="text-[13px] font-bold text-[#191f28] mt-4 mb-2">구성원 ({members.length}명)</div>
-      {members.map((mm) => <EditCard key={mm.row} data={{ ...mm, groupId: gid }} onDelete={() => delMember(mm.row, mm.name)} hideSeorak={true} />)}
+      {members.map((mm) => <EditCard key={mm.row} data={{ ...mm, groupId: gid }} onDelete={members.length > 1 ? () => setConfirmDel({ row: mm.row, name: mm.name }) : null} hideSeorak={true} />)}
 
       <div className="bg-[#f9fafb] rounded-2xl p-3 border border-dashed border-[#3182f6]/40 mt-2">
         <div className="text-[12px] font-bold text-[#1b64da] mb-2">+ 구성원 추가 (미제출자 등)</div>
@@ -1642,6 +1643,19 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         <button onClick={() => setAdd({ ...add, bus: !add.bus })} className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border ${add.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>버스 신청 {add.bus ? '✓' : ''}</button>
         <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#fff5f5] text-[#f04452] border-2 border-dashed border-[#f04452]/40 hover:bg-[#ffecec] font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '+ 구성원 추가'}</button>
       </div>
+
+      {confirmDel && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setConfirmDel(null)}>
+          <div className="bg-white w-full max-w-[400px] rounded-2xl p-5 animate-slide-up sm:animate-none" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[15px] font-bold text-[#191f28] mb-2">구성원 삭제</div>
+            <p className="text-[13px] text-[#4e5968] leading-relaxed mb-4"><b className="text-[#191f28]">{confirmDel.name}</b>님의 등록 신청을 취소하고, 그룹에서 삭제합니다.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDel(null)} className="flex-1 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">취소</button>
+              <button onClick={() => { const d = confirmDel; setConfirmDel(null); delMember(d.row, d.name) }} disabled={busy.indexOf('d') === 0} className="flex-1 py-3 rounded-xl bg-[#f04452] text-white font-bold text-[14px]">확인</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

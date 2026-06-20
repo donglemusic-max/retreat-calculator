@@ -1269,7 +1269,7 @@ function SubmitSection({ payload, valid, missing }) {
 }
 
 // ── 내 신청 조회 / 수정 ────────────────────────────────────────
-function EditCard({ data, onDelete }) {
+function EditCard({ data, onDelete, hideSeorak }) {
   const [gender, setGender] = useState(data.gender || '')
   const [contact, setContact] = useState(fmtPhone(data.contact || ''))
   const [email, setEmail] = useState(data.email || '')
@@ -1289,7 +1289,7 @@ function EditCard({ data, onDelete }) {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          action: 'update', row: data.row, name: data.name, contact: data.contact,
+          action: 'update', row: data.row, name: data.name, email: data.email,
           fields: { gender, contact, email, campus, deptLabel, bus, seorak, inquiry },
         }),
       })
@@ -1363,15 +1363,18 @@ function EditCard({ data, onDelete }) {
       <Field label="이메일"><input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" className={inputCls} /></Field>
       <Field label="캠퍼스"><SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} /></Field>
       <Field label="소속부서"><DeptSelect value={deptName} onChange={setDeptName} /></Field>
-      <Field label="버스 / 설악산뷰">
+      <Field label={hideSeorak ? '버스' : '버스 / 설악산뷰'}>
         <div className="flex gap-2">
           <button onClick={() => setBus(!bus)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
             버스{bus ? ' ✓' : ''}
           </button>
-          <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
-            설악산뷰{seorak ? ' ✓' : ''}
-          </button>
+          {!hideSeorak && (
+            <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+              설악산뷰{seorak ? ' ✓' : ''}
+            </button>
+          )}
         </div>
+        {hideSeorak && <p className="text-[12px] text-[#8b95a1] mt-1.5">설악산뷰는 그룹 공통입니다. 위 "설악산뷰(그룹 전체)"에서 변경하세요.</p>}
       </Field>
       <Field label="문의사항"><textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} /></Field>
 
@@ -1399,6 +1402,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const occInit = (() => { const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : (members.length || 8); return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
   const [occSel, setOccSel] = useState(occInit)
   const [occStatus, setOccStatus] = useState(/인이 투숙/.test(cur.occLabel || '') ? 'confirmed' : 'pending') // #15 확정/미정
+  const [seorakAll, setSeorakAll] = useState(members.some((m) => m.seorak)) // #11 설악 그룹 공통
   const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false })
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
@@ -1408,8 +1412,8 @@ function GroupEditor({ members, auth, onRefresh, title }) {
     setBusy('group'); setMsg('')
     const roomLabel = ROOMS.find((r) => r.name === roomName).label
     const occLabel = occStatus === 'pending' ? OCC_PARTIAL : OCCUPANCY.find((o) => o.label === occSel).formLabel
-    const j = await post({ action: 'groupSet', gid, roomLabel, occLabel })
-    setBusy(''); setMsg(j.ok ? '✓ 객실/투숙 저장됨' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
+    const j = await post({ action: 'groupSet', gid, roomLabel, occLabel, seorak: seorakAll })
+    setBusy(''); setMsg(j.ok ? '✓ 저장되었습니다' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
   }
   const delMember = async (row, nm) => {
     if (members.length <= 1) { setMsg('마지막 1명은 삭제할 수 없습니다.'); return }
@@ -1456,13 +1460,18 @@ function GroupEditor({ members, auth, onRefresh, title }) {
           </>
         )}
       </Field>
+      <Field label="설악산뷰 (그룹 전체)">
+        <button onClick={() => setSeorakAll((v) => !v)} className={`w-full py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorakAll ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+          설악산뷰 신청{seorakAll ? ' ✓' : ''} <span className="font-normal text-[12px]">(전원 적용 · 1인 {won(SEORAK_FEE)})</span>
+        </button>
+      </Field>
       <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#191f28] hover:bg-black text-white font-bold text-[13px] mb-1">
-        {busy === 'group' ? '저장 중…' : '객실/투숙 저장'}
+        {busy === 'group' ? '저장 중…' : '객실/투숙/설악산뷰 저장'}
       </button>
       {msg && <p className="text-[12px] text-[#1b64da] font-semibold my-2">{msg}</p>}
 
       <div className="text-[13px] font-bold text-[#191f28] mt-4 mb-2">구성원 ({members.length}명)</div>
-      {members.map((mm) => <EditCard key={mm.row} data={{ ...mm, groupId: gid }} onDelete={() => delMember(mm.row, mm.name)} />)}
+      {members.map((mm) => <EditCard key={mm.row} data={{ ...mm, groupId: gid }} onDelete={() => delMember(mm.row, mm.name)} hideSeorak={true} />)}
 
       <div className="bg-[#f9fafb] rounded-2xl p-3 border border-dashed border-[#3182f6]/40 mt-2">
         <div className="text-[12px] font-bold text-[#1b64da] mb-2">+ 구성원 추가 (미제출자 등)</div>
@@ -1569,7 +1578,7 @@ function LookupDeposit({ results }) {
 
 function LookupMode() {
   const [name, setName] = useState('')
-  const [contact, setContact] = useState('')
+  const [email, setEmail] = useState('')
   const [status, setStatus] = useState('idle') // idle | loading | loaded | error
   const [results, setResults] = useState([])
   const [grouped, setGrouped] = useState(false)
@@ -1580,7 +1589,7 @@ function LookupMode() {
     try {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'lookup', name: name.trim(), contact: contact.trim() }),
+        body: JSON.stringify({ action: 'lookup', name: name.trim(), email: email.trim() }),
       })
       const j = await res.json()
       if (j.ok) { setResults(j.results || []); setGrouped(!!j.grouped); setStatus('loaded') }
@@ -1592,19 +1601,19 @@ function LookupMode() {
     <>
       <Card title="내 신청 조회">
         <p className="text-[14px] text-[#4e5968] mb-4 leading-relaxed">
-          신청하실 때 입력한 이름과 연락처로 조회합니다.<br />
+          신청하실 때 입력한 이름과 이메일로 조회합니다.<br />
           가족·그룹은 대표자 이름으로 조회하세요.
         </p>
         <Field label="이름" required>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} />
         </Field>
-        <Field label="연락처" required>
-          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+        <Field label="이메일" required>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
         </Field>
         <button
           onClick={lookup}
-          disabled={!name.trim() || !contact.trim() || status === 'loading'}
-          className={`w-full py-4 rounded-2xl font-bold text-[16px] min-h-[52px] ${name.trim() && contact.trim() && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}
+          disabled={!name.trim() || !email.trim() || status === 'loading'}
+          className={`w-full py-4 rounded-2xl font-bold text-[16px] min-h-[52px] ${name.trim() && email.trim() && status !== 'loading' ? 'bg-[#191f28] text-white hover:bg-black' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}
         >
           {status === 'loading' ? '조회 중…' : '조회하기'}
         </button>
@@ -1615,12 +1624,12 @@ function LookupMode() {
         results.length === 0 ? (
           <Card title="조회 결과 없음">
             <p className="text-[14px] text-[#4e5968] leading-relaxed">
-              해당 이름과 연락처로 제출된 신청이 없습니다.<br />
+              해당 이름과 이메일로 제출된 신청이 없습니다.<br />
               입력 내용을 다시 확인하시거나, 안내데스크로 문의해 주세요.
             </p>
           </Card>
         ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (
-          <GroupEditor members={results} auth={{ verifyContact: contact.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
+          <GroupEditor members={results} auth={{ verifyEmail: email.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
         ) : (
           <Card title={`조회 결과 (${results.length}건)`}>
             {results.map((r) => <EditCard key={r.row} data={r} />)}

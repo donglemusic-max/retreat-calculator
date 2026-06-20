@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v13-split'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v14-partial-del'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -254,10 +254,10 @@ function enrichSheet() {
     // 침구추가: 그룹 확정 객실만 max(0, 투숙인원 - 기본정원)
     var bedding = isGrp ? Math.max(0, occPeople_(get(grpRow, 'occ')) - roomBase_(get(grpRow, 'room'))) : '';
 
-    // 중복 재제출 제거: 같은 이름은 1명만 집계 (구버전 행은 후순위로 밀어 비집계)
+    // 중복 재제출 제거: 같은 이름은 1명만 집계 (구버전 행은 후순위로 밀어 비집계). #17 '삭제' 행은 집계 제외.
     var ordered = members.slice().sort(function (a, b) { return (get(a, 'ver') === '구' ? 1 : 0) - (get(b, 'ver') === '구' ? 1 : 0); });
     var seenNm = {}, counted = {}, memberCount = 0;
-    ordered.forEach(function (r) { var nm = get(r, 'name'); if (nm && !seenNm[nm]) { seenNm[nm] = true; counted[r] = true; memberCount++; } });
+    ordered.forEach(function (r) { if (/삭제/.test(get(r, 'ver'))) return; var nm = get(r, 'name'); if (nm && !seenNm[nm]) { seenNm[nm] = true; counted[r] = true; memberCount++; } });
 
     // 대표자 추정: 대표자칸 → 입금자명 토큰(멤버이름 일치) → 장년부 → 첫행
     var rep = '';
@@ -294,6 +294,14 @@ function enrichSheet() {
       commonFee = roomAdd_(roomSel) + groupFeeByCount_(memberCount);
       bedding = Math.max(0, memberCount - roomBase_(roomSel));
       appType = '그룹';
+    }
+    // 부분그룹(앱 #7/#8): 'OCC_PARTIAL' 마커 → 객실 그룹가 1회만, 투숙(그룹)비는 추후결정=0, 유형='부분'.
+    var isPartialMarker = members.some(function (r) { return /나머지는 교회에서 배정/.test(get(r, 'occ')); });
+    if (isPartialMarker && grpRow < 0 && !forced) {
+      isGrp = true; // 객실 그룹가 1회 적용 + 본인객실 0
+      commonFee = roomAdd_(get(repRow, 'room')); // 객실 그룹가만 (투숙비 0)
+      bedding = '';
+      appType = '부분';
     }
 
     var groupTotal = members.reduce(function (s, r) {

@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv10-roomsync'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv11-emailver'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -70,7 +70,10 @@ function _ensureAdminCols_(sheet, H) {
   return H;
 }
 function _digits_(s) { var d = String(s || '').replace(/[^0-9]/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d; }
+function _email_(s) { return String(s || '').trim().toLowerCase(); } // #19 본인확인 키 = 이메일
 function _gv_(row, c) { return c >= 0 ? String(row[c] || '').trim() : ''; }
+// 집계 제외 행: 구버전('구') 또는 앱에서 삭제 신청(#17). enrich/재계산에서 인원·금액 미집계.
+function _isVoid_(v) { v = String(v || ''); return v === '구' || v.indexOf('삭제') >= 0; }
 // 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
 function _nameTokens_(t) {
   return String(t || '').split(/[^가-힣A-Za-z]+/).filter(function (x) {
@@ -183,11 +186,13 @@ function _submit_(body, sheet, col, width) {
   return _json_({ ok: true, groupId: gid, rows: rows.length, total: groupTotal });
 }
 
-// 이름 + 연락처(숫자만)로 본인 신청 조회 (그룹이면 그룹 전체 반환)
+// 이름 + 이메일로 본인 신청 조회 (그룹이면 그룹 전체 반환) — #19 본인확인 키=이메일.
+// (전환기 호환: 구 프론트가 보내는 전화(contact)도 폴백 매칭 → 배포 순서 무관, 조회 끊김 없음)
 function _lookup_(body, sheet, H, col, width) {
   var name = (body.name || '').trim();
+  var em = _email_(body.email || '');
   var ph = _digits_(body.contact || '');
-  if (!name || !ph) return _json_({ ok: false, error: '이름과 연락처를 입력해 주세요.' });
+  if (!name || (!em && !ph)) return _json_({ ok: false, error: '이름과 이메일을 입력해 주세요.' });
   var n = sheet.getLastRow();
   if (n < 2) return _json_({ ok: true, results: [] });
   var vals = sheet.getRange(1, 1, n, width).getValues();
@@ -201,50 +206,65 @@ function _lookup_(body, sheet, H, col, width) {
       groupTotal: Number(row[col.gtotal] || 0), common: Number(row[col.common] || 0), payer: _gv_(row, col.pay), appType: _gv_(row, col.type),
     };
   }
-  // 본인 행 수집 → 같은 그룹ID/같은 전화번호로 그룹 전체 확장
-  // (enrich가 이메일+전화로 그룹을 묶으므로 보통 groupId만으로 충분. 전화는 보강.)
-  var gids = {}, phones = {}, selfRows = [];
+  // 본인 행 수집 → 같은 그룹ID/같은 이메일(또는 전화)로 그룹 전체 확장
+  var gids = {}, emails = {}, phones = {}, selfRows = [];
   for (var r = 1; r < n; r++) {
     var row = vals[r];
-    if (_gv_(row, col.name) === name && _digits_(_gv_(row, col.contact)) === ph) {
+    var reMail = _email_(_gv_(row, col.email)), rePh = _digits_(_gv_(row, col.contact));
+    if (_gv_(row, col.name) === name && ((em && reMail === em) || (ph && rePh === ph))) {
       selfRows.push(r);
       var g = _gv_(row, col.gid); if (g) gids[g] = true;
-      phones[_digits_(_gv_(row, col.contact))] = true;
+      if (reMail) emails[reMail] = true;
+      if (rePh) phones[rePh] = true;
     }
   }
   if (!selfRows.length) return _json_({ ok: true, results: [] });
   var out = [];
   for (var r2 = 1; r2 < n; r2++) {
     var rw = vals[r2]; if (!_gv_(rw, col.name)) continue;
-    if (gids[_gv_(rw, col.gid)] || phones[_digits_(_gv_(rw, col.contact))]) {
+    if (gids[_gv_(rw, col.gid)] || emails[_email_(_gv_(rw, col.email))] || phones[_digits_(_gv_(rw, col.contact))]) {
       var o = rowObj(rw, r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o);
     }
   }
   return _json_({ ok: true, results: out, grouped: out.length > 1, me: name });
 }
 
-// 본인 신청 수정 (개인 필드만: 성별/연락처/이메일/캠퍼스/부서/버스/설악산/문의)
+// 본인 신청 수정. #19 본인확인=이름+이메일. #16 덮어쓰기 대신 새 행 생성 + 기존 행 '구' 표시.
 function _update_(body, sheet, H, col, width) {
   var rowNum = Number(body.row || 0);
   if (rowNum < 2) return _json_({ ok: false, error: '잘못된 요청입니다.' });
   var row = sheet.getRange(rowNum, 1, 1, width).getValues()[0];
-  // 낙관적 동시성: 조회 후 행이 밀렸는지 이름+연락처로 검증
-  if (_gv_(row, col.name) !== (body.name || '').trim() || _digits_(_gv_(row, col.contact)) !== _digits_(body.contact || '')) {
+  // 낙관적 동시성 + 본인확인: 이름 + (이메일 또는 전화) #19 (전환기 호환)
+  var keyEmail = _email_(body.email || ''), keyPh = _digits_(body.contact || '');
+  var okEmail = keyEmail && _email_(_gv_(row, col.email)) === keyEmail;
+  var okPh = keyPh && _digits_(_gv_(row, col.contact)) === keyPh;
+  if (_gv_(row, col.name) !== (body.name || '').trim() || (!okEmail && !okPh)) {
     return _json_({ ok: false, error: '신청 정보가 변경되었습니다. 다시 조회해 주세요.' });
   }
+  var gid = _gv_(row, col.gid);
   var f = body.fields || {};
-  var set = function (c, v) { if (c >= 0) row[c] = v; };
+  // 새 행 = 현재 행 복제 + 수정 반영 + 새 타임스탬프 (#16 데이터 버전 관리)
+  var nr = row.slice();
+  var set = function (c, v) { if (c >= 0) nr[c] = v; };
+  set(col.ts, new Date());
+  if (col.ver >= 0) nr[col.ver] = '';
   if (f.gender != null) set(col.gender, f.gender);
   if (f.contact != null) set(col.contact, f.contact);
   if (f.email != null) set(col.email, f.email);
   if (f.campus != null) set(col.campus, f.campus);
-  if (f.deptLabel != null) { set(col.dept, f.deptLabel); set(col.ifee, deptFee_(f.deptLabel)); }
-  if (f.bus != null) { set(col.bus, f.bus ? BUS_YES : BUS_NO); set(col.mbus, f.bus ? BUS_FEE : 0); }
-  if (f.seorak != null) { set(col.seorak, f.seorak ? SEORAK_YES : ''); set(col.mseo, f.seorak ? SEORAK_FEE : 0); }
+  if (f.deptLabel != null) set(col.dept, f.deptLabel);
+  if (f.bus != null) set(col.bus, f.bus ? BUS_YES : BUS_NO);
+  if (f.seorak != null) set(col.seorak, f.seorak ? SEORAK_YES : '');
   if (f.inquiry != null) set(col.inquiry, f.inquiry);
-  if (col.note >= 0) set(col.note, (_gv_(row, col.note) + ' / 본인수정 ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm')).trim().replace(/^\/ /, ''));
-  sheet.getRange(rowNum, 1, 1, width).setValues([row]);
-  var newTotal = _recalcGroup_(sheet, H, col, width, _gv_(row, col.gid));
+  if (col.route >= 0) set(col.route, '앱수정');
+  if (col.note >= 0) set(col.note, '본인수정 ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm'));
+  if (col.ver >= 0) {
+    sheet.getRange(rowNum, col.ver + 1).setValue('구'); // 기존 행 보존+구 표시
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, width).setValues([nr]); // 새 행 추가
+  } else {
+    sheet.getRange(rowNum, 1, 1, width).setValues([nr]); // 구버전 열 없으면 덮어쓰기 폴백
+  }
+  var newTotal = _recalcGroupFull_(sheet, H, col, width, gid);
   return _json_({ ok: true, groupTotal: newTotal });
 }
 
@@ -307,16 +327,21 @@ function _adminSet_(body, sheet, col, width) {
   return _json_({ ok: true });
 }
 
-// 그룹 접근 권한: 관리자 PIN 또는 그룹의 연락처 일치
+// 그룹 접근 권한: 관리자 PIN 또는 그룹의 이메일 일치 (#19). 전환기 호환: 전화(verifyContact)도 폴백.
 function _verifyGroupAccess_(vals, col, gid, body) {
   if (body.pin && body.pin === ADMIN_PIN) return true;
+  var em = _email_(body.verifyEmail || '');
   var ph = _digits_(body.verifyContact || '');
-  if (!ph) return false;
-  for (var r = 1; r < vals.length; r++) if (_gv_(vals[r], col.gid) === gid && _digits_(_gv_(vals[r], col.contact)) === ph) return true;
+  if (!em && !ph) return false;
+  for (var r = 1; r < vals.length; r++) {
+    if (_gv_(vals[r], col.gid) !== gid) continue;
+    if (em && _email_(_gv_(vals[r], col.email)) === em) return true;
+    if (ph && _digits_(_gv_(vals[r], col.contact)) === ph) return true;
+  }
   return false;
 }
 
-// 그룹 전체 재계산 (occ는 그룹 선택값 유지 — 인원수와 독립). override={roomLabel?, occLabel?}
+// 그룹 전체 재계산. override={roomLabel?, occLabel?, seorak?(그룹 공통)}
 function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   var n = sheet.getLastRow(); if (n < 2) return 0;
   var vals = sheet.getRange(1, 1, n, width).getValues();
@@ -324,41 +349,55 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   if (!idxs.length) return 0;
   var roomLabel = (override && override.roomLabel != null) ? override.roomLabel : _gv_(vals[idxs[0]], col.room);
   var occLabel = (override && override.occLabel != null) ? override.occLabel : _gv_(vals[idxs[0]], col.occ);
+  var seorakAll = (override && typeof override.seorak === 'boolean') ? override.seorak : null; // #11 설악 그룹 공통
   var isGrp = isGroupOcc_(occLabel);
-  // 강제그룹(합치기로 묶인 개인/부분): 6번 'N인 투숙' 텍스트는 없지만 enrich가 신청유형='그룹'을 남김.
-  //  → 그룹 요금 유지. 객실 그룹가는 대표자 객실(roomLabel), 그룹비는 인원수 기준.
-  var typeGrp = false;
-  if (col.type >= 0) for (var ti = 0; ti < idxs.length; ti++) if (_gv_(vals[idxs[ti]], col.type) === '그룹') { typeGrp = true; break; }
-  var forcedGrp = !isGrp && typeGrp;
-  var grp = isGrp || forcedGrp;
-  // dedup by name (구버전 후순위)
+  // 기존 신청유형 참조(강제그룹/부분 유지). 강제그룹=enrich가 '그룹', 부분그룹=OCC_PARTIAL/'부분'.
+  var typeGrp = false, typePartial = false;
+  if (col.type >= 0) for (var ti = 0; ti < idxs.length; ti++) { var tv = _gv_(vals[idxs[ti]], col.type); if (tv === '그룹') typeGrp = true; else if (tv === '부분') typePartial = true; }
+  var isPartialMarker = /나머지는 교회에서 배정/.test(occLabel) || (!isGrp && typePartial);
+  var forcedGrp = !isGrp && !isPartialMarker && typeGrp;
+  var grp = isGrp || forcedGrp || isPartialMarker; // 객실 그룹가 적용 여부
+  // dedup by name + 구/삭제 집계 제외 (#16/#17)
   var ord = idxs.slice().sort(function (a, b) { return ((col.ver >= 0 && _gv_(vals[a], col.ver) === '구') ? 1 : 0) - ((col.ver >= 0 && _gv_(vals[b], col.ver) === '구') ? 1 : 0); });
   var seen = {}, counted = {}, names = [];
-  ord.forEach(function (r) { var nm = _gv_(vals[r], col.name); if (nm && !seen[nm]) { seen[nm] = 1; counted[r] = 1; names.push(nm); } });
+  ord.forEach(function (r) {
+    if (col.ver >= 0 && _isVoid_(_gv_(vals[r], col.ver))) return; // 구/삭제 제외
+    var nm = _gv_(vals[r], col.name); if (nm && !seen[nm]) { seen[nm] = 1; counted[r] = 1; names.push(nm); }
+  });
   var memberCount = names.length;
-  var common = grp ? (roomAdd_(roomLabel) + (isGrp ? occAdd_(occLabel) : groupFeeByCount_(memberCount))) : 0;
+  // 그룹비: 정규그룹=투숙텍스트 / 강제그룹=인원수 / 부분=0(추후결정)
+  var groupFee = isGrp ? occAdd_(occLabel) : (isPartialMarker ? 0 : groupFeeByCount_(memberCount));
+  var common = grp ? (roomAdd_(roomLabel) + groupFee) : 0;
   var rep = ''; for (var k = 0; k < idxs.length && !rep; k++) { var mm = _gv_(vals[idxs[k]], col.rep).match(/[가-힣]{2,4}/); if (mm) rep = mm[0]; }
   if (!rep) rep = names[0] || _gv_(vals[idxs[0]], col.name);
   var repRow = idxs.filter(function (r) { return counted[r] && _gv_(vals[r], col.name) === rep; })[0];
   if (repRow === undefined) repRow = idxs.filter(function (r) { return counted[r]; })[0];
   if (repRow === undefined) repRow = idxs[0];
   var roster = names.join(' ') + ' (' + memberCount + ')';
+  var seoOf = function (r) { return seorakAll !== null ? seorakAll : (_gv_(vals[r], col.seorak).indexOf('원합니다') >= 0); };
   var total = common;
   idxs.forEach(function (r) {
     if (!counted[r]) return;
     total += deptFee_(_gv_(vals[r], col.dept)) + (grp ? 0 : roomIndiv_(roomLabel))
       + (_gv_(vals[r], col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0)
-      + (_gv_(vals[r], col.seorak).indexOf('원합니다') >= 0 ? SEORAK_FEE : 0);
+      + (seoOf(r) ? SEORAK_FEE : 0);
   });
+  var typeLabel = isPartialMarker ? '부분' : '그룹';
   idxs.forEach(function (r) {
-    var dup = !counted[r]; var row = vals[r]; var set = function (c, v) { if (c >= 0) row[c] = v; };
+    var row = vals[r]; var set = function (c, v) { if (c >= 0) row[c] = v; };
+    if (col.ver >= 0 && _isVoid_(_gv_(row, col.ver))) { // 구/삭제: 금액 0, 폼/구분값 보존
+      set(col.ifee, 0); set(col.iroom, 0); set(col.mbus, 0); set(col.mseo, 0); set(col.common, 0); set(col.gtotal, 0);
+      sheet.getRange(r + 1, 1, 1, width).setValues([row]); return;
+    }
+    var dup = !counted[r];
     set(col.room, roomLabel); set(col.occ, occLabel); set(col.list, roster);
     set(col.gn, memberCount); set(col.grep, rep);
-    if (grp && col.type >= 0 && !dup) set(col.type, '그룹'); // 강제그룹 유지(편집해도 그룹 요금 보존)
+    if (grp && col.type >= 0 && !dup) set(col.type, typeLabel);
+    if (seorakAll !== null && !dup) set(col.seorak, seorakAll ? SEORAK_YES : ''); // #11 전원 동일
     set(col.ifee, dup ? 0 : deptFee_(_gv_(row, col.dept)));
     set(col.iroom, dup ? 0 : (grp ? 0 : roomIndiv_(roomLabel)));
     set(col.mbus, dup ? 0 : (_gv_(row, col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0));
-    set(col.mseo, dup ? 0 : (_gv_(row, col.seorak).indexOf('원합니다') >= 0 ? SEORAK_FEE : 0));
+    set(col.mseo, dup ? 0 : (seoOf(r) ? SEORAK_FEE : 0));
     set(col.common, r === repRow ? common : 0); set(col.gtotal, r === repRow ? total : 0);
     if (dup) { set(col.route, '중복'); set(col.note, '중복 재제출(집계 제외)'); }
     sheet.getRange(r + 1, 1, 1, width).setValues([row]);
@@ -389,14 +428,19 @@ function _memberAdd_(body, sheet, H, col, width) {
   return _json_({ ok: true, groupTotal: total });
 }
 
-// 그룹에서 구성원 삭제 (행 삭제)
+// 그룹에서 구성원 삭제 — #17 행을 지우지 않고 '구버전 여부'에 '앱에서 삭제신청' 표시(값 보존, 집계 제외)
 function _memberDelete_(body, sheet, H, col, width) {
   var gid = String(body.gid || ''); var rowNum = Number(body.row || 0);
   if (rowNum < 2) return _json_({ ok: false, error: '잘못된 행' });
   var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
-  if (!_verifyGroupAccess_(vals, col, gid, body)) return _json_({ ok: false, error: '권한 확인 실패(연락처/PIN)' });
+  if (!_verifyGroupAccess_(vals, col, gid, body)) return _json_({ ok: false, error: '권한 확인 실패(이메일/PIN)' });
   if (_gv_(vals[rowNum - 1], col.name) !== (body.name || '').trim()) return _json_({ ok: false, error: '정보가 변경되었습니다. 다시 조회해 주세요.' });
-  sheet.deleteRow(rowNum);
+  if (col.ver >= 0) {
+    sheet.getRange(rowNum, col.ver + 1).setValue('앱에서 삭제신청');
+    if (col.note >= 0) sheet.getRange(rowNum, col.note + 1).setValue('앱 삭제신청 ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm'));
+  } else {
+    sheet.deleteRow(rowNum); // 구버전 열 없으면 폴백
+  }
   var total = _recalcGroupFull_(sheet, H, col, width, gid);
   return _json_({ ok: true, groupTotal: total });
 }
@@ -409,6 +453,7 @@ function _groupSet_(body, sheet, H, col, width) {
   var override = {};
   if (body.roomLabel != null) override.roomLabel = body.roomLabel;
   if (body.occLabel != null) override.occLabel = body.occLabel;
+  if (typeof body.seorak === 'boolean') override.seorak = body.seorak; // #11 설악 그룹 공통
   var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
   return _json_({ ok: true, groupTotal: total });
 }

@@ -1550,11 +1550,13 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
 
+  const occLabelFor = (n) => (OCCUPANCY.find((o) => o.people === n || (n >= 7 && o.people === 8)) || OCCUPANCY[0]).label
   const post = (p) => fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...p, ...auth }) }).then((r) => r.json())
   const saveGroup = async () => {
     setBusy('group'); setMsg('')
     const roomLabel = ROOMS.find((r) => r.name === roomName).label
-    const occLabel = occStatus === 'pending' ? OCC_PARTIAL : OCCUPANCY.find((o) => o.label === occSel).formLabel
+    // #21 미정: 투숙비는 추후결정(OCC_PARTIAL)이되 희망 인원은 기록해 다음 조회 때 유지
+    const occLabel = occStatus === 'pending' ? (OCC_PARTIAL + (occSel ? ' · 희망 ' + occSel : '')) : OCCUPANCY.find((o) => o.label === occSel).formLabel
     const j = await post({ action: 'groupSet', gid, roomLabel, occLabel, seorak: seorakAll })
     setBusy(''); setMsg(j.ok ? '✓ 저장되었습니다' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
   }
@@ -1562,7 +1564,8 @@ function GroupEditor({ members, auth, onRefresh, title }) {
     if (members.length <= 1) { setMsg('마지막 1명은 삭제할 수 없습니다.'); return }
     setBusy('d' + row); setMsg('')
     const j = await post({ action: 'memberDelete', gid, row, name: nm })
-    setBusy(''); if (j.ok) onRefresh && onRefresh(); else setMsg('오류: ' + (j.error || ''))
+    setBusy('')
+    if (j.ok) { if (occStatus === 'confirmed') setOccSel(occLabelFor(Math.max(1, members.length - 1))); onRefresh && onRefresh() } else setMsg('오류: ' + (j.error || ''))
   }
   const addMember = async () => {
     if (!add.name.trim() || !add.gender) { setMsg('추가할 분의 이름·성별을 입력해 주세요.'); return }
@@ -1570,7 +1573,10 @@ function GroupEditor({ members, auth, onRefresh, title }) {
     const deptLabel = DEPTS.find((d) => d.name === add.dept).label
     const j = await post({ action: 'memberAdd', gid, member: { name: add.name.trim(), gender: add.gender, deptLabel, bus: add.bus } })
     setBusy('')
-    if (j.ok) { setAdd({ name: '', gender: '', dept: DEPTS[0].name, bus: false }); onRefresh && onRefresh() } else setMsg('오류: ' + (j.error || ''))
+    if (j.ok) {
+      if (occStatus === 'confirmed') { setOccSel(occLabelFor(members.length + 1)); setMsg('투숙 인원이 ' + occLabelFor(members.length + 1) + '으로 맞춰졌어요. "저장"을 눌러 반영하세요.') } // #20
+      setAdd({ name: '', gender: '', dept: DEPTS[0].name, bus: false }); onRefresh && onRefresh()
+    } else setMsg('오류: ' + (j.error || ''))
   }
 
   return (
@@ -1596,10 +1602,10 @@ function GroupEditor({ members, auth, onRefresh, title }) {
           </select>
         ) : (
           <>
-            <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls} disabled>
+            <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls}>
               {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} (추가비용 추후결정됨)</option>)}
             </select>
-            <p className="text-[12px] text-[#5f6b7a] mt-2 leading-relaxed">나머지 인원은 교회에서 배정해드립니다. 투숙 추가비용은 최종 방배정 후 결정됩니다.</p>
+            <p className="text-[12px] text-[#5f6b7a] mt-2 leading-relaxed">원하는 인원을 고르면 참고용으로 기록돼요. 나머지 인원은 교회에서 배정해드리고, 투숙 추가비용은 최종 방배정 후 결정됩니다.</p>
           </>
         )}
       </Field>

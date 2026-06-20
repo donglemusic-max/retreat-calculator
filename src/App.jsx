@@ -305,14 +305,45 @@ function DeptSelect({ value, onChange }) {
 const inputCls =
   'w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]'
 
-function Field({ label, required, children }) {
+function Field({ label, required, children, id, error }) {
   return (
-    <div className="mb-4 last:mb-0">
+    <div id={id} className="mb-4 last:mb-0 scroll-mt-24">
       <label className="block text-[13px] font-semibold text-[#4e5968] mb-2">
         {label}{required && <span className="text-[#f04452]"> *</span>}
       </label>
       {children}
+      {error && <p className="mt-1.5 text-[12px] font-semibold text-[#f04452]">{error}</p>}
     </div>
+  )
+}
+
+// 첫 미입력 칸으로 부드럽게 이동 (#3). scrollIntoView 대신 window.scrollTo 사용.
+function scrollToId(id) {
+  if (typeof document === 'undefined') return
+  var el = document.getElementById(id); if (!el) return
+  var y = el.getBoundingClientRect().top + window.scrollY - 80
+  window.scrollTo({ top: y < 0 ? 0 : y, behavior: 'smooth' })
+}
+
+// 화면 하단 고정 금액 요약 바 (#1) + 단일 주 버튼(#2). 옵션 바꾸면 total이 즉시 갱신됨.
+function StickyBar({ total, count, perPerson, hint, cta, onCta }) {
+  return (
+    <>
+      <div aria-hidden style={{ height: 86 }} />
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#e5e8eb] bg-white/95 backdrop-blur-sm">
+        <div className="max-w-[480px] mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] text-[#8b95a1] leading-none mb-1">{hint || '총 등록 금액'}</div>
+            <div className="text-[22px] font-extrabold text-[#191f28] leading-none truncate">
+              {won(total)}{count > 1 && <span className="text-[12px] font-medium text-[#8b95a1] ml-2">1인 평균 {won(perPerson)}</span>}
+            </div>
+          </div>
+          <button onClick={onCta} className="shrink-0 px-6 py-3.5 rounded-2xl bg-[#191f28] text-white font-bold text-[15px] hover:bg-black shadow-lg active:scale-[0.98] transition">
+            {cta}
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -427,6 +458,7 @@ function IndividualMode() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitDone, setSubmitDone] = useState(null)
   const [submitErr, setSubmitErr] = useState('')
+  const [showErr, setShowErr] = useState(false)
 
   const d = DEPTS.find((x) => x.name === dept)
   const room = ROOMS[roomIdx]
@@ -437,6 +469,18 @@ function IndividualMode() {
   if (!contact.trim()) missing.push('연락처')
   if (!email.trim()) missing.push('이메일')
   if (!campus) missing.push('캠퍼스')
+  // #3 미입력 시 첫 빈 칸으로 이동 + 인라인 에러. 채워지면 즉시 사라짐.
+  const tryNext = () => {
+    if (missing.length) {
+      setShowErr(true)
+      var order = [['f-name', !name.trim()], ['f-gender', !gender], ['f-contact', !contact.trim()], ['f-email', !email.trim()], ['f-campus', !campus]]
+      var first = order.filter(function (o) { return o[1] })[0]
+      if (first) scrollToId(first[0])
+      return
+    }
+    setConfirmOpen(true)
+  }
+  const errCls = (bad) => inputCls + (showErr && bad ? ' border-2 border-[#f04452] focus:ring-[#f04452]' : '')
 
   const submission = {
     mode: '개인', email: email.trim(), contact: contact.trim(), campus, leader: name.trim(), inquiry: inquiry.trim(),
@@ -547,19 +591,19 @@ function IndividualMode() {
       </Card>
 
       <Card title="신청자 정보">
-        <Field label="이름" required>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} />
+        <Field label="이름" required id="f-name" error={showErr && !name.trim() ? '이름을 입력해 주세요.' : ''}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={errCls(!name.trim())} />
         </Field>
-        <Field label="성별" required>
+        <Field label="성별" required id="f-gender" error={showErr && !gender ? '성별을 선택해 주세요.' : ''}>
           <SegPicker value={gender} onChange={setGender} options={['남', '여']} />
         </Field>
-        <Field label="연락처" required>
-          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+        <Field label="연락처" required id="f-contact" error={showErr && !contact.trim() ? '연락처를 입력해 주세요.' : ''}>
+          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={errCls(!contact.trim())} />
         </Field>
-        <Field label="이메일" required>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
+        <Field label="이메일" required id="f-email" error={showErr && !email.trim() ? '이메일을 입력해 주세요.' : ''}>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={errCls(!email.trim())} />
         </Field>
-        <Field label="주로 예배드리는 캠퍼스" required>
+        <Field label="주로 예배드리는 캠퍼스" required id="f-campus" error={showErr && !campus ? '캠퍼스를 선택해 주세요.' : ''}>
           <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} />
         </Field>
         <Field label="문의사항 (선택)">
@@ -567,26 +611,9 @@ function IndividualMode() {
         </Field>
       </Card>
 
-      <ResultPanel calc={calc} subtitle={`※ 입금자명: ${name.trim() || '이름'}`} />
-
-      <div className="mb-6">
-        {missing.length > 0 && (
-          <p className="text-[13px] text-[#f04452] font-semibold mb-3 leading-relaxed">입력 필요: {missing.join(', ')}</p>
-        )}
-        {submitErr && <p className="text-[13px] text-[#f04452] mb-3 leading-relaxed">제출 오류: {submitErr}</p>}
-        <button
-          onClick={() => setConfirmOpen(true)}
-          disabled={missing.length > 0}
-          className={`w-full py-4 rounded-2xl font-bold text-[16px] transition-all ${
-            missing.length === 0 ? 'bg-[#191f28] text-white hover:bg-black shadow-lg' : 'bg-[#e5e8eb] text-[#b0b8c1]'
-          }`}
-        >
-          신청 내용 확인하고 제출하기
-        </button>
-        <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed text-center">
-          * 제출 후 입금까지 완료해야 등록이 확정됩니다.
-        </p>
-      </div>
+      {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
+      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
+      <StickyBar total={calc.total} count={1} hint="총 등록 금액" cta="신청 내용 확인" onCta={tryNext} />
 
       <ConfirmSheet
         open={confirmOpen}
@@ -620,6 +647,7 @@ function GroupMode() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitDone, setSubmitDone] = useState(null)
   const [submitErr, setSubmitErr] = useState('')
+  const [showErr, setShowErr] = useState(false)
 
   const room = ROOMS[roomIdx]
   const count = members.length
@@ -641,6 +669,18 @@ function GroupMode() {
     if (!m.name.trim()) missing.push(`${i + 1}번 이름`)
     if (!m.gender) missing.push(`${i + 1}번 성별`)
   })
+  const memberIncomplete = members.some((m) => !m.name.trim() || !m.gender)
+  const tryNext = () => {
+    if (missing.length) {
+      setShowErr(true)
+      var order = [['f-leader', !leader.trim()], ['f-contact', !contact.trim()], ['f-email', !email.trim()], ['f-campus', !campus], ['f-members', memberIncomplete]]
+      var first = order.filter(function (o) { return o[1] })[0]
+      if (first) scrollToId(first[0])
+      return
+    }
+    setConfirmOpen(true)
+  }
+  const errCls = (bad) => inputCls + (showErr && bad ? ' border-2 border-[#f04452] focus:ring-[#f04452]' : '')
 
   const submission = {
     mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
@@ -741,16 +781,16 @@ function GroupMode() {
         <p className="text-[13px] text-[#8b95a1] mb-4 leading-relaxed">
           가족·그룹을 대표해서 신청하는 분의 정보입니다. 공동비용 입금 시 이 이름으로 입금합니다.
         </p>
-        <Field label="대표자 이름" required>
-          <input value={leader} onChange={(e) => { setLeader(e.target.value); updateMember(0, { name: e.target.value }) }} placeholder="예: 김바울" className={inputCls} />
+        <Field label="대표자 이름" required id="f-leader" error={showErr && !leader.trim() ? '대표자 이름을 입력해 주세요.' : ''}>
+          <input value={leader} onChange={(e) => { setLeader(e.target.value); updateMember(0, { name: e.target.value }) }} placeholder="예: 김바울" className={errCls(!leader.trim())} />
         </Field>
-        <Field label="연락처" required>
-          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
+        <Field label="연락처" required id="f-contact" error={showErr && !contact.trim() ? '연락처를 입력해 주세요.' : ''}>
+          <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={errCls(!contact.trim())} />
         </Field>
-        <Field label="이메일" required>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
+        <Field label="이메일" required id="f-email" error={showErr && !email.trim() ? '이메일을 입력해 주세요.' : ''}>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={errCls(!email.trim())} />
         </Field>
-        <Field label="주로 예배드리는 캠퍼스" required>
+        <Field label="주로 예배드리는 캠퍼스" required id="f-campus" error={showErr && !campus ? '캠퍼스를 선택해 주세요.' : ''}>
           <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} />
         </Field>
         <Field label="문의사항 (선택)">
@@ -758,7 +798,11 @@ function GroupMode() {
         </Field>
       </Card>
 
+      <div id="f-members" className="scroll-mt-24" />
       <Card title="구성원" badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
+        {showErr && memberIncomplete && (
+          <p className="text-[12px] font-semibold text-[#f04452] mb-2">모든 구성원의 이름과 성별을 입력해 주세요.</p>
+        )}
         <div className="space-y-3">
           {members.map((m, i) => (
             <div key={i} className="bg-[#f9fafb] rounded-2xl p-4 border border-[#f2f4f6]">
@@ -1006,26 +1050,9 @@ function GroupMode() {
         )}
       </Card>
 
-      <ResultPanel calc={calc} subtitle={`※ ${subtitle}`} />
-
-      <div className="mb-6">
-        {missing.length > 0 && (
-          <p className="text-[13px] text-[#f04452] font-semibold mb-3 leading-relaxed">입력 필요: {missing.join(', ')}</p>
-        )}
-        {submitErr && <p className="text-[13px] text-[#f04452] mb-3 leading-relaxed">제출 오류: {submitErr}</p>}
-        <button
-          onClick={() => setConfirmOpen(true)}
-          disabled={missing.length > 0}
-          className={`w-full py-4 rounded-2xl font-bold text-[16px] transition-all ${
-            missing.length === 0 ? 'bg-[#191f28] text-white hover:bg-black shadow-lg' : 'bg-[#e5e8eb] text-[#b0b8c1]'
-          }`}
-        >
-          신청 내용 확인하고 제출하기
-        </button>
-        <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed text-center">
-          * 제출 후 입금까지 완료해야 등록이 확정됩니다.
-        </p>
-      </div>
+      {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
+      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
+      <StickyBar total={calc.total} count={count} perPerson={calc.perPerson} hint="총 등록 금액" cta="신청 내용 확인" onCta={tryNext} />
 
       <ConfirmSheet
         open={confirmOpen}

@@ -2203,6 +2203,7 @@ function AdminApp() {
   const [qList, setQList] = useState('') // #1 정리안 검색
   const [onlyProblem, setOnlyProblem] = useState(false) // #6 정리안 문제만 보기
   const [gSort, setGSort] = useState('time') // 정리안 그룹 정렬: time(접수순)/name(ㄱㄴㄷ)/size(인원)
+  const [liveSort, setLiveSort] = useState('time') // 실시간 목록 정렬(그룹정리·미입금): time=접수(행)순/name/size
   const [doneInq, setDoneInq] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_done_inq') || '[]')) } catch { return new Set() } }) // #8 문의 완료
   const [onlyUndoneInq, setOnlyUndoneInq] = useState(true) // #8 미처리만 보기
   const toggleDoneInq = (key) => { const ns = new Set(doneInq); ns.has(key) ? ns.delete(key) : ns.add(key); setDoneInq(ns); try { localStorage.setItem('retreat_done_inq', JSON.stringify([...ns])) } catch (e) {} }
@@ -3117,6 +3118,8 @@ function AdminApp() {
           const gidList = Object.keys(groups)
           const repOf = (g) => (g.find((r) => (r.groupTotal || 0) > 0) || g[0]).rep || g[0].name
           const labelOf = (gid) => `${repOf(groups[gid])} 그룹 (${groups[gid].length})`
+          const minRow = (gid) => Math.min.apply(null, groups[gid].map((p) => p.row || 1e9))
+          const gidSorted = gidList.slice().sort((a, b) => liveSort === 'name' ? repOf(groups[a]).localeCompare(repOf(groups[b]), 'ko') : liveSort === 'size' ? groups[b].length - groups[a].length : minRow(a) - minRow(b))
           const pk = (s) => { let d = String(s || '').replace(/\D/g, ''); if (d.length === 10 && d.charAt(0) === '1') d = '0' + d; return d }
           // S1: 같은 전화번호인데 그룹이 여러 개
           const phoneG = {}; live.forEach((r) => { const p = pk(r.contact); if (p) { (phoneG[p] = phoneG[p] || {}); phoneG[p][r.gid] = true } })
@@ -3221,7 +3224,13 @@ function AdminApp() {
               </div>
 
               <Collapsible title={`전체 그룹 목록 (${gidList.length}그룹)`}>
-              {gidList.map((gid) => (
+              <div className="flex gap-1.5 mb-2 items-center">
+                <span className="text-[11px] text-[#9ca3af] font-bold mr-0.5">정렬</span>
+                {[['time', '시간순'], ['name', 'ㄱㄴㄷ순'], ['size', '인원순']].map(([v, lbl]) => (
+                  <button key={v} onClick={() => setLiveSort(v)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${liveSort === v ? 'bg-[#1b64da] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>{lbl}</button>
+                ))}
+              </div>
+              {gidSorted.map((gid) => (
                 <div key={gid} className="bg-white rounded-2xl border border-[#f2f4f6] p-3 mb-2">
                   <label className="flex items-center gap-1.5 mb-2 cursor-pointer">
                     <input type="checkbox" checked={!!mergeSel[gid]} onChange={() => toggleMerge(gid)} className="w-4 h-4" />
@@ -3258,12 +3267,19 @@ function AdminApp() {
               const filtered = q ? m.unpaid.filter((r) => (r.name || '').includes(q) || (r.pay || '').includes(q)) : m.unpaid
               const byPay = {}
               filtered.forEach((r) => { const k = (r.pay || '').trim() || r.name; (byPay[k] = byPay[k] || []).push(r) })
-              const groups = Object.entries(byPay).sort((a, b) => b[1].length - a[1].length)
+              const minRowOf = (mem) => Math.min.apply(null, mem.map((r) => r.row || 1e9))
+              const groups = Object.entries(byPay).sort((a, b) => liveSort === 'name' ? a[0].localeCompare(b[0], 'ko') : liveSort === 'size' ? b[1].length - a[1].length : minRowOf(a[1]) - minRowOf(b[1]))
               return (
               <Collapsible title="미입금" count={`${m.unpaid.length}명`} defaultOpen>
                 {m.unpaid.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">전원 입금확인 완료</p> : (
                   <>
                     <FilterBar q={qUnpaid} setQ={setQUnpaid} total={m.unpaid.length} shown={filtered.length} placeholder="이름·입금자명 검색" />
+                    <div className="flex gap-1.5 mb-2 items-center">
+                      <span className="text-[11px] text-[#9ca3af] font-bold mr-0.5">정렬</span>
+                      {[['time', '시간순'], ['name', 'ㄱㄴㄷ순'], ['size', '인원순']].map(([v, lbl]) => (
+                        <button key={v} onClick={() => setLiveSort(v)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${liveSort === v ? 'bg-[#1b64da] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>{lbl}</button>
+                      ))}
+                    </div>
                     <div className="flex items-center gap-2 mb-2">
                       <button onClick={() => setSel(Object.fromEntries(filtered.map((r) => [r.row, true])))} className="text-[11px] font-bold text-[#3182f6] bg-[#f2f8ff] px-2.5 py-1.5 rounded-lg">전체선택</button>
                       <button onClick={() => setSel({})} className="text-[11px] font-bold text-[#5f6b7a] bg-[#f2f4f6] px-2.5 py-1.5 rounded-lg">해제</button>

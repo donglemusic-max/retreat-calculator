@@ -2202,6 +2202,7 @@ function AdminApp() {
   const [qUnpaid, setQUnpaid] = useState('') // #1 미입금 검색(이름·입금자명)
   const [qList, setQList] = useState('') // #1 정리안 검색
   const [onlyProblem, setOnlyProblem] = useState(false) // #6 정리안 문제만 보기
+  const [gSort, setGSort] = useState('time') // 정리안 그룹 정렬: time(접수순)/name(ㄱㄴㄷ)/size(인원)
   const [doneInq, setDoneInq] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_done_inq') || '[]')) } catch { return new Set() } }) // #8 문의 완료
   const [onlyUndoneInq, setOnlyUndoneInq] = useState(true) // #8 미처리만 보기
   const toggleDoneInq = (key) => { const ns = new Set(doneInq); ns.has(key) ? ns.delete(key) : ns.add(key); setDoneInq(ns); try { localStorage.setItem('retreat_done_inq', JSON.stringify([...ns])) } catch (e) {} }
@@ -2833,6 +2834,7 @@ function AdminApp() {
             '13. 오기 정정: 조영렬 캠퍼스(분당↔부산), 김혜진 연락처(=방호근), 문상철 연락처 자리수.',
           ]
           const statusCls = (s) => s === '전원' ? 'bg-[#12b886]' : /^\d+\/\d+$/.test(s) ? 'bg-[#f59f00]' : 'bg-[#f04452]'
+          const gPeople = (g) => g[2].split('·').filter(Boolean).length + (g[3] ? g[3].split('·').filter(Boolean).length : 0) // 명단+미제출 인원
           return (
             <div>
               <HelpToggle>{`구글폼 원본을 전수 검토해 만든 '확정 정리안'입니다. (앱 자동 그룹과 별개의 기준 스냅샷)
@@ -2854,7 +2856,16 @@ function AdminApp() {
                   <button onClick={() => setOnlyProblem(false)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${!onlyProblem ? 'bg-[#191f28] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>전체 {G.length}</button>
                   <button onClick={() => setOnlyProblem(true)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${onlyProblem ? 'bg-[#191f28] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>문제만 {G.filter((g) => g[5] !== '전원').length}</button>
                 </div>
-                {G.filter((g) => !onlyProblem || g[5] !== '전원').map((g, i) => {
+                <div className="flex gap-1.5 mb-2 items-center">
+                  <span className="text-[11px] text-[#9ca3af] font-bold mr-0.5">정렬</span>
+                  {[['time', '접수순'], ['name', 'ㄱㄴㄷ순'], ['size', '인원순']].map(([v, lbl]) => (
+                    <button key={v} onClick={() => setGSort(v)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${gSort === v ? 'bg-[#1b64da] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>{lbl}</button>
+                  ))}
+                </div>
+                {G.map((g, idx) => ({ g, idx }))
+                  .filter(({ g }) => !onlyProblem || g[5] !== '전원')
+                  .sort((a, b) => gSort === 'name' ? a.g[0].localeCompare(b.g[0], 'ko') : gSort === 'size' ? gPeople(b.g) - gPeople(a.g) : a.idx - b.idx)
+                  .map(({ g }, i) => {
                   const tone = g[5] === '전원' ? 'done' : /^\d+\/\d+$/.test(g[5]) ? 'prog' : 'prob'
                   const mem = g[2].split('·'); const miss = g[3] ? g[3].split('·') : []
                   return (

@@ -2096,7 +2096,7 @@ function PersonChip({ p, warn }) {
   const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 50 } : undefined
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
-      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab active:cursor-grabbing touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : warn ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
+      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border-2 cursor-grab active:cursor-grabbing touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : warn ? 'border-[#f59e0b] bg-[#fffbeb]' : p.gender === '남' ? 'border-[#9ec5ff] bg-[#eff6ff] text-[#1b64da]' : p.gender === '여' ? 'border-[#ffc2d1] bg-[#fff1f5] text-[#e0407a]' : 'border-[#e5e8eb] bg-white'}`}>
       <span className="text-[#b0b8c1] text-[11px] leading-none" aria-hidden>⠿</span>
       {warn && <span title="신청한 객실 옵션과 다른 방">⚠️</span>}
       {p.name}
@@ -2118,13 +2118,16 @@ function ReadChip({ p }) {
 }
 
 // 드롭 가능한 방 박스
-function RoomDrop({ id, title, sub, count, cap, danger, children }) {
+function RoomDrop({ id, title, sub, count, cap, danger, children, onDelete }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
     <div ref={setNodeRef} className={`rounded-2xl border p-3 mb-2 transition-colors ${isOver ? 'border-2 border-[#3182f6] bg-[#eaf3ff]' : danger ? 'border-[#f04452] bg-[#fff5f5]' : 'border-[#e5e8eb] bg-white'}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[13px] font-bold text-[#191f28]">{title}{sub && <span className="text-[11px] text-[#5f6b7a] font-normal ml-1">{sub}</span>}</span>
-        {cap != null && <span className={`text-[12px] font-bold ${danger ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{count}/{cap}명</span>}
+        <span className="flex items-center gap-2">
+          {cap != null && <span className={`text-[12px] font-bold ${danger ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{count}/{cap}명</span>}
+          {onDelete && <button onClick={onDelete} title="방 삭제 (인원은 미배정으로)" className="text-[#b0b8c1] hover:text-[#f04452] text-[13px] leading-none">✕</button>}
+        </span>
       </div>
       <div className="flex flex-wrap gap-1.5 min-h-[34px]">{children}</div>
     </div>
@@ -2209,7 +2212,9 @@ function AdminApp() {
   const toggleDoneInq = (key) => { const ns = new Set(doneInq); ns.has(key) ? ns.delete(key) : ns.add(key); setDoneInq(ns); try { localStorage.setItem('retreat_done_inq', JSON.stringify([...ns])) } catch (e) {} }
   const [boarded, setBoarded] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_boarded') || '[]')) } catch { return new Set() } }) // #9 버스 탑승 체크
   const toggleBoarded = (key) => { const ns = new Set(boarded); ns.has(key) ? ns.delete(key) : ns.add(key); setBoarded(ns); try { localStorage.setItem('retreat_boarded', JSON.stringify([...ns])) } catch (e) {} }
-  const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨
+  const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨 (타입 인코딩: "방1 (소노캄)")
+  const [poolSort, setPoolSort] = useState('name') // 미배정 정렬: name(ㄱㄴㄷ)/dept(부서)
+  const [poolRoomFilter, setPoolRoomFilter] = useState('all') // 미배정 객실 필터
   const [editGid, setEditGid] = useState(null) // 관리자 그룹 편집 대상
   const [mergeSel, setMergeSel] = useState({}) // 합치기 선택 gid→bool
   const [mergeMsg, setMergeMsg] = useState('')
@@ -2435,12 +2440,26 @@ function AdminApp() {
     if (!over) return
     const row = Number(String(active.id).slice(1))
     const isPool = over.id === '__pool__' || over.id === '__reqcheck__'
+    if (!isPool) {
+      const target = String(over.id)
+      const person = m.pool.find((p) => p.row === row)
+      const occ = m.pool.filter((p) => p.row !== row && (assignDraft[p.row] !== undefined ? assignDraft[p.row] : (p.assigned || '')) === target)
+      const clash = occ.find((p) => p.gender && person && person.gender && p.gender !== person.gender)
+      if (clash) { setSaveMsg(`⚠️ 한 방에 남녀를 함께 배정할 수 없습니다 — ${target}: ${clash.name}(${clash.gender}) ↔ ${person.name}(${person.gender})`); return }
+    }
     setAssignDraft((d) => ({ ...d, [row]: isPool ? '' : String(over.id) }))
   }
-  const addRoom = () => {
+  const roomTypeShort2 = (t) => (t === '소노캄 스위트' ? '소노캄' : t === '소노벨 스위트' ? '스위트' : '패밀리')
+  const addRoom = (type) => {
+    const short = roomTypeShort2(type || '소노벨 패밀리')
+    const labOf = (n) => `방${n} (${short})`
     let i = 1; const exist = new Set([...m.pool.map((p) => eff(p)).filter(Boolean), ...extraRooms])
-    while (exist.has(`방${i}`)) i++
-    setExtraRooms((r) => [...r, `방${i}`])
+    while (exist.has(labOf(i))) i++
+    setExtraRooms((r) => [...r, labOf(i)])
+  }
+  const removeRoom = (lab) => {
+    setExtraRooms((r) => r.filter((x) => x !== lab))
+    setAssignDraft((d) => { const nd = { ...d }; m.pool.forEach((p) => { const cur = d[p.row] !== undefined ? d[p.row] : (p.assigned || ''); if (cur === lab) nd[p.row] = '' }); return nd })
   }
 
   const saveAssign = () => {
@@ -3029,7 +3048,12 @@ function AdminApp() {
                 </p>
                 <div className="flex gap-2">
                   <button onClick={autoAssign} className="flex-1 py-3 rounded-xl bg-white border border-[#3182f6] text-[#3182f6] font-bold text-[13px]">자동 배치</button>
-                  <button onClick={addRoom} className="px-4 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px]">+ 방</button>
+                  <select value="" onChange={(e) => { if (e.target.value) addRoom(e.target.value) }} className="px-2 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[12px] border-0">
+                    <option value="">+ 방 추가 ▾</option>
+                    <option value="소노벨 패밀리">+ 패밀리 방</option>
+                    <option value="소노벨 스위트">+ 소노벨 스위트 방</option>
+                    <option value="소노캄 스위트">+ 소노캄 스위트 방</option>
+                  </select>
                   <button onClick={saveAssign} disabled={!Object.keys(assignDraft).length} className={`flex-1 py-3 rounded-xl font-bold text-[13px] ${Object.keys(assignDraft).length ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>저장{Object.keys(assignDraft).length ? ` (${Object.keys(assignDraft).length})` : ''}</button>
                 </div>
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
@@ -3099,13 +3123,36 @@ function AdminApp() {
                     ))}
                   </RoomDrop>
                 )}
-                <RoomDrop id="__pool__" title="미배정" count={plain.length}>
-                  {plain.map((p) => <PersonChip key={p.row} p={p} />)}
-                </RoomDrop>
-                {roomLabels.map((lab) => {
-                  const mem = roomMap[lab]; const type = roomTypeOfMembers(mem); const cap = ROOM_CAP[type]
+                {(() => {
+                  const DORD = DEPTS.map((d) => d.name)
+                  let pv = poolRoomFilter === 'all' ? plain : plain.filter((p) => reqRoomType(p.roomLabel) === poolRoomFilter)
+                  pv = [...pv].sort((a, b) => poolSort === 'dept' ? ((DORD.indexOf(deptName(a.deptLabel)) - DORD.indexOf(deptName(b.deptLabel))) || a.name.localeCompare(b.name, 'ko')) : a.name.localeCompare(b.name, 'ko'))
+                  const fcss = (on) => `text-[11px] font-bold px-2 py-1 rounded-lg ${on ? 'bg-[#1b64da] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`
                   return (
-                    <RoomDrop key={lab} id={lab} title={lab} sub={roomTypeShort(type)} count={mem.length} cap={cap} danger={mem.length > cap}>
+                    <RoomDrop id="__pool__" title="미배정" count={plain.length}>
+                      <div className="flex flex-wrap items-center gap-1.5 mb-2 w-full">
+                        <span className="text-[11px] text-[#9ca3af] font-bold">정렬</span>
+                        <button onClick={() => setPoolSort('name')} className={fcss(poolSort === 'name')}>ㄱㄴㄷ</button>
+                        <button onClick={() => setPoolSort('dept')} className={fcss(poolSort === 'dept')}>부서순</button>
+                        <span className="text-[11px] text-[#9ca3af] font-bold ml-1">객실</span>
+                        {[['all', '전체'], ['소노벨 패밀리', '패밀리'], ['소노벨 스위트', '스위트'], ['소노캄 스위트', '소노캄']].map(([v, l]) => <button key={v} onClick={() => setPoolRoomFilter(v)} className={fcss(poolRoomFilter === v)}>{l}</button>)}
+                      </div>
+                      {['남', '여', '기타'].map((g) => { const list = pv.filter((p) => (p.gender || '기타') === g); if (!list.length) return null; return (
+                        <div key={g} className="w-full mb-1.5">
+                          <div className={`text-[11px] font-bold mb-1 ${g === '남' ? 'text-[#1b64da]' : g === '여' ? 'text-[#e0407a]' : 'text-[#5f6b7a]'}`}>{g === '기타' ? '성별미상' : g} {list.length}명</div>
+                          <div className="flex flex-wrap gap-1.5">{list.map((p) => <PersonChip key={p.row} p={p} />)}</div>
+                        </div>
+                      ) })}
+                      {!pv.length && <p className="text-[12px] text-[#5f6b7a]">해당 조건의 미배정 인원이 없습니다.</p>}
+                    </RoomDrop>
+                  )
+                })()}
+                {roomLabels.map((lab) => {
+                  const mem = roomMap[lab]
+                  const type = (/소노캄/.test(lab) ? '소노캄 스위트' : /스위트/.test(lab) ? '소노벨 스위트' : /패밀리/.test(lab) ? '소노벨 패밀리' : null) || roomTypeOfMembers(mem)
+                  const cap = ROOM_CAP[type]
+                  return (
+                    <RoomDrop key={lab} id={lab} title={lab} sub={roomTypeShort(type)} count={mem.length} cap={cap} danger={mem.length > cap} onDelete={() => removeRoom(lab)}>
                       {mem.map((p) => <PersonChip key={p.row} p={p} warn={reqRoomType(p.roomLabel) !== type} />)}
                     </RoomDrop>
                   )

@@ -158,6 +158,28 @@ function _submit_(body, sheet, col, width) {
     rows.push(row);
   });
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, width).setValues(rows);
+  // #18 신청 결과 확인 이메일 (실패해도 제출은 성공). 재배포 시 메일 권한 승인 필요.
+  try {
+    if (body.email && body.email.indexOf('@') > 0) {
+      var memLines = members.map(function (m) {
+        var dep = m.deptLabel ? String(m.deptLabel).split(' ')[0] : '';
+        return '· ' + (m.name || '') + (dep ? ' (' + dep + (m.bus ? ', 버스' : '') + ')' : (m.bus ? ' (버스)' : ''));
+      }).join('\n');
+      var modeTxt = isGroupMode ? ('가족/그룹 ' + members.length + '명') : '개인';
+      var mailBody = '안녕하세요, 2026 전교인 리트릿(7/21~23) 등록 신청이 접수되었습니다.\n\n'
+        + '· 접수번호: ' + gid + '\n'
+        + '· 신청: ' + modeTxt + '\n'
+        + (isGroupMode ? ('· 대표자: ' + (leader || '') + '\n') : '')
+        + '· 객실: ' + String(roomLabel || '').split(' (')[0] + '\n'
+        + '\n[구성원]\n' + memLines + '\n'
+        + '\n총 등록 금액: ' + groupTotal.toLocaleString() + '원\n'
+        + '입금 계좌: 우리은행 1005803168121 주님의 교회\n\n'
+        + '* 원활한 등록 관리를 위하여, 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.\n'
+        + '* 입금까지 완료해야 등록이 확정됩니다.\n'
+        + '* 자세한 항목별 입금 안내와 신청 조회·수정은 등록 사이트에서 하실 수 있습니다.\n\n주님의교회 드림';
+      MailApp.sendEmail(body.email, '[2026 전교인 리트릿] 등록 신청이 접수되었습니다', mailBody);
+    }
+  } catch (mailErr) { /* 메일 실패는 제출 성공에 영향 없음 */ }
   return _json_({ ok: true, groupId: gid, rows: rows.length, total: groupTotal });
 }
 

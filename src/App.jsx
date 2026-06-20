@@ -652,8 +652,12 @@ function IndividualMode() {
         </Field>
       </Card>
 
+      <div className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-4 mb-3">
+        <DepositExample />
+        <p className="text-[12px] text-[#5f6b7a] leading-relaxed">입금자명 쓰는 법 미리 보기 · 계좌번호와 항목별 복사는 제출 완료 화면에 안내됩니다.</p>
+      </div>
       {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
-      <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
+      <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다.</p>
       <StickyBar total={calc.total} count={1} hint="총 등록 금액" cta="신청 내용 확인" onCta={tryNext} />
 
       <ConfirmSheet
@@ -1117,8 +1121,12 @@ function GroupMode() {
         )}
       </Card>
 
+      <div className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-4 mb-3">
+        <DepositExample />
+        <p className="text-[12px] text-[#5f6b7a] leading-relaxed">입금자명 쓰는 법 미리 보기 · 계좌번호와 항목별 복사는 제출 완료 화면에 안내됩니다.</p>
+      </div>
       {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
-      <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
+      <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다.</p>
       <StickyBar total={calc.total} count={count} perPerson={calc.perPerson} hint="총 등록 금액" cta="신청 내용 확인" onCta={tryNext} />
 
       <ConfirmSheet

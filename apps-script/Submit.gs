@@ -142,7 +142,7 @@ function _submit_(body, sheet, col, width) {
     var set = function (c, v) { if (c >= 0) row[c] = v; };
     set(col.ts, now); set(col.email, body.email || ''); set(col.name, m.name || '');
     set(col.gender, m.gender || ''); set(col.contact, m.contact || body.contact || '');
-    set(col.rep, isGroupMode ? leader : (m.name || '')); set(col.campus, body.campus || '');
+    set(col.rep, isGroupMode ? leader : (m.name || '')); set(col.campus, m.campus || body.campus || '');
     set(col.dept, deptLabel); set(col.room, roomLabel); set(col.occ, occLabel);
     set(col.list, isGroupMode ? (body.roster || '') : '');
     set(col.bus, m.bus ? BUS_YES : BUS_NO); set(col.seorak, seorakOn ? SEORAK_YES : '');

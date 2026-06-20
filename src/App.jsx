@@ -604,7 +604,7 @@ function IndividualMode() {
 // ── 가족 / 그룹 등록 ──────────────────────────────────────────
 function GroupMode() {
   const [leader, setLeader] = useState('')
-  const [members, setMembers] = useState([{ name: '', dept: '장년부', bus: false, gender: '' }])
+  const [members, setMembers] = useState([{ name: '', dept: '장년부', bus: false, gender: '', campus: '' }])
   const [roomIdx, setRoomIdx] = useState(1)
   const [occOverride, setOccOverride] = useState(null) // null = 자동(인원수 기준)
   const [occOpen, setOccOpen] = useState(false) // 투숙인원 수동선택 영역 열기
@@ -628,7 +628,7 @@ function GroupMode() {
 
   const updateMember = (i, patch) =>
     setMembers((m) => m.map((mm, idx) => (idx === i ? { ...mm, ...patch } : mm)))
-  const addMember = () => setMembers((m) => [...m, { name: '', dept: '장년부', bus: false, gender: '' }])
+  const addMember = () => setMembers((m) => [...m, { name: '', dept: '장년부', bus: false, gender: '', campus: '' }])
   const removeMember = (i) => setMembers((m) => (m.length > 1 ? m.filter((_, idx) => idx !== i) : m))
 
   const roster = members.map((m) => m.name.trim()).filter(Boolean).join(' ') + ` (${count})`
@@ -646,7 +646,7 @@ function GroupMode() {
     mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
     roomLabel: room.label, occLabel: partial ? OCC_PARTIAL : effOcc.formLabel, seorak, depositMode,
     roster: partial ? roster + ' [부분그룹·나머지 교회배정]' : roster,
-    members: members.map((m) => ({ name: m.name.trim(), gender: m.gender, deptLabel: DEPTS.find((d) => d.name === m.dept).label, bus: m.bus })),
+    members: members.map((m) => ({ name: m.name.trim(), gender: m.gender, deptLabel: DEPTS.find((d) => d.name === m.dept).label, bus: m.bus, campus: m.campus || campus })),
   }
 
   const calc = useMemo(() => {
@@ -790,6 +790,23 @@ function GroupMode() {
                 ))}
               </div>
               <DeptSelect value={m.dept} onChange={(v) => updateMember(i, { dept: v })} />
+              <div className="mt-3">
+                <div className="text-[12px] font-bold text-[#8b95a1] mb-1.5">캠퍼스 {(m.campus || campus) ? '' : '(미선택 시 대표자와 동일)'}</div>
+                <div className="flex gap-2">
+                  {CAMPUSES.map((c) => {
+                    const active = (m.campus || campus) === c
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => updateMember(i, { campus: c })}
+                        className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border transition-all min-h-[44px] ${active ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}
+                      >
+                        {c.replace(' 캠퍼스', '')}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
               <button
                 onClick={() => updateMember(i, { bus: !m.bus })}
                 className={`w-full mt-3 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${

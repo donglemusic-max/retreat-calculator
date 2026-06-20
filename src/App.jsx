@@ -387,7 +387,7 @@ function StickyBar({ total, count, perPerson, hint, cta, onCta }) {
   )
 }
 
-function SegPicker({ value, onChange, options, render }) {
+function SegPicker({ value, onChange, options, render, invalid }) {
   return (
     <div className="flex gap-2">
       {options.map((o) => (
@@ -395,7 +395,8 @@ function SegPicker({ value, onChange, options, render }) {
           key={o}
           onClick={() => onChange(o)}
           className={`flex-1 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
-            value === o ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
+            value === o ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]'
+              : invalid ? 'border-2 border-[#f04452] bg-[#fff5f5] text-[#f04452]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
           }`}
         >
           {render ? render(o) : o}
@@ -637,7 +638,7 @@ function IndividualMode() {
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={errCls(!name.trim())} />
         </Field>
         <Field label="성별" required id="f-gender" error={showErr && !gender ? '성별을 선택해 주세요.' : ''}>
-          <SegPicker value={gender} onChange={setGender} options={['남', '여']} />
+          <SegPicker value={gender} onChange={setGender} options={['남', '여']} invalid={showErr && !gender} />
         </Field>
         <Field label="연락처" required id="f-contact" error={showErr && !contact.trim() ? '연락처를 입력해 주세요.' : ''}>
           <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={errCls(!contact.trim())} />
@@ -646,7 +647,7 @@ function IndividualMode() {
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={errCls(!email.trim())} />
         </Field>
         <Field label="주로 예배드리는 캠퍼스" required id="f-campus" error={showErr && !campus ? '캠퍼스를 선택해 주세요.' : ''}>
-          <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} />
+          <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} invalid={showErr && !campus} />
         </Field>
         <Field label="문의사항 (선택)">
           <textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} />
@@ -844,7 +845,7 @@ function GroupMode() {
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={errCls(!email.trim())} />
         </Field>
         <Field label="주로 예배드리는 캠퍼스" required id="f-campus" error={showErr && !campus ? '캠퍼스를 선택해 주세요.' : ''}>
-          <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} />
+          <SegPicker value={campus} onChange={setCampus} options={CAMPUSES} render={(c) => c.replace(' 캠퍼스', '')} invalid={showErr && !campus} />
         </Field>
         <Field label="문의사항 (선택)">
           <textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} />
@@ -871,7 +872,7 @@ function GroupMode() {
                 value={m.name}
                 onChange={(e) => updateMember(i, { name: e.target.value })}
                 placeholder={i === 0 ? '대표자 이름 (위에서 자동 입력)' : '이름'}
-                className="w-full bg-white border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] mb-3 focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]"
+                className={`w-full bg-white rounded-xl px-3 py-3 text-[15px] mb-3 focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px] border ${showErr && !m.name.trim() ? 'border-2 border-[#f04452] bg-[#fff5f5]' : 'border-[#e5e8eb]'}`}
               />
               <div className="flex gap-2 mb-3">
                 {['남', '여'].map((g) => (
@@ -879,7 +880,8 @@ function GroupMode() {
                     key={g}
                     onClick={() => updateMember(i, { gender: g })}
                     className={`flex-1 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
-                      m.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
+                      m.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]'
+                        : showErr && !m.gender ? 'border-2 border-[#f04452] bg-[#fff5f5] text-[#f04452]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
                     }`}
                   >
                     {g}

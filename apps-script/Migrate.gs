@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v14-partial-del'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v15-groupkey'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -205,10 +205,13 @@ function enrichSheet() {
   var byEmail = {}, byPhone = {}, byRep = {}, byNm = {};
   rowsIdx.forEach(function (r) {
     if (splitSet[r]) return; // 분리 지정 행은 자동 병합 버킷에서 제외 (강제그룹으로만 합류)
-    var em = get(r, 'email'); if (em) (byEmail[em] = byEmail[em] || []).push(r);
-    var ph = phoneKey(get(r, 'contact')); if (ph) (byPhone[ph] = byPhone[ph] || []).push(r);
+    // 이메일/전화 병합 키에 대표자(rk)를 포함 — 같은 이메일·전화라도 대표자가 다르면 안 묶임
+    // (옛 데이터는 대표자 공란이라 rk='' → 같은 이메일끼리 그대로 묶임 / 앱 신청은 대표자 항상 있음 → 무관한 사람 분리)
+    var rm = get(r, 'rep').match(/[가-힣]{2,4}[A-Za-z0-9]*/); var rk = rm ? rm[0] : '';
+    var em = get(r, 'email'); if (em) { var ek = em + '|' + rk; (byEmail[ek] = byEmail[ek] || []).push(r); }
+    var ph = phoneKey(get(r, 'contact')); if (ph) { var pk = ph + '|' + rk; (byPhone[pk] = byPhone[pk] || []).push(r); }
     var nm = get(r, 'name'); if (nm) (byNm[nm] = byNm[nm] || []).push(r);
-    var rm = get(r, 'rep').match(/[가-힣]{2,4}/); if (rm) (byRep[rm[0]] = byRep[rm[0]] || []).push(r);
+    if (rk) (byRep[rk] = byRep[rk] || []).push(r);
   });
   var unionBucket = function (map) { Object.keys(map).forEach(function (k) { var arr = map[k]; for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }); };
   unionBucket(byEmail); unionBucket(byPhone);

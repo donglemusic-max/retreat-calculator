@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv15-rep-mail'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv16-groupkey'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -232,7 +232,9 @@ function _lookup_(body, sheet, H, col, width) {
   for (var r2 = 1; r2 < n; r2++) {
     var rw = vals[r2]; if (!_gv_(rw, col.name)) continue;
     if (col.ver >= 0 && _isVoid_(_gv_(rw, col.ver))) continue; // #16/#17 구·삭제 행 제외
-    if (gids[_gv_(rw, col.gid)] || emails[_email_(_gv_(rw, col.email))] || phones[_digits_(_gv_(rw, col.contact))]) {
+    // 그룹 확장은 '그룹ID'로만 (이메일/전화 공유로 무관한 사람이 끌려오는 문제 방지) + 본인 행은 항상 포함
+    var g2 = _gv_(rw, col.gid);
+    if ((g2 && gids[g2]) || selfRows.indexOf(r2) >= 0) {
       var o = rowObj(rw, r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o);
     }
   }

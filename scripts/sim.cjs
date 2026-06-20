@@ -292,6 +292,33 @@ for (const room of ROOMS) for (const count of [2, 3, 4]) {
   check('신청유형없는 행 삭제 후 조회 1명', lookup('부분0', 'nt@x.com').length === 1)
 }
 
+// ════════════ 13) 같은 이메일·전화 + 다른 대표자 → 분리 (수정8 버그) ════════════
+const rkOf = (r) => { const m = (r.rep || '').match(/[가-힣]{2,4}[A-Za-z0-9]*/); return m ? m[0] : '' }
+function enrichCluster() { // 실제 enrich union(이메일+대표자, 전화+대표자, 대표자) 미러 → gid 재배정
+  const N = SHEET.length, parent = {}; for (let i = 0; i < N; i++) parent[i] = i
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+  const uni = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
+  const buckets = {}
+  SHEET.forEach((r, i) => { if (isVoid(r.ver)) return; const k = rkOf(r); ['e' + (r.email || '') + '|' + k, 'p' + (r.phone || '') + '|' + k].forEach((bk) => { (buckets[bk] = buckets[bk] || []).push(i) }) })
+  Object.values(buckets).forEach((arr) => { for (let j = 1; j < arr.length; j++) uni(arr[0], arr[j]) })
+  SHEET.forEach((r, i) => { if (!isVoid(r.ver)) r.gid = 'G' + find(i) })
+}
+{
+  SHEET = []; GIDC = 0
+  SHEET.push({ gid: 'A1', name: '김마리', email: 'x@x.com', phone: '010', rep: '김마리', dept: '장년부', roomLabel: ROOMS[1].label, occLabel: OCC_CHURCH, bus: false, seorak: false, ver: '', appType: '개인' })
+  SHEET.push({ gid: 'A2', name: '박테스트1', email: 'x@x.com', phone: '010', rep: '박테스트1', dept: '장년부', roomLabel: ROOMS[1].label, occLabel: OCC[2].label, bus: false, seorak: false, ver: '', appType: '그룹' })
+  SHEET.push({ gid: 'A2', name: '박테스트4', email: 'x@x.com', phone: '010', rep: '박테스트1', dept: '장년부', roomLabel: ROOMS[1].label, occLabel: OCC[2].label, bus: false, seorak: false, ver: '', appType: '그룹' })
+  enrichCluster()
+  check('수정8: 김마리 조회 1명(박테스트 안 붙음)', lookup('김마리', 'x@x.com').length === 1, `len=${lookup('김마리', 'x@x.com').length}`)
+  check('수정8: 박테스트1 조회 2명(김마리 안 붙음)', lookup('박테스트1', 'x@x.com').length === 2 && lookup('박테스트1', 'x@x.com').every((r) => r.name.indexOf('박테스트') === 0))
+}
+{
+  SHEET = []; GIDC = 0
+  ;['조형만', '조영렬', '김미정', '조윤정'].forEach((nm, i) => SHEET.push({ gid: 'O' + i, name: nm, email: 'fam@x.com', phone: '010-' + i, rep: '', dept: '장년부', roomLabel: ROOMS[2].label, occLabel: OCC[4].label, bus: false, seorak: false, ver: '', appType: '' }))
+  enrichCluster()
+  check('옛가족(대표자 공란·같은 이메일·다른 전화) 4명 한 그룹', lookup('조형만', 'fam@x.com').length === 4, `len=${lookup('조형만', 'fam@x.com').length}`)
+}
+
 // ── 결과 ──
 console.log(`\n시뮬레이션: PASS ${PASS} / FAIL ${FAIL}`)
 if (fails.length) { console.log('\n실패 케이스:'); fails.slice(0, 40).forEach((f) => console.log(' ✗ ' + f)); if (fails.length > 40) console.log(` …외 ${fails.length - 40}건`) }

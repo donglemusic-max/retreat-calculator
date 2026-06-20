@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv16-groupkey'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv17-mailtone'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -94,7 +94,28 @@ function _mailTo_(to, subject, body) {
     MailApp.sendEmail(to, subject, body, opts);
   } catch (e) {}
 }
-var MAIL_FOOT = '\n\n자세한 내용은 등록 사이트 "내 신청 조회·수정"에서 확인하실 수 있습니다.\n주님의교회 드림';
+var MAIL_FOOT = '\n\n신청 내용은 등록 사이트 "내 신청 조회·수정"에서 언제든 확인·수정하실 수 있습니다.\n궁금하신 점은 편하게 문의해 주세요. 늘 함께해 주셔서 감사합니다. 🙏\n\n주님의교회 드림';
+// 그룹의 '최종 정리 한판' — 변경 후 현재 시트 값으로 항목별 내역·총액 생성 (수정·추가·삭제·그룹변경 메일용)
+function _groupSummary_(sheet, col, width, gid) {
+  var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+  var rows = []; for (var r = 1; r < n; r++) if (_gv_(vals[r], col.gid) === gid && !(col.ver >= 0 && _isVoid_(_gv_(vals[r], col.ver)))) rows.push(vals[r]);
+  if (!rows.length) return '';
+  var names = rows.map(function (rw) { return _gv_(rw, col.name); });
+  var room = _gv_(rows[0], col.room).split(' (')[0];
+  var reg = 0, bus = 0, seo = 0, iroom = 0, common = 0, total = 0;
+  rows.forEach(function (rw) { reg += Number(rw[col.ifee] || 0); bus += Number(rw[col.mbus] || 0); seo += Number(rw[col.mseo] || 0); iroom += Number(rw[col.iroom] || 0); common += Number(rw[col.common] || 0); total += Number(rw[col.gtotal] || 0); });
+  var roomFee = roomAdd_(_gv_(rows[0], col.room)); var groupFee = common - roomFee; if (groupFee < 0) groupFee = 0;
+  var won = function (v) { return v.toLocaleString() + '원'; };
+  var L = [];
+  if (reg > 0) L.push('▸ 등록비        ' + won(reg));
+  if (iroom > 0) L.push('▸ 객실(본인)     ' + won(iroom));
+  if (roomFee > 0) L.push('▸ 객실선택       ' + won(roomFee));
+  if (groupFee > 0) L.push('▸ 그룹비         ' + won(groupFee));
+  if (bus > 0) L.push('▸ 버스비         ' + won(bus));
+  if (seo > 0) L.push('▸ 설악산뷰       ' + won(seo));
+  return '[최종 등록 내역]\n· 인원 ' + names.length + '명: ' + names.join(', ') + '\n· 객실: ' + (room || '교회 배정')
+    + '\n\n' + L.join('\n') + '\n─────────────────\n총 합계: ' + won(total) + '\n입금 계좌: 우리은행 1005803168121 주님의 교회';
+}
 // 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
 function _nameTokens_(t) {
   return String(t || '').split(/[^가-힣A-Za-z]+/).filter(function (x) {
@@ -187,10 +208,13 @@ function _submit_(body, sheet, col, width) {
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, width).setValues(rows);
   // #18 신청 결과 확인 이메일 — 프론트가 보낸 '입금 안내 문구'(복사 버튼과 동일 항목별 형식) 사용.
   var guide = body.guideText || ('총 등록 금액: ' + groupTotal.toLocaleString() + '원\n입금 계좌: 우리은행 1005803168121 주님의 교회');
-  _mailTo_(body.email, '[2026 전교인 리트릿] 등록 신청이 접수되었습니다',
-    '안녕하세요, 2026 전교인 리트릿(7/21~23) 등록 신청이 접수되었습니다. (접수번호 ' + gid + ')\n\n'
+  _mailTo_(body.email, '[2026 전교인 리트릿] 등록 신청이 접수되었습니다 🙏',
+    '샬롬! ' + (leader || (members[0] && members[0].name) || '') + '님,\n'
+    + '2026 전교인 리트릿(7/21~23, 델피노 리조트)에 함께해 주셔서 진심으로 감사합니다.\n'
+    + '아래 내용으로 등록 신청이 정상 접수되었습니다. (접수번호 ' + gid + ')\n\n'
     + guide
-    + '\n\n* 입금까지 완료해야 등록이 확정됩니다.\n* 신청 조회·수정은 등록 사이트 "내 신청 조회·수정"에서 하실 수 있습니다.\n\n주님의교회 드림');
+    + '\n\n입금까지 완료되어야 등록이 최종 확정됩니다. 위 항목대로 입금 부탁드립니다.'
+    + MAIL_FOOT);
   return _json_({ ok: true, groupId: gid, rows: rows.length, total: groupTotal });
 }
 
@@ -277,8 +301,11 @@ function _update_(body, sheet, H, col, width) {
     sheet.getRange(rowNum, 1, 1, width).setValues([nr]); // 구버전 열 없으면 덮어쓰기 폴백
   }
   var newTotal = _recalcGroupFull_(sheet, H, col, width, gid);
-  _mailTo_(col.email >= 0 ? nr[col.email] : '', '[2026 전교인 리트릿] 신청 내용이 수정되었습니다',
-    (body.name || '') + '님의 신청 내용이 수정되었습니다.' + MAIL_FOOT);
+  _mailTo_(col.email >= 0 ? nr[col.email] : '', '[2026 전교인 리트릿] 신청 내용이 수정되었습니다 🙏',
+    '샬롬! ' + (body.name || '') + '님,\n신청 내용이 정상적으로 수정되었습니다. 변경된 최종 내역을 안내드립니다.\n\n'
+    + _groupSummary_(sheet, col, width, gid)
+    + '\n\n변경 후 금액 기준으로 입금 부탁드리며, 입금까지 완료되어야 등록이 확정됩니다.'
+    + MAIL_FOOT);
   return _json_({ ok: true, groupTotal: newTotal });
 }
 
@@ -440,8 +467,11 @@ function _memberAdd_(body, sheet, H, col, width) {
   set(col.route, '앱추가'); set(col.gid, gid);
   sheet.getRange(n + 1, 1, 1, width).setValues([row]);
   var total = _recalcGroupFull_(sheet, H, col, width, gid);
-  _mailTo_(_gv_(t, col.email), '[2026 전교인 리트릿] 그룹에 구성원이 추가되었습니다',
-    (m.name || '').trim() + '님이 그룹 신청에 추가되었습니다.' + MAIL_FOOT);
+  _mailTo_(_gv_(t, col.email), '[2026 전교인 리트릿] 그룹에 구성원이 추가되었습니다 🙏',
+    '샬롬! ' + (m.name || '').trim() + '님이 그룹 신청에 추가되었습니다. 변경된 최종 내역을 안내드립니다.\n\n'
+    + _groupSummary_(sheet, col, width, gid)
+    + '\n\n변경 후 금액 기준으로 입금 부탁드립니다.'
+    + MAIL_FOOT);
   return _json_({ ok: true, groupTotal: total });
 }
 
@@ -460,8 +490,10 @@ function _memberDelete_(body, sheet, H, col, width) {
     sheet.deleteRow(rowNum); // 구버전 열 없으면 폴백
   }
   var total = _recalcGroupFull_(sheet, H, col, width, gid);
-  _mailTo_(delEmail, '[2026 전교인 리트릿] 구성원이 삭제되었습니다',
-    (body.name || '') + '님이 그룹 신청에서 삭제(취소)되었습니다.' + MAIL_FOOT);
+  _mailTo_(delEmail, '[2026 전교인 리트릿] 구성원 등록이 취소되었습니다',
+    '샬롬! ' + (body.name || '') + '님의 등록 신청이 취소되어 그룹에서 제외되었습니다.\n혹시 착오가 있으시면 "내 신청 조회·수정" 또는 문의로 알려주세요.\n\n'
+    + (total > 0 ? '[남은 그룹 최종 내역]\n' + _groupSummary_(sheet, col, width, gid).replace(/^\[최종 등록 내역\]\n/, '') : '')
+    + MAIL_FOOT);
   return _json_({ ok: true, groupTotal: total });
 }
 
@@ -476,8 +508,11 @@ function _groupSet_(body, sheet, H, col, width) {
   if (body.occLabel != null) override.occLabel = body.occLabel;
   if (typeof body.seorak === 'boolean') override.seorak = body.seorak; // #11 설악 그룹 공통
   var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
-  _mailTo_(gEmail, '[2026 전교인 리트릿] 그룹 설정이 변경되었습니다',
-    '그룹의 객실/투숙 인원/설악산뷰 설정이 변경되었습니다.' + MAIL_FOOT);
+  _mailTo_(gEmail, '[2026 전교인 리트릿] 그룹 설정이 변경되었습니다 🙏',
+    '샬롬! 그룹의 객실/투숙 인원/설악산뷰 설정이 변경되었습니다. 변경된 최종 내역을 안내드립니다.\n\n'
+    + _groupSummary_(sheet, col, width, gid)
+    + '\n\n변경 후 금액 기준으로 입금 부탁드립니다.'
+    + MAIL_FOOT);
   return _json_({ ok: true, groupTotal: total });
 }
 

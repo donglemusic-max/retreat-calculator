@@ -1795,7 +1795,8 @@ function PersonChip({ p, warn }) {
   const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 50 } : undefined
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
-      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : warn ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
+      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border cursor-grab active:cursor-grabbing touch-none select-none ${isDragging ? 'opacity-70 border-[#3182f6] shadow-lg' : warn ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
+      <span className="text-[#b0b8c1] text-[11px] leading-none" aria-hidden>⠿</span>
       {warn && <span title="신청한 객실 옵션과 다른 방">⚠️</span>}
       {p.name}
       {p.route === '미제출' && <span className="text-[9px] font-bold text-white bg-[#f04452] rounded px-1">미제출</span>}
@@ -1899,6 +1900,7 @@ function AdminApp() {
   const [sel, setSel] = useState({}) // 리마인드 다중선택 row→bool
   const [qUnpaid, setQUnpaid] = useState('') // #1 미입금 검색(이름·입금자명)
   const [qList, setQList] = useState('') // #1 정리안 검색
+  const [onlyProblem, setOnlyProblem] = useState(false) // #6 정리안 문제만 보기
   const [doneInq, setDoneInq] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_done_inq') || '[]')) } catch { return new Set() } }) // #8 문의 완료
   const [onlyUndoneInq, setOnlyUndoneInq] = useState(true) // #8 미처리만 보기
   const toggleDoneInq = (key) => { const ns = new Set(doneInq); ns.has(key) ? ns.delete(key) : ns.add(key); setDoneInq(ns); try { localStorage.setItem('retreat_done_inq', JSON.stringify([...ns])) } catch (e) {} }
@@ -2541,17 +2543,27 @@ function AdminApp() {
                 {stat('개인', '23명')}
               </div>
               <Collapsible title="① 그룹 (가족·예약그룹)" count={`${G.length}개`} defaultOpen>
-                {G.map((g, i) => (
-                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[13px] font-bold text-[#191f28]">{g[0]}</span>
-                      <span className="text-[11px] text-[#5f6b7a]">{g[1]} · {g[4]}</span>
-                      <span className={`inline-block text-[10px] font-bold rounded px-1.5 py-0.5 text-white ${statusCls(g[5])}`}>{g[5]}</span>
+                <div className="flex gap-2 mb-2">
+                  <button onClick={() => setOnlyProblem(false)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${!onlyProblem ? 'bg-[#191f28] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>전체 {G.length}</button>
+                  <button onClick={() => setOnlyProblem(true)} className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${onlyProblem ? 'bg-[#191f28] text-white' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>문제만 {G.filter((g) => g[5] !== '전원').length}</button>
+                </div>
+                {G.filter((g) => !onlyProblem || g[5] !== '전원').map((g, i) => {
+                  const tone = g[5] === '전원' ? 'done' : /^\d+\/\d+$/.test(g[5]) ? 'prog' : 'prob'
+                  const mem = g[2].split('·'); const miss = g[3] ? g[3].split('·') : []
+                  return (
+                    <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        <span className="text-[13px] font-bold text-[#191f28]">{g[0]}</span>
+                        <span className="text-[11px] text-[#5f6b7a]">{g[1]} · {g[4]}</span>
+                        <Badge tone={tone}>{g[5]}</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {mem.map((nm, j) => <span key={j} className="text-[11px] bg-[#eef0f3] text-[#4e5968] rounded px-1.5 py-0.5">{nm}</span>)}
+                        {miss.map((nm, j) => <span key={'x' + j} className="text-[11px] bg-[#fde7ea] text-[#dc2626] rounded px-1.5 py-0.5">{nm} 미제출</span>)}
+                      </div>
                     </div>
-                    <div className="text-[12px] text-[#4e5968] mt-0.5">{g[2]}</div>
-                    {g[3] && <div className="text-[11px] text-[#f04452] mt-0.5">미제출: {g[3]}</div>}
-                  </div>
-                ))}
+                  )
+                })}
               </Collapsible>
               <Collapsible title="② 부분그룹 (추가 배정 예정)" count={`${P.length}개`}>
                 {P.map((g, i) => (
@@ -2607,12 +2619,16 @@ function AdminApp() {
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
               </div>
               {!clusters.length && <p className="text-[13px] text-[#5f6b7a] text-center py-10">처리할 방배정 요청이 없습니다.</p>}
-              {clusters.map((c, i) => (
+              {[...clusters].sort((a, b) => (a.done ? 3 : a.block ? 0 : a.conflicts.length ? 1 : 2) - (b.done ? 3 : b.block ? 0 : b.conflicts.length ? 1 : 2)).map((c, i) => (
                 <div key={i} className={`rounded-2xl border p-4 mb-2.5 ${c.done ? 'border-[#e5e8eb] bg-[#f9fafb]' : c.block ? 'border-[#f04452] bg-[#fff5f5]' : c.conflicts.length ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[13px] font-bold text-[#191f28]">{c.done ? '✅' : c.block ? '🔴' : c.conflicts.length ? '🟡' : '🟢'} {c.members.map((p) => p.name).join(', ')}{c.done && <span className="text-[11px] font-normal text-[#1b64da] ml-1">이미 같은 방: {c.room}</span>}</span>
-                    <span className={`text-[12px] font-bold ${c.members.length > c.cap ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{roomTypeShort(c.roomType)} {c.members.length}/{c.cap}</span>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Badge tone={c.done ? 'done' : c.block ? 'prob' : c.conflicts.length ? 'prog' : 'done'}>{c.done ? '배정됨' : c.block ? '해소 필요' : c.conflicts.length ? '확인 필요' : '묶기 가능'}</Badge>
+                      <span className="text-[13px] font-bold text-[#191f28] truncate">{c.members.map((p) => p.name).join(', ')}</span>
+                    </div>
+                    <span className={`text-[12px] font-bold shrink-0 ${c.members.length > c.cap ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{roomTypeShort(c.roomType)} {c.members.length}/{c.cap}</span>
                   </div>
+                  {c.done && <div className="text-[11px] text-[#1b64da] mb-1.5">이미 같은 방: {c.room}</div>}
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {c.members.map((p) => (
                       <span key={p.row} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-bold border border-[#e5e8eb] bg-white">
@@ -2621,9 +2637,14 @@ function AdminApp() {
                       </span>
                     ))}
                   </div>
-                  {c.members.filter((p) => p.list || p.inquiry).map((p) => (
-                    <div key={'m' + p.row} className="text-[11px] text-[#5f6b7a] leading-snug mb-0.5">📝 {p.name}: {p.list || p.inquiry}</div>
-                  ))}
+                  {c.members.filter((p) => p.list || p.inquiry).length > 0 && (
+                    <details className="mb-1">
+                      <summary className="text-[11px] text-[#5f6b7a] cursor-pointer select-none">📝 원문 메모 보기</summary>
+                      {c.members.filter((p) => p.list || p.inquiry).map((p) => (
+                        <div key={'m' + p.row} className="text-[11px] text-[#5f6b7a] leading-snug mb-0.5 mt-1">{p.name}: {p.list || p.inquiry}</div>
+                      ))}
+                    </details>
+                  )}
                   {c.conflicts.map((cf, j) => (
                     <div key={j} className={`text-[12px] font-semibold mt-1 ${cf.lv === 'block' ? 'text-[#f04452]' : cf.lv === 'check' ? 'text-[#b45309]' : 'text-[#5f6b7a]'}`}>
                       {cf.lv === 'block' ? '🔴' : cf.lv === 'check' ? '🟡' : '⚪'} {cf.msg}
@@ -2642,7 +2663,7 @@ function AdminApp() {
                         <>
                           <div className="text-[11px] text-[#4e5968] mb-1.5">추천(같은 성별·캠퍼스·미배정): {c.fillCandidates.map((p) => `${p.name}(${deptName(p.deptLabel)})`).join(', ')}{c.fillMore > c.fillCandidates.length ? ` · 후보 ${c.fillMore}명 중` : ''}</div>
                           <button onClick={() => ask('이 방에 추가할까요?', `${c.fillCandidates.map((p) => p.name).join(', ')}님을 '${c.fillRoom}' 방에 같이 배정합니다.\n(방만 같이 쓰고 비용은 각자입니다)`, () => assignRoom([...c.members.map((p) => p.row), ...c.fillCandidates.map((p) => p.row)], c.fillRoom), '추가')}
-                            className="text-[12px] font-bold text-white bg-[#1b64da] rounded-lg px-3 py-1.5">추천 {c.fillCandidates.length}명 이 방에 추가</button>
+                            className="text-[12px] font-bold text-[#1b64da] bg-white border border-[#1b64da] rounded-lg px-3 py-1.5">추천 {c.fillCandidates.length}명 이 방에 추가</button>
                         </>
                       ) : (
                         <div className="text-[11px] text-[#5f6b7a]">조정 제안: 조건(같은 성별·캠퍼스) 맞는 미배정자가 없어요. → 객실을 {c.members.length}인으로 줄이거나, 빈자리로 두거나, 다른 부분그룹과 합치세요.</div>
@@ -2684,9 +2705,9 @@ function AdminApp() {
                   교회 배정 대상 <b>{m.pool.length}명</b>. <b>자동 배치</b>는 <u>메모 없는</u> 사람만 캠퍼스·신청 객실옵션별 정원(패밀리 6 / 스위트·소노캄 8)에 맞춰 채웁니다. 메모 있는 사람은 아래 "배정 요청 확인"에 따로 두니 직접 드래그하세요.
                 </p>
                 <div className="flex gap-2">
-                  <button onClick={autoAssign} className="flex-1 py-3 rounded-xl bg-[#3182f6] text-white font-bold text-[13px]">자동 배치</button>
+                  <button onClick={autoAssign} className="flex-1 py-3 rounded-xl bg-white border border-[#3182f6] text-[#3182f6] font-bold text-[13px]">자동 배치</button>
                   <button onClick={addRoom} className="px-4 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px]">+ 방</button>
-                  <button onClick={saveAssign} className="flex-1 py-3 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">저장</button>
+                  <button onClick={saveAssign} disabled={!Object.keys(assignDraft).length} className={`flex-1 py-3 rounded-xl font-bold text-[13px] ${Object.keys(assignDraft).length ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>저장{Object.keys(assignDraft).length ? ` (${Object.keys(assignDraft).length})` : ''}</button>
                 </div>
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
                 <div className="mt-3 pt-3 border-t border-[#f2f4f6]">
@@ -2702,7 +2723,7 @@ function AdminApp() {
                       <option value="">부서?</option>
                       {DEPTS.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
                     </select>
-                    <button onClick={addPlaceholder} className="px-3 py-2 rounded-xl bg-[#f04452] text-white font-bold text-[12px] whitespace-nowrap">+ 미제출</button>
+                    <button onClick={addPlaceholder} className="px-3 py-2 rounded-xl bg-[#4e5968] text-white font-bold text-[12px] whitespace-nowrap">+ 미제출</button>
                   </div>
                   {phMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{phMsg}</p>}
                 </div>

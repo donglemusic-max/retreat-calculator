@@ -1840,6 +1840,40 @@ function HelpToggle({ children }) {
   )
 }
 
+// #3 상태색 4단계 통일: 초록=완료/전원, 노랑=진행/부분, 빨강=문제/중복, 회색=대기/정보
+const TONE = {
+  done: 'bg-[#e7f5ec] text-[#1d7a4d] border border-[#bfe6cd]',
+  prog: 'bg-[#fef3e2] text-[#b45309] border border-[#f6dcb0]',
+  prob: 'bg-[#fde7ea] text-[#dc2626] border border-[#f6c9d0]',
+  wait: 'bg-[#eef0f3] text-[#5f6b7a] border border-[#e0e3e8]',
+}
+function Badge({ tone = 'wait', children }) {
+  return <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}>{children}</span>
+}
+function StatusLegend() {
+  const items = [['done', '완료·전원'], ['prog', '진행·부분'], ['prob', '문제·중복'], ['wait', '대기·정보']]
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mb-3 bg-white rounded-xl border border-[#f2f4f6] px-3 py-2">
+      <span className="text-[11px] font-bold text-[#83868c] mr-0.5">상태색</span>
+      {items.map(([t, l]) => <Badge key={t} tone={t}>{l}</Badge>)}
+    </div>
+  )
+}
+// 이름 검색 + 결과수 (#1 공통). list=객체배열, keys=검색대상 필드들
+function FilterBar({ q, setQ, total, shown, placeholder }) {
+  return (
+    <div className="mb-3 sticky top-[52px] z-10">
+      <div className="relative">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder || '이름 검색'}
+          className="w-full bg-white border border-[#e5e8eb] rounded-xl pl-9 pr-20 py-2.5 text-[14px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none" />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aa0a8] text-[14px]">🔍</span>
+        {q ? <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#5f6b7a] bg-[#f2f4f6] rounded-lg px-2 py-1">{shown}/{total} ✕</button>
+          : <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#9aa0a8]">{total}명</span>}
+      </div>
+    </div>
+  )
+}
+
 function Collapsible({ title, count, defaultOpen, children }) {
   const [open, setOpen] = useState(!!defaultOpen)
   return (
@@ -1863,6 +1897,9 @@ function AdminApp() {
   const [assignDraft, setAssignDraft] = useState({})
   const [saveMsg, setSaveMsg] = useState('')
   const [sel, setSel] = useState({}) // 리마인드 다중선택 row→bool
+  const [qUnpaid, setQUnpaid] = useState('') // #1 미입금 검색(이름·입금자명)
+  const [qList, setQList] = useState('') // #1 정리안 검색
+  const [doneInq, setDoneInq] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_done_inq') || '[]')) } catch { return new Set() } }) // #8 문의 완료
   const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨
   const [editGid, setEditGid] = useState(null) // 관리자 그룹 편집 대상
   const [mergeSel, setMergeSel] = useState({}) // 합치기 선택 gid→bool
@@ -2309,6 +2346,8 @@ function AdminApp() {
             )
           })}
         </div>
+
+        <StatusLegend />
 
         {tab === '요약' && (
           <div>
@@ -2869,21 +2908,46 @@ function AdminApp() {
 
 • '미입금': 아직 입금확인 안 된 사람. 체크 후 [선택 N명 입금확인]으로 한 번에 처리.
 • '확인 필요': 명단엔 있는데 본인 신청서가 없는 그룹 — 연락해 신청을 받거나 미제출로 추가하세요.`}</HelpToggle>
-            {(() => { const selN = Object.keys(sel).filter((r) => sel[r]).length; return (
+            {(() => {
+              const selN = Object.keys(sel).filter((r) => sel[r]).length
+              const amt = (r) => (r.ifee || 0) + (r.iroom || 0) + (r.mbus || 0) + (r.mseo || 0) + (r.common || 0)
+              const q = qUnpaid.trim()
+              const filtered = q ? m.unpaid.filter((r) => (r.name || '').includes(q) || (r.pay || '').includes(q)) : m.unpaid
+              const byPay = {}
+              filtered.forEach((r) => { const k = (r.pay || '').trim() || r.name; (byPay[k] = byPay[k] || []).push(r) })
+              const groups = Object.entries(byPay).sort((a, b) => b[1].length - a[1].length)
+              return (
               <Collapsible title="미입금" count={`${m.unpaid.length}명`} defaultOpen>
                 {m.unpaid.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">전원 입금확인 완료</p> : (
                   <>
+                    <FilterBar q={qUnpaid} setQ={setQUnpaid} total={m.unpaid.length} shown={filtered.length} placeholder="이름·입금자명 검색" />
                     <div className="flex items-center gap-2 mb-2">
-                      <button onClick={() => setSel(Object.fromEntries(m.unpaid.map((r) => [r.row, true])))} className="text-[11px] font-bold text-[#3182f6] bg-[#f2f8ff] px-2.5 py-1.5 rounded-lg">전체선택</button>
+                      <button onClick={() => setSel(Object.fromEntries(filtered.map((r) => [r.row, true])))} className="text-[11px] font-bold text-[#3182f6] bg-[#f2f8ff] px-2.5 py-1.5 rounded-lg">전체선택</button>
                       <button onClick={() => setSel({})} className="text-[11px] font-bold text-[#5f6b7a] bg-[#f2f4f6] px-2.5 py-1.5 rounded-lg">해제</button>
                       <button onClick={batchConfirmPaid} disabled={!selN} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}명 입금확인</button>
                     </div>
-                    {m.unpaid.map((r) => (
-                      <label key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 cursor-pointer">
-                        <input type="checkbox" checked={!!sel[r.row]} onChange={() => toggleSel(r.row)} className="w-4 h-4" />
-                        <span className="text-[13px] font-bold text-[#191f28] flex-1">{r.name} <span className="text-[11px] text-[#5f6b7a] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.pay ? ` · 입금자명 ${r.pay}` : ''}</span></span>
-                      </label>
-                    ))}
+                    {groups.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">검색 결과 없음</p> : groups.map(([payName, mem]) => {
+                      const sum = mem.reduce((s, r) => s + amt(r), 0)
+                      const allSel = mem.every((r) => sel[r.row])
+                      return (
+                        <div key={payName} className="border border-[#f2f4f6] rounded-xl mb-2 overflow-hidden">
+                          <label className="flex items-center gap-2 px-3 py-2 bg-[#f9fafb] cursor-pointer">
+                            <input type="checkbox" checked={allSel} onChange={() => { const ns = { ...sel }; mem.forEach((r) => { ns[r.row] = !allSel }); setSel(ns) }} className="w-4 h-4" />
+                            <span className="text-[13px] font-bold text-[#191f28] flex-1 min-w-0 truncate">입금자명 {payName}{mem.length > 1 && <span className="text-[11px] text-[#5f6b7a] font-normal"> · {mem.length}명</span>}</span>
+                            <span className="text-[13px] font-extrabold text-[#1b64da] shrink-0">{won(sum)}</span>
+                          </label>
+                          <div className="px-3">
+                            {mem.map((r) => (
+                              <label key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 cursor-pointer">
+                                <input type="checkbox" checked={!!sel[r.row]} onChange={() => toggleSel(r.row)} className="w-4 h-4" />
+                                <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{r.name} <span className="text-[11px] text-[#5f6b7a]">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}</span></span>
+                                <span className="text-[12px] font-bold text-[#4e5968] shrink-0">{won(amt(r))}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </>
                 )}
               </Collapsible>

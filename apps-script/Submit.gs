@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv11-emailver'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv12-voidhide'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -223,6 +223,7 @@ function _lookup_(body, sheet, H, col, width) {
   var gids = {}, emails = {}, phones = {}, selfRows = [];
   for (var r = 1; r < n; r++) {
     var row = vals[r];
+    if (col.ver >= 0 && _isVoid_(_gv_(row, col.ver))) continue; // #16/#17 구·삭제 행 제외
     var reMail = _email_(_gv_(row, col.email)), rePh = _digits_(_gv_(row, col.contact));
     if (_gv_(row, col.name) === name && ((em && reMail === em) || (ph && rePh === ph))) {
       selfRows.push(r);
@@ -235,6 +236,7 @@ function _lookup_(body, sheet, H, col, width) {
   var out = [];
   for (var r2 = 1; r2 < n; r2++) {
     var rw = vals[r2]; if (!_gv_(rw, col.name)) continue;
+    if (col.ver >= 0 && _isVoid_(_gv_(rw, col.ver))) continue; // #16/#17 구·삭제 행 제외
     if (gids[_gv_(rw, col.gid)] || emails[_email_(_gv_(rw, col.email))] || phones[_digits_(_gv_(rw, col.contact))]) {
       var o = rowObj(rw, r2); o.isSelf = selfRows.indexOf(r2) >= 0; out.push(o);
     }
@@ -313,6 +315,7 @@ function _admin_(sheet, H, col, width) {
   for (var r = 1; r < n; r++) {
     var row = vals[r];
     if (!_gv_(row, col.name) && !_gv_(row, col.email)) continue;
+    if (col.ver >= 0 && _isVoid_(_gv_(row, col.ver))) continue; // #16/#17 구·삭제 행 제외(관리자 목록·집계)
     out.push({
       row: r + 1, name: _gv_(row, col.name), gender: _gv_(row, col.gender), contact: _gv_(row, col.contact),
       email: _gv_(row, col.email), campus: _gv_(row, col.campus), deptLabel: _gv_(row, col.dept),

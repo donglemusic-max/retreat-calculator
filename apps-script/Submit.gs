@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv17-mailtone'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv18-mailtpl'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -116,6 +116,53 @@ function _groupSummary_(sheet, col, width, gid) {
   return '[최종 등록 내역]\n· 인원 ' + names.length + '명: ' + names.join(', ') + '\n· 객실: ' + (room || '교회 배정')
     + '\n\n' + L.join('\n') + '\n─────────────────\n총 합계: ' + won(total) + '\n입금 계좌: 우리은행 1005803168121 주님의 교회';
 }
+// ── 메일 템플릿(관리자 편집 가능, #26/#30) ───────────────────────────────
+// Script Properties 'MAIL_TPL'(JSON)로 덮어쓰기. 비어있으면 아래 기본값 사용.
+// 치환자: {name} {gid} {guide} {summary} {changes} {vision} {foot}
+var MAIL_TPL_DEFAULT = {
+  foot: MAIL_FOOT,
+  vision: '', // #30: 관리자에서 비전/영적 기대 문구 입력 (모든 메일 끝에 삽입)
+  submit_subject: '[2026 전교인 리트릿] 등록 신청이 접수되었습니다 🙏',
+  submit_body: '샬롬! {name}님,\n2026 전교인 리트릿(7/21~23, 델피노 리조트)에 함께해 주셔서 진심으로 감사합니다.\n아래 내용으로 등록 신청이 정상 접수되었습니다. (접수번호 {gid})\n\n{guide}\n\n입금까지 완료되어야 등록이 최종 확정됩니다. 위 항목대로 입금 부탁드립니다.{vision}{foot}',
+  update_subject: '[2026 전교인 리트릿] 신청 내용이 수정되었습니다 🙏',
+  update_body: '샬롬! {name}님,\n신청 내용이 정상적으로 수정되었습니다.{changes}\n\n변경된 최종 내역을 안내드립니다.\n\n{summary}\n\n변경 후 금액 기준으로 입금 부탁드리며, 입금까지 완료되어야 등록이 확정됩니다.{vision}{foot}',
+  add_subject: '[2026 전교인 리트릿] 그룹에 구성원이 추가되었습니다 🙏',
+  add_body: '샬롬! {name}님이 그룹 신청에 추가되었습니다.\n\n변경된 최종 내역을 안내드립니다.\n\n{summary}\n\n변경 후 금액 기준으로 입금 부탁드립니다.{vision}{foot}',
+  delete_subject: '[2026 전교인 리트릿] 구성원 등록이 취소되었습니다',
+  delete_body: '샬롬! {name}님의 등록 신청이 취소되어 그룹에서 제외되었습니다.\n혹시 착오가 있으시면 "내 신청 조회·수정" 또는 문의로 알려주세요.\n\n{summary}{foot}',
+  groupset_subject: '[2026 전교인 리트릿] 그룹 설정이 변경되었습니다 🙏',
+  groupset_body: '샬롬! 그룹의 객실/투숙 인원/설악산뷰 설정이 변경되었습니다.{changes}\n\n변경된 최종 내역을 안내드립니다.\n\n{summary}\n\n변경 후 금액 기준으로 입금 부탁드립니다.{vision}{foot}',
+};
+function _tplAll_() {
+  var o = {}; for (var k in MAIL_TPL_DEFAULT) o[k] = MAIL_TPL_DEFAULT[k];
+  try { var s = PropertiesService.getScriptProperties().getProperty('MAIL_TPL'); if (s) { var ov = JSON.parse(s); for (var k2 in ov) if (ov[k2] != null) o[k2] = ov[k2]; } } catch (e) {}
+  return o;
+}
+function _render_(s, vars) { return String(s || '').replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : ''; }); }
+function _mailTplSend_(to, key, vars) {
+  var t = _tplAll_();
+  var v = {}; for (var k in vars) v[k] = vars[k];
+  v.foot = t.foot || ''; v.vision = t.vision ? ('\n\n' + t.vision) : '';
+  _mailTo_(to, _render_(t[key + '_subject'] || '', v), _render_(t[key + '_body'] || '', v));
+}
+// #26 변경 항목 diff. items=[['항목', old, new], ...]. new==null이면 미변경으로 간주(건너뜀).
+function _changesText_(items) {
+  var L = [];
+  items.forEach(function (it) {
+    if (it[2] == null) return;
+    var o = String(it[1] == null ? '' : it[1]), nw = String(it[2]);
+    if (o !== nw) L.push('▸ ' + it[0] + ': ' + (o || '(없음)') + ' → ' + (nw || '(없음)'));
+  });
+  return L.length ? ('\n\n[변경된 항목]\n' + L.join('\n')) : '';
+}
+// 관리자: 메일 템플릿 조회/저장
+function _mailTplGet_() { return _json_({ ok: true, tpl: _tplAll_(), defaults: MAIL_TPL_DEFAULT, keys: Object.keys(MAIL_TPL_DEFAULT) }); }
+function _mailTplSet_(body) {
+  var t = body.tpl || {}, clean = {};
+  for (var k in MAIL_TPL_DEFAULT) if (t[k] != null) clean[k] = String(t[k]);
+  PropertiesService.getScriptProperties().setProperty('MAIL_TPL', JSON.stringify(clean));
+  return _json_({ ok: true });
+}
 // 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
 function _nameTokens_(t) {
   return String(t || '').split(/[^가-힣A-Za-z]+/).filter(function (x) {
@@ -134,8 +181,10 @@ function doPost(e) {
     var H = sheet.getRange(1, 1, 1, width).getValues()[0];
     var action = body.action || 'submit';
     // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신 (PIN 필요)
-    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember') {
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet') {
       if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
+      if (action === 'mailTplGet') return _mailTplGet_();
+      if (action === 'mailTplSet') return _mailTplSet_(body);
       H = _ensureAdminCols_(sheet, H);
       width = H.length;
       var acol = _colMap_(H);
@@ -208,13 +257,7 @@ function _submit_(body, sheet, col, width) {
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, width).setValues(rows);
   // #18 신청 결과 확인 이메일 — 프론트가 보낸 '입금 안내 문구'(복사 버튼과 동일 항목별 형식) 사용.
   var guide = body.guideText || ('총 등록 금액: ' + groupTotal.toLocaleString() + '원\n입금 계좌: 우리은행 1005803168121 주님의 교회');
-  _mailTo_(body.email, '[2026 전교인 리트릿] 등록 신청이 접수되었습니다 🙏',
-    '샬롬! ' + (leader || (members[0] && members[0].name) || '') + '님,\n'
-    + '2026 전교인 리트릿(7/21~23, 델피노 리조트)에 함께해 주셔서 진심으로 감사합니다.\n'
-    + '아래 내용으로 등록 신청이 정상 접수되었습니다. (접수번호 ' + gid + ')\n\n'
-    + guide
-    + '\n\n입금까지 완료되어야 등록이 최종 확정됩니다. 위 항목대로 입금 부탁드립니다.'
-    + MAIL_FOOT);
+  _mailTplSend_(body.email, 'submit', { name: (leader || (members[0] && members[0].name) || ''), gid: gid, guide: guide });
   return _json_({ ok: true, groupId: gid, rows: rows.length, total: groupTotal });
 }
 
@@ -301,11 +344,17 @@ function _update_(body, sheet, H, col, width) {
     sheet.getRange(rowNum, 1, 1, width).setValues([nr]); // 구버전 열 없으면 덮어쓰기 폴백
   }
   var newTotal = _recalcGroupFull_(sheet, H, col, width, gid);
-  _mailTo_(col.email >= 0 ? nr[col.email] : '', '[2026 전교인 리트릿] 신청 내용이 수정되었습니다 🙏',
-    '샬롬! ' + (body.name || '') + '님,\n신청 내용이 정상적으로 수정되었습니다. 변경된 최종 내역을 안내드립니다.\n\n'
-    + _groupSummary_(sheet, col, width, gid)
-    + '\n\n변경 후 금액 기준으로 입금 부탁드리며, 입금까지 완료되어야 등록이 확정됩니다.'
-    + MAIL_FOOT);
+  var chg = _changesText_([ // #26 무엇 → 무엇으로 바뀌었는지
+    ['성별', _gv_(row, col.gender), f.gender],
+    ['연락처', _gv_(row, col.contact), f.contact],
+    ['이메일', _gv_(row, col.email), f.email],
+    ['캠퍼스', _gv_(row, col.campus), f.campus],
+    ['부서', _gv_(row, col.dept), f.deptLabel],
+    ['버스', _gv_(row, col.bus).indexOf('버스') >= 0 ? '신청' : '자차', f.bus == null ? null : (f.bus ? '신청' : '자차')],
+    ['설악산뷰', _gv_(row, col.seorak).indexOf('원합니다') >= 0 ? '신청' : '미신청', f.seorak == null ? null : (f.seorak ? '신청' : '미신청')],
+    ['문의', _gv_(row, col.inquiry), f.inquiry],
+  ]);
+  _mailTplSend_(col.email >= 0 ? nr[col.email] : '', 'update', { name: body.name || '', summary: _groupSummary_(sheet, col, width, gid), changes: chg });
   return _json_({ ok: true, groupTotal: newTotal });
 }
 
@@ -467,11 +516,7 @@ function _memberAdd_(body, sheet, H, col, width) {
   set(col.route, '앱추가'); set(col.gid, gid);
   sheet.getRange(n + 1, 1, 1, width).setValues([row]);
   var total = _recalcGroupFull_(sheet, H, col, width, gid);
-  _mailTo_(_gv_(t, col.email), '[2026 전교인 리트릿] 그룹에 구성원이 추가되었습니다 🙏',
-    '샬롬! ' + (m.name || '').trim() + '님이 그룹 신청에 추가되었습니다. 변경된 최종 내역을 안내드립니다.\n\n'
-    + _groupSummary_(sheet, col, width, gid)
-    + '\n\n변경 후 금액 기준으로 입금 부탁드립니다.'
-    + MAIL_FOOT);
+  _mailTplSend_(_gv_(t, col.email), 'add', { name: (m.name || '').trim(), summary: _groupSummary_(sheet, col, width, gid) });
   return _json_({ ok: true, groupTotal: total });
 }
 
@@ -489,11 +534,14 @@ function _memberDelete_(body, sheet, H, col, width) {
   } else {
     sheet.deleteRow(rowNum); // 구버전 열 없으면 폴백
   }
+  // #29 대표자를 삭제한 경우: 남은 구성원 중 지정된 새 대표자로 그룹 대표자 일괄 갱신(재계산이 반영)
+  if (body.newRep && col.rep >= 0) {
+    var nn = sheet.getLastRow(), v2 = sheet.getRange(1, 1, nn, width).getValues();
+    for (var r2 = 1; r2 < nn; r2++) if (_gv_(v2[r2], col.gid) === gid && !_isVoid_(_gv_(v2[r2], col.ver))) sheet.getRange(r2 + 1, col.rep + 1).setValue(body.newRep);
+  }
   var total = _recalcGroupFull_(sheet, H, col, width, gid);
-  _mailTo_(delEmail, '[2026 전교인 리트릿] 구성원 등록이 취소되었습니다',
-    '샬롬! ' + (body.name || '') + '님의 등록 신청이 취소되어 그룹에서 제외되었습니다.\n혹시 착오가 있으시면 "내 신청 조회·수정" 또는 문의로 알려주세요.\n\n'
-    + (total > 0 ? '[남은 그룹 최종 내역]\n' + _groupSummary_(sheet, col, width, gid).replace(/^\[최종 등록 내역\]\n/, '') : '')
-    + MAIL_FOOT);
+  var summ = total > 0 ? ('[남은 그룹 최종 내역]\n' + _groupSummary_(sheet, col, width, gid).replace(/^\[최종 등록 내역\]\n/, '')) : '본 신청은 취소 처리되었습니다.';
+  _mailTplSend_(delEmail, 'delete', { name: body.name || '', summary: summ });
   return _json_({ ok: true, groupTotal: total });
 }
 
@@ -502,17 +550,43 @@ function _groupSet_(body, sheet, H, col, width) {
   var gid = String(body.gid || '');
   var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
   if (!_verifyGroupAccess_(vals, col, gid, body)) return _json_({ ok: false, error: '권한 확인 실패(연락처/PIN)' });
-  var gEmail = ''; for (var gi = 1; gi < vals.length; gi++) if (_gv_(vals[gi], col.gid) === gid && !_isVoid_(_gv_(vals[gi], col.ver))) { gEmail = _gv_(vals[gi], col.email); break; }
+  // 변경 전 값(메일 diff용) — 첫 live 행 기준
+  var gEmail = '', oldRoom = '', oldOcc = '', oldSeo = '';
+  for (var gi = 1; gi < vals.length; gi++) if (_gv_(vals[gi], col.gid) === gid && !_isVoid_(_gv_(vals[gi], col.ver))) {
+    gEmail = _gv_(vals[gi], col.email);
+    oldRoom = _gv_(vals[gi], col.room).split(' (')[0];
+    oldOcc = _gv_(vals[gi], col.occ);
+    oldSeo = _gv_(vals[gi], col.seorak).indexOf('원합니다') >= 0 ? '신청' : '미신청';
+    break;
+  }
   var override = {};
   if (body.roomLabel != null) override.roomLabel = body.roomLabel;
   if (body.occLabel != null) override.occLabel = body.occLabel;
   if (typeof body.seorak === 'boolean') override.seorak = body.seorak; // #11 설악 그룹 공통
+  // #27 버전관리: 기존 live 행을 새 행(변경 적용·새 타임스탬프)으로 복제하고 기존 행은 '구' 표시
+  if (col.ver >= 0) {
+    var liveIdx = []; for (var r = 1; r < n; r++) if (_gv_(vals[r], col.gid) === gid && !_isVoid_(_gv_(vals[r], col.ver))) liveIdx.push(r);
+    var newRows = liveIdx.map(function (r) {
+      var nr = vals[r].slice();
+      nr[col.ts] = new Date(); nr[col.ver] = '';
+      if (override.roomLabel != null) nr[col.room] = override.roomLabel;
+      if (override.occLabel != null) nr[col.occ] = override.occLabel;
+      if (typeof override.seorak === 'boolean') nr[col.seorak] = override.seorak ? SEORAK_YES : '';
+      if (col.route >= 0) nr[col.route] = '앱수정';
+      if (col.note >= 0) nr[col.note] = '객실/인원/설악 저장 ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm');
+      return nr;
+    });
+    liveIdx.forEach(function (r) { sheet.getRange(r + 1, col.ver + 1).setValue('구'); });
+    if (newRows.length) sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, width).setValues(newRows);
+  }
   var total = _recalcGroupFull_(sheet, H, col, width, gid, override);
-  _mailTo_(gEmail, '[2026 전교인 리트릿] 그룹 설정이 변경되었습니다 🙏',
-    '샬롬! 그룹의 객실/투숙 인원/설악산뷰 설정이 변경되었습니다. 변경된 최종 내역을 안내드립니다.\n\n'
-    + _groupSummary_(sheet, col, width, gid)
-    + '\n\n변경 후 금액 기준으로 입금 부탁드립니다.'
-    + MAIL_FOOT);
+  var occDisp = function (s) { if (/인원무관/.test(s)) return '인원 상관없음(추후결정)'; if (/나머지는 교회에서 배정/.test(s)) return '추후 결정'; var m = String(s).match(/(\d)인/); return m ? (m[1] + '인') : String(s).split(':')[0]; };
+  var chg = _changesText_([ // #26
+    ['객실', oldRoom, override.roomLabel != null ? String(override.roomLabel).split(' (')[0] : null],
+    ['투숙 인원', occDisp(oldOcc), override.occLabel != null ? occDisp(override.occLabel) : null],
+    ['설악산뷰', oldSeo, typeof override.seorak === 'boolean' ? (override.seorak ? '신청' : '미신청') : null],
+  ]);
+  _mailTplSend_(gEmail, 'groupset', { summary: _groupSummary_(sheet, col, width, gid), changes: chg });
   return _json_({ ok: true, groupTotal: total });
 }
 

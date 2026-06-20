@@ -1550,6 +1550,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
   const [confirmDel, setConfirmDel] = useState(null) // 삭제 확인 대상 {row, name}
+  const [repPick, setRepPick] = useState('') // #29 대표자 삭제 시 새 대표자
 
   const occLabelFor = (n) => (OCCUPANCY.find((o) => o.people === n || (n >= 7 && o.people === 8)) || OCCUPANCY[0]).label
   const post = (p) => fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...p, ...auth }) }).then((r) => r.json())
@@ -1563,10 +1564,10 @@ function GroupEditor({ members, auth, onRefresh, title }) {
     const j = await post({ action: 'groupSet', gid, roomLabel, occLabel, seorak: seorakAll })
     setBusy(''); setMsg(j.ok ? '✓ 저장되었습니다' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
   }
-  const delMember = async (row, nm) => {
+  const delMember = async (row, nm, newRep) => {
     if (members.length <= 1) { setMsg('마지막 1명은 삭제할 수 없습니다.'); return }
     setBusy('d' + row); setMsg('')
-    const j = await post({ action: 'memberDelete', gid, row, name: nm })
+    const j = await post({ action: 'memberDelete', gid, row, name: nm, ...(newRep ? { newRep } : {}) })
     setBusy('')
     if (j.ok) { if (occStatus === 'confirmed') setOccSel(occLabelFor(Math.max(1, members.length - 1))); onRefresh && onRefresh() } else setMsg('오류: ' + (j.error || ''))
   }
@@ -1635,7 +1636,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         </button>
       </Field>
       <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#191f28] hover:bg-black text-white font-bold text-[13px] mb-1">
-        {busy === 'group' ? '저장 중…' : '객실/투숙/설악산뷰 저장'}
+        {busy === 'group' ? '저장 중…' : '객실/인원/설악산뷰 저장'}
       </button>
       {msg && <p className="text-[12px] text-[#1b64da] font-semibold my-2">{msg}</p>}
 
@@ -1663,18 +1664,33 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#fff5f5] text-[#f04452] border-2 border-dashed border-[#f04452]/40 hover:bg-[#ffecec] font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '+ 구성원 추가'}</button>
       </div>
 
-      {confirmDel && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setConfirmDel(null)}>
-          <div className="bg-white w-full max-w-[400px] rounded-2xl p-5 animate-slide-up sm:animate-none" onClick={(e) => e.stopPropagation()}>
-            <div className="text-[15px] font-bold text-[#191f28] mb-2">구성원 삭제</div>
-            <p className="text-[13px] text-[#4e5968] leading-relaxed mb-4"><b className="text-[#191f28]">{confirmDel.name}</b>님의 등록 신청을 취소하고, 그룹에서 삭제합니다.</p>
-            <div className="flex gap-2">
-              <button onClick={() => setConfirmDel(null)} className="flex-1 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">취소</button>
-              <button onClick={() => { const d = confirmDel; setConfirmDel(null); delMember(d.row, d.name) }} disabled={busy.indexOf('d') === 0} className="flex-1 py-3 rounded-xl bg-[#f04452] text-white font-bold text-[14px]">확인</button>
+      {confirmDel && (() => {
+        const isRepDel = confirmDel.name === (cur.rep || '') // #29 대표자를 삭제하는가
+        const remaining = members.filter((m) => m.name !== confirmDel.name)
+        const blocked = isRepDel && !repPick
+        const close = () => { setConfirmDel(null); setRepPick('') }
+        return (
+          <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={close}>
+            <div className="bg-white w-full max-w-[400px] rounded-2xl p-5 animate-slide-up sm:animate-none" onClick={(e) => e.stopPropagation()}>
+              <div className="text-[15px] font-bold text-[#191f28] mb-2">구성원 삭제</div>
+              <p className="text-[13px] text-[#4e5968] leading-relaxed mb-4"><b className="text-[#191f28]">{confirmDel.name}</b>님의 등록 신청을 취소하고, 그룹에서 삭제합니다.</p>
+              {isRepDel && (
+                <div className="mb-4 p-3 rounded-xl bg-[#fff4f4] border border-[#ffd9dc]">
+                  <p className="text-[13px] font-bold text-[#f04452] mb-2">⚠️ 대표자({confirmDel.name})를 삭제합니다.<br />남은 구성원 중 새 대표자를 선택해 주세요.</p>
+                  <select value={repPick} onChange={(e) => setRepPick(e.target.value)} className={inputCls}>
+                    <option value="">새 대표자 선택…</option>
+                    {remaining.map((m) => <option key={m.row} value={m.name}>{m.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={close} className="flex-1 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">취소</button>
+                <button onClick={() => { const d = confirmDel; const nr = isRepDel ? repPick : undefined; close(); delMember(d.row, d.name, nr) }} disabled={busy.indexOf('d') === 0 || blocked} className={`flex-1 py-3 rounded-xl text-white font-bold text-[14px] ${blocked ? 'bg-[#f0445280]' : 'bg-[#f04452]'}`}>확인</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </Card>
   )
 }
@@ -2010,6 +2026,11 @@ function AdminApp() {
   const [confirmBox, setConfirmBox] = useState(null) // 공용 확인 다이얼로그 {title, lines, onOk, okLabel}
   const ask = (title, lines, onOk, okLabel = '진행') => setConfirmBox({ title, lines, onOk, okLabel })
   const [showGuide, setShowGuide] = useState(false) // 인앱 사용법 가이드
+  const [mailTpl, setMailTpl] = useState(null) // #26/#30 메일 템플릿(관리자 편집)
+  const [mailDef, setMailDef] = useState({}) // 기본값(초기화용)
+  const [mailMsg, setMailMsg] = useState('')
+  const loadMailTpl = async () => { setMailMsg('불러오는 중…'); const j = await post({ action: 'mailTplGet', pin }); if (j.ok) { setMailTpl(j.tpl); setMailDef(j.defaults || {}); setMailMsg('') } else setMailMsg('오류: ' + (j.error || '')) }
+  const saveMailTpl = async () => { setMailMsg('저장 중…'); const j = await post({ action: 'mailTplSet', pin, tpl: mailTpl }); setMailMsg(j.ok ? '✓ 저장되었습니다 (이후 발송부터 적용)' : '오류: ' + (j.error || '')) }
   const [undoStack, setUndoStack] = useState([]) // 실행 취소: 방/입금 컬럼 작업의 직전 값 스냅샷
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -2342,12 +2363,12 @@ function AdminApp() {
     </div>
   )
 
-  const TAB_ORDER = ['요약', '정리안', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단']
-  const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스' }
+  const TAB_ORDER = ['요약', '정리안', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단', '메일문구']
+  const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스', 메일문구: '✉️ 메일문구' }
   // #11 워크플로우 단계 번호(① 그룹정리 → ② 같은방 → ③ 방배정 → ④ 입금) + 처리할 건수 배지
   const TAB_STEP = { 그룹정리: 1, 요청조합: 2, 방배정: 3, 리마인드: 4 }
   const tabCount = (t) => t === '리마인드' ? m.unpaid.length : t === '방배정' ? m.unassigned.length : t === '그룹정리' ? m.checkGroups.length : 0
-  const goTab = (t) => { setTab(t); setMergeSel({}) } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
+  const goTab = (t) => { setTab(t); setMergeSel({}); if (t === '메일문구' && !mailTpl) loadMailTpl() } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
 
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12">
@@ -3189,6 +3210,57 @@ function AdminApp() {
                 </div>
               )
             })}
+          </div>
+        )}
+        {tab === '메일문구' && (
+          <div className="space-y-3">
+            <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+              <p className="text-[12px] text-[#4e5968] leading-relaxed">성도에게 자동 발송되는 메일 문구를 직접 수정합니다. <b>저장하면 이후 발송분부터</b> 적용돼요. 치환자는 발송 시 실제 값으로 바뀝니다:</p>
+              <p className="text-[11px] text-[#5f6b7a] mt-2 leading-relaxed">
+                <code className="bg-[#f2f4f6] px-1 rounded">{'{name}'}</code> 이름 · <code className="bg-[#f2f4f6] px-1 rounded">{'{gid}'}</code> 접수번호 · <code className="bg-[#f2f4f6] px-1 rounded">{'{guide}'}</code> 항목별 입금안내 · <code className="bg-[#f2f4f6] px-1 rounded">{'{summary}'}</code> 최종 등록내역 · <code className="bg-[#f2f4f6] px-1 rounded">{'{changes}'}</code> 변경된 항목 · <code className="bg-[#f2f4f6] px-1 rounded">{'{vision}'}</code> 비전문구 · <code className="bg-[#f2f4f6] px-1 rounded">{'{foot}'}</code> 공통마무리
+              </p>
+            </div>
+            {!mailTpl ? (
+              <button onClick={loadMailTpl} className="w-full py-3 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">메일 문구 불러오기</button>
+            ) : (
+              <>
+                {(() => {
+                  const set = (k, v) => setMailTpl({ ...mailTpl, [k]: v })
+                  const Reset = ({ k }) => mailDef[k] != null && mailTpl[k] !== mailDef[k] ? <button onClick={() => set(k, mailDef[k])} className="text-[11px] font-bold text-[#f04452]">기본값으로</button> : null
+                  const Body = ({ k, rows = 6 }) => <textarea value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} rows={rows} className={inputCls + ' resize-y text-[12px] leading-relaxed font-mono'} />
+                  const Subj = ({ k }) => <input value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} className={inputCls + ' text-[13px] mb-2'} />
+                  const MAILS = [['submit', '접수 메일 (신규 신청)'], ['update', '수정 메일 (본인 정보)'], ['add', '구성원 추가 메일'], ['delete', '구성원 취소 메일'], ['groupset', '그룹설정 변경 메일 (객실/인원/설악)']]
+                  return (
+                    <>
+                      <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+                        <div className="flex items-center justify-between mb-1"><div className="text-[13px] font-bold text-[#191f28]">✨ 비전·영적 기대 문구 (#30)</div><Reset k="vision" /></div>
+                        <p className="text-[11px] text-[#5f6b7a] mb-2">비워두면 안 나오고, 적으면 모든 안내 메일 끝(마무리 위)에 들어갑니다.</p>
+                        <Body k="vision" rows={4} />
+                      </div>
+                      <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+                        <div className="flex items-center justify-between mb-1"><div className="text-[13px] font-bold text-[#191f28]">공통 마무리 문구</div><Reset k="foot" /></div>
+                        <Body k="foot" rows={4} />
+                      </div>
+                      {MAILS.map(([k, label]) => (
+                        <div key={k} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
+                          <div className="flex items-center justify-between mb-2"><div className="text-[13px] font-bold text-[#191f28]">{label}</div><Reset k={k + '_body'} /></div>
+                          <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">제목</div>
+                          <Subj k={k + '_subject'} />
+                          <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">본문</div>
+                          <Body k={k + '_body'} rows={7} />
+                        </div>
+                      ))}
+                      <div className="sticky bottom-2 bg-white rounded-2xl border border-[#e5e8eb] shadow-lg p-3 flex items-center gap-2">
+                        <button onClick={saveMailTpl} className="flex-1 py-3 rounded-xl bg-[#191f28] text-white font-bold text-[14px]">메일 문구 저장</button>
+                        <button onClick={loadMailTpl} className="px-4 py-3 rounded-xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px]">되돌리기</button>
+                      </div>
+                      {mailMsg && <p className="text-[12px] text-[#1b64da] font-semibold text-center">{mailMsg}</p>}
+                    </>
+                  )
+                })()}
+              </>
+            )}
+            {mailMsg && !mailTpl && <p className="text-[12px] text-[#1b64da] font-semibold text-center">{mailMsg}</p>}
           </div>
         )}
       </div>

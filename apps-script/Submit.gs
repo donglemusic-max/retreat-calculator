@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv12-voidhide'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv13-partialfix'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -138,8 +138,11 @@ function _submit_(body, sheet, col, width) {
   var occLabel = body.occLabel || '';
   var seorakOn = !!body.seorak;
   var isGrp = isGroupOcc_(occLabel);
-  var commonFee = isGrp ? (roomAdd_(roomLabel) + occAdd_(occLabel)) : 0;
-  var pRoom = function () { return isGrp ? 0 : roomIndiv_(roomLabel); };
+  var isPartial = /나머지는 교회에서 배정/.test(occLabel); // OCC_PARTIAL: 객실 그룹가 1회·투숙(그룹)비 0
+  var grp = isGrp || isPartial;
+  var commonFee = grp ? (roomAdd_(roomLabel) + (isGrp ? occAdd_(occLabel) : 0)) : 0;
+  var pRoom = function () { return grp ? 0 : roomIndiv_(roomLabel); };
+  var appType = isGrp ? '그룹' : (isPartial ? '부분' : '개인');
   var groupTotal = commonFee;
   members.forEach(function (m) {
     groupTotal += deptFee_(m.deptLabel || '') + pRoom() + (m.bus ? BUS_FEE : 0) + (seorakOn ? SEORAK_FEE : 0);
@@ -161,7 +164,7 @@ function _submit_(body, sheet, col, width) {
     set(col.pay, payer); set(col.inquiry, body.inquiry || '');
     set(col.route, '앱'); set(col.gid, gid);
     set(col.grep, isGroupMode ? (leader || (members[0] && members[0].name) || '') : (m.name || ''));
-    set(col.gn, members.length);
+    set(col.gn, members.length); set(col.type, appType);
     set(col.ifee, deptFee_(deptLabel)); set(col.iroom, pRoom());
     set(col.mbus, m.bus ? BUS_FEE : 0); set(col.mseo, seorakOn ? SEORAK_FEE : 0);
     set(col.common, idx === repIdx ? commonFee : 0); set(col.gtotal, idx === repIdx ? groupTotal : 0);

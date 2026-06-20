@@ -219,6 +219,79 @@ for (const room of ROOMS) for (const count of [2, 3, 4]) {
   check('이메일 틀리면 조회 0', lookup('대표', 'wrong@x.com').length === 0)
 }
 
+// ════════════ 8) 이미 제출한 사람: 기존 그룹 조회 → 수정 → 재조회 ════════════
+{
+  SHEET = []; GIDC = 0
+  // 며칠 전 제출된 그룹(소노벨스위트 4인) 가정
+  const gid = submit({ mode: '그룹', members: [{ name: '아빠' }, { name: '엄마' }, { name: '아들' }, { name: '딸' }].map((m, i) => ({ ...m, dept: i < 2 ? '장년부' : '중고등부', bus: 0 })), roomLabel: ROOMS[1].label, occLabel: OCC[4].label, email: 'home@x.com', leader: '아빠', seorak: 0 })
+  enrich()
+  const before = recalc(SHEET, gid).total
+  // 엄마가 버스 추가로 수정
+  update('엄마', 'home@x.com', { bus: true })
+  const look = lookup('아빠', 'home@x.com')
+  check('기존그룹 수정후 조회 4명(구제외)', look.length === 4, `len=${look.length}`)
+  check('기존그룹 수정후 엄마 버스 반영', look.find((r) => r.name === '엄마').bus === true)
+  check('기존그룹 수정후 총액 +버스', recalc(SHEET, gid).total === before + BUS, `${before}→${recalc(SHEET, gid).total}`)
+  check('기존그룹 구행 1개 누적', SHEET.filter((r) => r.name === '엄마' && r.ver === '구').length === 1)
+}
+
+// ════════════ 9) 재-enrich 멱등성: 두 번 돌려도 동일 ════════════
+{
+  SHEET = []; GIDC = 0
+  submit({ mode: '그룹', members: [{ name: 'I0' }, { name: 'I1' }, { name: 'I2' }].map((m) => ({ ...m, dept: '장년부' })), roomLabel: ROOMS[2].label, occLabel: OCC[6].label, email: 'i@x.com', leader: 'I0', seorak: 1 })
+  const e1 = enrich()
+  const e2 = enrich()
+  const gid = SHEET[0].gid
+  check('enrich 멱등(총액 동일)', e1[gid].total === e2[gid].total, `${e1[gid].total} vs ${e2[gid].total}`)
+  check('enrich 멱등(인원 동일)', e1[gid].count === e2[gid].count)
+  // 수정 후에도 재-enrich 안정
+  update('I1', 'i@x.com', { dept: '청년부' })
+  const e3 = enrich(); const e4 = enrich()
+  check('수정후 enrich 멱등', e3[gid].total === e4[gid].total && e3[gid].count === 3, `cnt=${e3[gid].count}`)
+}
+
+// ════════════ 10) 다중 수정: '구' 여러 개 누적돼도 최신 1건만 ════════════
+{
+  SHEET = []; GIDC = 0
+  submit({ mode: '개인', members: [{ name: '여러번', dept: '유년부', bus: 0 }], roomLabel: ROOMS[0].label, occLabel: OCC_CHURCH, email: 'multi@x.com', leader: '여러번', seorak: 0 })
+  enrich()
+  update('여러번', 'multi@x.com', { dept: '초등부' })
+  update('여러번', 'multi@x.com', { dept: '중고등부' })
+  update('여러번', 'multi@x.com', { dept: '장년부' })
+  const r = lookup('여러번', 'multi@x.com')
+  check('다중수정 조회 1건', r.length === 1, `len=${r.length}`)
+  check('다중수정 최신 부서', r[0].dept === '장년부')
+  check('구 행 3개 누적(보존)', SHEET.filter((x) => x.ver === '구').length === 3)
+}
+
+// ════════════ 11) 원본폼 '구' 행 혼재(기존 데이터): 조회·집계 제외 ════════════
+{
+  SHEET = []; GIDC = 0
+  const gid = 'OLD1'
+  // 원본 구글폼 구버전 행 2개 + 유효행 3개 (같은 그룹)
+  SHEET.push({ gid, name: '구버전킴', email: 'old@x.com', dept: '장년부', roomLabel: ROOMS[2].label, occLabel: OCC[5].label, bus: false, seorak: false, ver: '구', appType: '', rep: '대표킴' })
+  SHEET.push({ gid, name: '구버전리', email: 'old@x.com', dept: '장년부', roomLabel: ROOMS[2].label, occLabel: OCC[5].label, bus: false, seorak: false, ver: '구', appType: '', rep: '대표킴' });
+  ['대표킴', '멤버1', '멤버2'].forEach((nm) => SHEET.push({ gid, name: nm, email: 'old@x.com', dept: '장년부', roomLabel: ROOMS[2].label, occLabel: OCC[5].label, bus: false, seorak: false, ver: '', appType: '', rep: '대표킴' }))
+  const look = lookup('대표킴', 'old@x.com')
+  check('원본 구행 혼재: 조회 유효 3명만', look.length === 3, `len=${look.length}`)
+  check('원본 구행 혼재: 구버전 이름 안나옴', !look.some((r) => r.name.indexOf('구버전') >= 0))
+  const rc = recalc(SHEET, gid)
+  check('원본 구행 혼재: 집계 인원 3', rc.count === 3, `count=${rc.count}`)
+}
+
+// ════════════ 12) 신청유형 없는 기존 행(구 _submit_) 수정·삭제 정상 ════════════
+{
+  SHEET = []; GIDC = 0
+  const gid = 'NOTYPE'
+  // appType '' 인 기존 부분그룹 행(occ=OCC_PARTIAL, 구 _submit_은 개인가 저장했었음)
+  ;['부분0', '부분1'].forEach((nm) => SHEET.push({ gid, name: nm, email: 'nt@x.com', dept: '장년부', roomLabel: ROOMS[2].label, occLabel: OCC_PARTIAL, bus: false, seorak: false, ver: '', appType: '', rep: '부분0' }))
+  const rc = recalc(SHEET, gid) // occ 마커로 부분 인식해야
+  const expect = roomAdd(ROOMS[2].label) + 0 + 278000 * 2 // 객실그룹가 + 투숙0 + 등록2
+  check('신청유형없는 부분행 recalc=그룹가', rc.total === expect && rc.appType === '부분', `rc=${rc.total} exp=${expect} type=${rc.appType}`)
+  del('부분1', 'nt@x.com')
+  check('신청유형없는 행 삭제 후 조회 1명', lookup('부분0', 'nt@x.com').length === 1)
+}
+
 // ── 결과 ──
 console.log(`\n시뮬레이션: PASS ${PASS} / FAIL ${FAIL}`)
 if (fails.length) { console.log('\n실패 케이스:'); fails.slice(0, 40).forEach((f) => console.log(' ✗ ' + f)); if (fails.length > 40) console.log(` …외 ${fails.length - 40}건`) }

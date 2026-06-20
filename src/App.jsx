@@ -36,6 +36,8 @@ const OCCUPANCY = [
 ]
 // 교회 배정(가족/그룹 미신청) 정본 문자열
 const OCC_CHURCH = '가족/그룹을 따로 신청하지 않고 교회에서 정해주시는 대로 신청합니다. 추가 비용 없음'
+// 부분 그룹: 일부만 함께, 나머지는 교회 배정. 투숙(그룹)비는 추후 결정, 객실선택은 그룹비용으로 처리(#7·#8)
+const OCC_PARTIAL = '부분 그룹 신청 (나머지는 교회에서 배정, 추가비용 추후 결정)'
 const BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)'
 const BUS_NO = '자차를 이용합니다'
 const SEORAK_YES = '설악산 뷰 원합니다.'
@@ -609,6 +611,7 @@ function GroupMode() {
   const [seorak, setSeorak] = useState(false)
   const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
   const [busSeorakBy, setBusSeorakBy] = useState('leader') // split일 때만: 'leader'(대표자 모아서) | 'each'(개인별)
+  const [partial, setPartial] = useState(false) // 부분그룹: 나머지는 교회 배정(투숙비 추후결정)
   const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
   const [campus, setCampus] = useState('')
@@ -641,7 +644,8 @@ function GroupMode() {
 
   const submission = {
     mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
-    roomLabel: room.label, occLabel: effOcc.formLabel, seorak, depositMode, roster,
+    roomLabel: room.label, occLabel: partial ? OCC_PARTIAL : effOcc.formLabel, seorak, depositMode,
+    roster: partial ? roster + ' [부분그룹·나머지 교회배정]' : roster,
     members: members.map((m) => ({ name: m.name.trim(), gender: m.gender, deptLabel: DEPTS.find((d) => d.name === m.dept).label, bus: m.bus })),
   }
 
@@ -650,7 +654,7 @@ function GroupMode() {
     const baseSum = members.reduce((s, m) => s + memberFee(m), 0)
     const busCount = members.filter((m) => m.bus).length
     const roomGroup = room.group
-    const occFee = effOcc.fee
+    const occFee = partial ? 0 : effOcc.fee // 부분그룹: 투숙(그룹)비 추후결정 → 지금은 0
     const busTotal = busCount * BUS_FEE
     const seorakTotal = seorak ? count * SEORAK_FEE : 0
     const total = baseSum + roomGroup + occFee + busTotal + seorakTotal
@@ -663,7 +667,7 @@ function GroupMode() {
     } else {
       lines.push({ cat: '등록비', payer: who, amt: baseSum, note: `${count}명 합산` })
     }
-    if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: room.name })
+    if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: partial ? `${room.name} · 그룹 기준` : room.name })
     if (occFee > 0) lines.push({ cat: '그룹', payer: who, amt: occFee, note: `${effOcc.label} 투숙` })
     // 버스·설악: split 모드에서 '개인별'이면 각자 본인 이름으로, 아니면 대표자가 모아서
     const byEach = depositMode === 'split' && busSeorakBy === 'each'
@@ -677,7 +681,7 @@ function GroupMode() {
     }
 
     return { total, perPerson: Math.round(total / count), lines, count, overMax: count > room.max }
-  }, [members, room, effOcc, count, seorak, depositMode, busSeorakBy, who])
+  }, [members, room, effOcc, count, seorak, depositMode, busSeorakBy, partial, who])
 
   const subtitle =
     depositMode === 'split'
@@ -805,42 +809,28 @@ function GroupMode() {
         </button>
       </Card>
 
-      <Card title="방 선택" help={HELP.room} helpTitle="객실 종류 안내">
-        <div className="space-y-2">
-          {ROOMS.map((r, i) => (
-            <OptionRow
-              key={r.name}
-              active={roomIdx === i}
-              onClick={() => setRoomIdx(i)}
-              title={r.name}
-              sub={r.desc}
-              right={r.group > 0 ? `+${won(r.group)}` : '추가비용 없음'}
-            />
-          ))}
-        </div>
-        {calc.overMax && (
-          <p className="text-[13px] text-[#f04452] font-bold mt-3">
-            구성원 {count}명이 선택한 방 최대 인원({room.max}명)을 초과합니다.
-          </p>
-        )}
-      </Card>
-
       <Card title="몇 분이 한 방을 쓰나요?" help={HELP.occupancy} helpTitle="투숙 인원 / 방배정 안내">
         <div className="bg-[#f2f8ff] rounded-2xl px-4 py-4 mb-3 flex items-center justify-between">
           <div>
-            <div className="text-[13px] text-[#4e5968] mb-0.5">현재 구성원 수 기준 자동 적용</div>
+            <div className="text-[13px] text-[#4e5968] mb-0.5">{partial ? '부분 그룹 신청' : '현재 구성원 수 기준 자동 적용'}</div>
             <div className="text-[17px] font-extrabold text-[#1b64da]">
-              {effOcc.label} 투숙
-              {effOcc.fee > 0
-                ? <span className="text-[14px] font-bold text-[#f04452] ml-2">+{won(effOcc.fee)}</span>
-                : <span className="text-[14px] font-bold text-[#15803d] ml-2">추가비용 없음</span>
-              }
+              {partial ? (
+                <>나머지는 교회 배정<span className="text-[14px] font-bold text-[#8b95a1] ml-2">추가비용 추후 결정</span></>
+              ) : (
+                <>
+                  {effOcc.label} 투숙
+                  {effOcc.fee > 0
+                    ? <span className="text-[14px] font-bold text-[#f04452] ml-2">+{won(effOcc.fee)}</span>
+                    : <span className="text-[14px] font-bold text-[#15803d] ml-2">추가비용 없음</span>
+                  }
+                </>
+              )}
             </div>
-            {occOverride != null && (
+            {!partial && occOverride != null && (
               <div className="text-[12px] text-[#8b95a1] mt-0.5">(수동 선택 중)</div>
             )}
           </div>
-          {occOverride != null && (
+          {!partial && occOverride != null && (
             <button
               onClick={() => { setOccOverride(null); setOccOpen(false) }}
               className="text-[12px] font-bold text-[#3182f6] min-w-[44px] min-h-[44px] flex items-center justify-end"
@@ -850,37 +840,85 @@ function GroupMode() {
           )}
         </div>
 
+        {/* #7 부분그룹 체크박스 */}
         <button
-          onClick={() => setOccOpen((v) => !v)}
-          className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-[#f9fafb] border border-[#e5e8eb] text-[13px] font-bold text-[#4e5968] min-h-[48px]"
+          onClick={() => setPartial((v) => !v)}
+          className={`w-full mb-3 flex items-start gap-2 text-left px-4 py-3 rounded-xl border transition-all ${partial ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'}`}
         >
-          <span>직접 선택하기</span>
-          <span className={`text-[#8b95a1] text-[12px] transition-transform ${occOpen ? 'rotate-180' : ''}`}>▼</span>
+          <span className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center text-[12px] font-bold shrink-0 ${partial ? 'bg-[#3182f6] text-white' : 'border border-[#c4c9d0] text-transparent'}`}>✓</span>
+          <span className="text-[13px] font-bold text-[#333d4b] leading-snug">
+            나머지 멤버는 교회에서 배정해주시면 좋겠습니다.
+            <span className="block text-[12px] font-normal text-[#8b95a1] mt-0.5">이 경우 추가금(그룹 투숙비)은 추후 결정됩니다.</span>
+          </span>
         </button>
 
-        {occOpen && (
-          <div className="mt-3">
-            <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
-              방에 실제로 투숙하는 인원에 따라 추가비용이 달라집니다. 7~8명이면 추가비용 없음.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {OCCUPANCY.map((o) => (
-                <button
-                  key={o.label}
-                  onClick={() => { setOccOverride(o.label); setOccOpen(false) }}
-                  className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${
-                    occOverride === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'
-                  }`}
-                >
-                  {o.label}<br />
-                  <span className="text-[13px] font-normal text-[#8b95a1]">{o.fee > 0 ? `+${o.fee/10000}만원` : '추가없음'}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed">
-              * 일부만 함께 쓰는 경우는 문의사항에 적어주세요.
-            </p>
-          </div>
+        {!partial && (
+          <>
+            <button
+              onClick={() => setOccOpen((v) => !v)}
+              className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-[#f9fafb] border border-[#e5e8eb] text-[13px] font-bold text-[#4e5968] min-h-[48px]"
+            >
+              <span>직접 선택하기</span>
+              <span className={`text-[#8b95a1] text-[12px] transition-transform ${occOpen ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+
+            {occOpen && (
+              <div className="mt-3">
+                <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+                  방에 실제로 투숙하는 인원에 따라 추가비용이 달라집니다. 7~8명이면 추가비용 없음.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {OCCUPANCY.map((o) => (
+                    <button
+                      key={o.label}
+                      onClick={() => { setOccOverride(o.label); setOccOpen(false) }}
+                      className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${
+                        occOverride === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'
+                      }`}
+                    >
+                      {o.label}<br />
+                      <span className="text-[13px] font-normal text-[#8b95a1]">{o.fee > 0 ? `+${o.fee/10000}만원` : '추가없음'}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed">
+                  * 일부만 함께 쓰는 경우는 위 체크박스를 이용하거나 문의사항에 적어주세요.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+        {partial && (
+          <p className="text-[13px] text-[#8b95a1] leading-relaxed">
+            나머지 인원은 교회에서 배정해드립니다. 투숙 인원에 따른 추가비용은 최종 방배정 후 결정됩니다.
+          </p>
+        )}
+      </Card>
+
+      <Card title="방 선택" help={HELP.room} helpTitle="객실 종류 안내">
+        <div className="space-y-2">
+          {ROOMS.map((r, i) => (
+            <OptionRow
+              key={r.name}
+              active={roomIdx === i}
+              onClick={() => setRoomIdx(i)}
+              title={r.name}
+              sub={r.desc}
+              right={partial
+                ? (r.indiv > 0 ? `1인 +${won(r.indiv)}` : '추가비용 없음')
+                : (r.group > 0 ? `+${won(r.group)}` : '추가비용 없음')}
+            />
+          ))}
+        </div>
+        {partial && (
+          <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed">
+            * 부분 그룹은 <b>1인 기준</b> 객실 추가비용을 참고로 보여드립니다. 입금 안내는 방(그룹) 기준으로 안내되며, 최종 방배정 후 조정될 수 있습니다.
+          </p>
+        )}
+        {calc.overMax && (
+          <p className="text-[13px] text-[#f04452] font-bold mt-3">
+            구성원 {count}명이 선택한 방 최대 인원({room.max}명)을 초과합니다.
+          </p>
         )}
       </Card>
 
@@ -1274,6 +1312,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const [roomName, setRoomName] = useState(reqRoomType(cur.roomLabel))
   const occInit = (() => { const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : (members.length || 8); return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
   const [occSel, setOccSel] = useState(occInit)
+  const [occStatus, setOccStatus] = useState(/인이 투숙/.test(cur.occLabel || '') ? 'confirmed' : 'pending') // #15 확정/미정
   const [add, setAdd] = useState({ name: '', gender: '', dept: DEPTS[0].name, bus: false })
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
@@ -1282,7 +1321,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const saveGroup = async () => {
     setBusy('group'); setMsg('')
     const roomLabel = ROOMS.find((r) => r.name === roomName).label
-    const occLabel = OCCUPANCY.find((o) => o.label === occSel).formLabel
+    const occLabel = occStatus === 'pending' ? OCC_PARTIAL : OCCUPANCY.find((o) => o.label === occSel).formLabel
     const j = await post({ action: 'groupSet', gid, roomLabel, occLabel })
     setBusy(''); setMsg(j.ok ? '✓ 객실/투숙 저장됨' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
   }
@@ -1310,9 +1349,26 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         </select>
       </Field>
       <Field label="투숙 인원 (방 크기)">
-        <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls}>
-          {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} {o.fee > 0 ? `(그룹 +${o.fee / 10000}만)` : '(추가없음)'}</option>)}
-        </select>
+        <div className="flex gap-2 mb-2">
+          {[['confirmed', '확정'], ['pending', '미정']].map(([v, lbl]) => (
+            <button key={v} onClick={() => setOccStatus(v)}
+              className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border ${occStatus === v ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+        {occStatus === 'confirmed' ? (
+          <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls}>
+            {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} {o.fee > 0 ? `(그룹 +${o.fee / 10000}만)` : '(추가없음)'}</option>)}
+          </select>
+        ) : (
+          <>
+            <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls} disabled>
+              {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} (추가비용 추후결정됨)</option>)}
+            </select>
+            <p className="text-[12px] text-[#8b95a1] mt-2 leading-relaxed">나머지 인원은 교회에서 배정해드립니다. 투숙 추가비용은 최종 방배정 후 결정됩니다.</p>
+          </>
+        )}
       </Field>
       <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#191f28] hover:bg-black text-white font-bold text-[13px] mb-1">
         {busy === 'group' ? '저장 중…' : '객실/투숙 저장'}

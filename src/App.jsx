@@ -1866,7 +1866,7 @@ const COST_EXAMPLES = [
       { label: '설악산 뷰', calc: '1 × 1명', amount: '1' },
       { label: '객실 선택비 (소노벨 스위트)', calc: '1 × 1명', amount: '1' },
     ],
-    total: '33.6만원', payNote: '본인 이름으로 항목별(등록비·버스비·설악산·객실선택)로 나눠 입금해요.',
+    total: '33.6만원', payNote: '본인 이름으로 항목별(등록비·버스비·설악산·객실선택)로 나누어 입금해 주세요.',
   },
   {
     tab: '4인', tab2: '가족', badgeText: '예시 2 · 4인 가족 등록', badgeBg: '#ecfdf5', badgeColor: '#047857',
@@ -1877,7 +1877,7 @@ const COST_EXAMPLES = [
       { label: '설악산 뷰', calc: '1 × 4명', amount: '4' },
       { label: '객실 선택비 (소노벨 스위트)', calc: '1 × 4명', amount: '4' },
     ],
-    total: '128.6만원', payNote: '가족 비용을 모아 대표자(예: 아빠 김바울) 한 사람 이름으로, 항목별로 묶어서 입금해요.',
+    total: '128.6만원', payNote: '가족 비용을 모아 대표자(예: 아빠 김바울) 한 분 이름으로, 항목별로 묶어 입금해 주세요.',
   },
   {
     tab: '셀·성도', tab2: '그룹', badgeText: '예시 3 · 셀·성도 모아 등록 (그룹)', badgeBg: '#eef2ff', badgeColor: '#4338ca',
@@ -1887,7 +1887,7 @@ const COST_EXAMPLES = [
       { label: '버스', calc: '3.8 × 5명', amount: '19.0' },
       { label: '객실 선택비 (소노캄 스위트 · 5인 한 방)', calc: '그룹당 1개', amount: '24' },
     ],
-    total: '182.0만원', payNote: '등록비·버스비는 1인당 비용을 모아 대표자 이름으로 항목별 입금. 객실 선택비는 방 하나당 비용이므로 대표자 이름으로 한 번만 입금해요.',
+    total: '182.0만원', payNote: '등록비·버스비는 1인당 비용을 모아 대표자 이름으로 항목별로 입금해 주세요. 객실 선택비는 방 하나당 비용이므로 대표자 이름으로 한 번만 입금해 주시면 됩니다.',
   },
   {
     tab: '부분', tab2: '등록', badgeText: '예시 4 · 부분 등록', badgeBg: '#fef2f2', badgeColor: '#b91c1c',
@@ -1897,7 +1897,7 @@ const COST_EXAMPLES = [
       { label: '버스', calc: '3.8 × 2명', amount: '7.6' },
       { label: '객실 선택비 (소노벨 스위트)', calc: '1 × 2명', amount: '2' },
     ],
-    total: '64.2만원', payNote: '방만 같이 쓰고 비용은 각자예요. 대표자 이름으로 항목별로 묶어 입금하면 됩니다.',
+    total: '64.2만원', payNote: '방만 함께 쓰고 비용은 각자 부담입니다. 대표자 이름으로 항목별로 묶어 입금해 주시면 됩니다.',
   },
 ]
 function CostExamples() {
@@ -1909,8 +1909,8 @@ function CostExamples() {
   return (
     <div style={{ fontFamily: "'Pretendard',-apple-system,sans-serif" }}>
       <div style={{ marginBottom: 22 }}>
-        <h2 style={{ margin: '0 0 8px', fontSize: 22, lineHeight: 1.3, fontWeight: 800, color: '#111827', letterSpacing: '-0.02em' }}>등록비는 이렇게 구성돼요</h2>
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#4b5563' }}>기본 등록비에 원하는 선택을 더하는 방식이에요. 아래 <strong style={{ color: '#1d4ed8' }}>내 상황과 비슷한 예시</strong>를 보면 한눈에 이해돼요. <span style={{ color: '#6b7280' }}>(단위: 만원)</span></p>
+        <h2 style={{ margin: '0 0 8px', fontSize: 22, lineHeight: 1.3, fontWeight: 800, color: '#111827', letterSpacing: '-0.02em' }}>등록비는 이렇게 구성됩니다</h2>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#4b5563' }}>기본 등록비에 원하시는 선택을 더하는 방식입니다. 아래에서 <strong style={{ color: '#1d4ed8' }}>상황과 비슷한 예시</strong>를 보시면 한눈에 이해하실 수 있습니다. <span style={{ color: '#6b7280' }}>(단위: 만원)</span></p>
       </div>
       <div style={card}>
         <div style={secLabel}>1 · 기본 등록비 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(부서별 · 1인당)</span></div>
@@ -1934,11 +1934,11 @@ function CostExamples() {
         </div>
         <div style={{ marginTop: 14, display: 'flex', gap: 9, alignItems: 'flex-start', background: '#eff6ff', borderRadius: 10, padding: '11px 13px' }}>
           <span style={{ flex: 'none', fontSize: 14 }}>💡</span>
-          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#1e40af' }}>셀·성도들이 <strong>한 방을 통째로</strong> 쓰는 그룹 신청이면, 객실비는 1인당이 아니라 <strong>방 하나당(그룹당)</strong>으로 계산돼요. (예: 소노캄 스위트 5인 한 방 = 24)</span>
+          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#1e40af' }}>셀·성도분들이 <strong>한 방을 통째로</strong> 쓰는 그룹 신청이시면, 객실비는 1인당이 아니라 <strong>방 하나당(그룹당)</strong>으로 계산됩니다. (예: 소노캄 스위트 5인 한 방 = 24)</span>
         </div>
       </div>
       <div style={{ margin: '26px 0 14px' }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em' }}>내 상황과 비슷한 예시를 골라보세요</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em' }}>상황과 비슷한 예시를 골라 보세요</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 7, marginBottom: 14 }}>
         {COST_EXAMPLES.map((e, i) => {
@@ -1975,7 +1975,7 @@ function CostExamples() {
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#92400e' }}>{ex.payNote}</p>
         </div>
       </div>
-      <p style={{ margin: '16px 4px 0', fontSize: 12.5, lineHeight: 1.6, color: '#9ca3af' }}>※ 그룹(방 전체) 객실 선택비는 투숙 인원·객실 종류에 따라 달라집니다. 위 예시 금액은 원본 ‘비용 예시’ 문서를 기준으로 했어요.</p>
+      <p style={{ margin: '16px 4px 0', fontSize: 12.5, lineHeight: 1.6, color: '#9ca3af' }}>※ 그룹(방 전체) 객실 선택비는 투숙 인원·객실 종류에 따라 달라집니다.</p>
     </div>
   )
 }

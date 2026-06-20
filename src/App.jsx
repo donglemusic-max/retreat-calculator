@@ -608,6 +608,7 @@ function GroupMode() {
   const [occOpen, setOccOpen] = useState(false) // 투숙인원 수동선택 영역 열기
   const [seorak, setSeorak] = useState(false)
   const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
+  const [busSeorakBy, setBusSeorakBy] = useState('leader') // split일 때만: 'leader'(대표자 모아서) | 'each'(개인별)
   const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
   const [campus, setCampus] = useState('')
@@ -664,15 +665,25 @@ function GroupMode() {
     }
     if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: room.name })
     if (occFee > 0) lines.push({ cat: '그룹', payer: who, amt: occFee, note: `${effOcc.label} 투숙` })
-    if (busTotal > 0) lines.push({ cat: '버스비', payer: who, amt: busTotal, note: `${busCount}명` })
-    if (seorakTotal > 0) lines.push({ cat: '설악산', payer: who, amt: seorakTotal, note: `${count}명 전원` })
+    // 버스·설악: split 모드에서 '개인별'이면 각자 본인 이름으로, 아니면 대표자가 모아서
+    const byEach = depositMode === 'split' && busSeorakBy === 'each'
+    if (busTotal > 0) {
+      if (byEach) members.forEach((m, i) => { if (m.bus) lines.push({ cat: '버스비', payer: m.name.trim() || `구성원${i + 1}`, amt: BUS_FEE }) })
+      else lines.push({ cat: '버스비', payer: who, amt: busTotal, note: `${busCount}명` })
+    }
+    if (seorakTotal > 0) {
+      if (byEach) members.forEach((m, i) => lines.push({ cat: '설악산', payer: m.name.trim() || `구성원${i + 1}`, amt: SEORAK_FEE }))
+      else lines.push({ cat: '설악산', payer: who, amt: seorakTotal, note: `${count}명 전원` })
+    }
 
     return { total, perPerson: Math.round(total / count), lines, count, overMax: count > room.max }
-  }, [members, room, effOcc, count, seorak, depositMode, who])
+  }, [members, room, effOcc, count, seorak, depositMode, busSeorakBy, who])
 
   const subtitle =
     depositMode === 'split'
-      ? `등록비는 각 구성원 이름으로, 공동비용(객실·그룹비)은 대표자 ${who} 이름으로 입금`
+      ? (busSeorakBy === 'each'
+          ? `등록비·버스·설악산뷰는 각 구성원 이름으로, 공동비용(객실·그룹비)은 대표자 ${who} 이름으로 입금`
+          : `등록비는 각 구성원 이름으로, 공동비용(객실·그룹비·버스·설악산뷰)은 대표자 ${who} 이름으로 입금`)
       : `모든 항목 대표자 ${who} 이름으로 입금`
 
   const doSubmit = async () => {
@@ -913,9 +924,30 @@ function GroupMode() {
           </button>
         </div>
         {depositMode === 'split' && (
-          <p className="text-[13px] text-[#4e5968] mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3 leading-relaxed">
-            구성원 이름이 입금자명으로 사용됩니다. 위에 이름을 정확히 입력해 주세요.
-          </p>
+          <>
+            <p className="text-[13px] text-[#4e5968] mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3 leading-relaxed">
+              구성원 이름이 입금자명으로 사용됩니다. 위에 이름을 정확히 입력해 주세요.
+            </p>
+            <div className="mt-3">
+              <div className="text-[13px] font-bold text-[#4e5968] mb-2">버스비·설악산뷰는 어떻게 입금하실 건가요?</div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setBusSeorakBy('each')}
+                  className={`w-full px-4 py-3 rounded-xl text-left text-[14px] font-bold border min-h-[52px] ${busSeorakBy === 'each' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}
+                >
+                  개인별로 등록비에 합해서 입금
+                  <span className="block text-[12px] font-normal text-[#8b95a1] mt-0.5">버스·설악산뷰를 각자 본인 이름으로</span>
+                </button>
+                <button
+                  onClick={() => setBusSeorakBy('leader')}
+                  className={`w-full px-4 py-3 rounded-xl text-left text-[14px] font-bold border min-h-[52px] ${busSeorakBy === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}
+                >
+                  대표자가 모아서 입금
+                  <span className="block text-[12px] font-normal text-[#8b95a1] mt-0.5">버스·설악산뷰를 대표자({who}) 이름으로</span>
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </Card>
 

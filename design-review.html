@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>리트릿 등록 — UI/UX 전면 검토</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --card:#ffffff; --ink:#16233d; --ink2:#4e5968; --ink3:#9aa3b2;
+    --line:#e6eaf0; --brand:#2f6bff; --brand-soft:#eef3ff; --good:#1f9d57; --warn:#e8893a; --bad:#e0455a;
+    --r:16px; --shadow:0 1px 3px rgba(20,40,80,.06),0 8px 24px -16px rgba(20,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:32px 20px 80px}
+  header{margin-bottom:28px}
+  .kic{display:inline-block;background:var(--brand);color:#fff;font-size:13px;font-weight:700;padding:5px 14px;border-radius:999px;letter-spacing:.3px}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.6px;margin:14px 0 8px}
+  .sub{color:var(--ink2);font-size:16px}
+  h2{font-size:21px;font-weight:800;letter-spacing:-.4px;margin:36px 0 14px;padding-top:18px;border-top:1px solid var(--line)}
+  h3{font-size:16px;font-weight:700;margin:18px 0 8px}
+  p{color:var(--ink2);font-size:15px;margin:0 0 10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);margin-bottom:14px}
+  .tldr{background:linear-gradient(180deg,#fff,#fafcff);border-left:4px solid var(--brand)}
+  .tldr p{color:var(--ink);font-size:15px}
+  ul{margin:6px 0 4px;padding-left:20px}
+  li{color:var(--ink2);font-size:15px;margin:5px 0}
+  b{color:var(--ink)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+  .stat{background:var(--brand-soft);border-radius:12px;padding:14px}
+  .stat .n{font-size:26px;font-weight:800;color:var(--brand);line-height:1}
+  .stat .l{font-size:13px;color:var(--ink2);margin-top:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  td.bad{color:var(--bad);font-weight:600}td.good{color:var(--good);font-weight:600}
+  .swatches{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .sw{border-radius:10px;border:1px solid var(--line);overflow:hidden;width:108px;font-size:11px}
+  .sw .c{height:48px}.sw .t{padding:5px 7px}.sw .t b{display:block;font-size:12px}
+  .scale{display:flex;flex-direction:column;gap:4px;margin:8px 0}
+  .scale div{display:flex;align-items:baseline;gap:12px;border-bottom:1px dashed var(--line);padding:4px 0}
+  .scale .px{color:var(--ink3);font-size:12px;width:120px;flex:none}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;margin-right:6px}
+  .p0{background:#fde7ea;color:var(--bad)} .p1{background:#fef0e3;color:var(--warn)} .p2{background:#e7f5ec;color:var(--good)}
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .ba>div{border-radius:12px;padding:13px;font-size:14px}
+  .before{background:#fdf2f3;border:1px solid #f6d6da}.after{background:#eef7f1;border:1px solid #cfe9d8}
+  .ba h4{font-size:12px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+  .before h4{color:var(--bad)}.after h4{color:var(--good)}
+  .ba ul{padding-left:18px}.ba li{font-size:13.5px}
+  @media(max-width:560px){.ba,.grid{grid-template-columns:1fr}h1{font-size:25px}}
+  .foot{color:var(--ink3);font-size:13px;margin-top:30px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <span class="kic">디자인팀 검토</span>
+  <h1>2026 리트릿 등록 — UI/UX 전면 검토</h1>
+  <p class="sub">기능이 늘며 화면이 복잡해진 상태를 진단하고, 가독성·직관성을 높이는 디자인 시스템과 화면별 개선안을 제안합니다.</p>
+</header>
+
+<div class="card tldr">
+  <h3 style="margin-top:0">한 줄 결론</h3>
+  <p>지금 화면은 <b>"규칙이 없어서"</b> 복잡합니다. 폰트 16종·회색 4종·파랑 3종이 섞이고 모든 섹션이 항상 펼쳐져 있어, <b>무엇이 중요한지</b>가 안 보입니다. 해법은 새 화면이 아니라 <b>① 타입 스케일 5단계 ② 컬러 역할 정리 ③ 점진적 노출(접기) ④ 8px 간격 그리드</b> 4가지 규칙을 일괄 적용하는 것입니다.</p>
+</div>
+
+<h2>1. 현황 진단 (코드 실측)</h2>
+<div class="grid">
+  <div class="stat"><div class="n">16종</div><div class="l">폰트 크기 (9~48px 난립)</div></div>
+  <div class="stat"><div class="n">4종</div><div class="l">회색 텍스트 색 혼용</div></div>
+  <div class="stat"><div class="n">3종</div><div class="l">파랑(브랜드) 혼용</div></div>
+  <div class="stat"><div class="n">3종</div><div class="l">모서리 반경 혼용</div></div>
+</div>
+<table>
+  <tr><th>증상</th><th>실측</th><th>문제</th></tr>
+  <tr><td>본문 글씨</td><td class="bad">11·12·13·14px가 276곳에 뒤섞임</td><td>위계가 약해 "다 비슷하게" 보임 → 눈이 쉴 곳이 없음</td></tr>
+  <tr><td>회색 텍스트</td><td class="bad">#8b95a1·#4e5968·#333d4b·#b0b8c1</td><td>보조문구/설명/라벨 색이 제각각 → 정보 등급이 안 읽힘</td></tr>
+  <tr><td>브랜드 블루</td><td class="bad">#3182f6·#1b64da·#2563eb</td><td>같은 "파랑"인데 미묘하게 달라 산만</td></tr>
+  <tr><td>섹션 노출</td><td class="bad">대부분 상시 펼침</td><td>한 화면에 카드·버튼·안내가 동시에 쏟아짐(인지 과부하)</td></tr>
+  <tr><td>강조</td><td class="bad">굵게+색+박스 동시 다발</td><td>모두가 강조되면 아무것도 강조 안 됨</td></tr>
+</table>
+
+<h2>2. 제안 디자인 시스템 (4규칙)</h2>
+
+<h3>① 타입 스케일 — 16종 → 6단계</h3>
+<p>역할별로 크기를 고정합니다. "그냥 조금 작게"를 금지.</p>
+<div class="scale">
+  <div><span class="px">Display 28/800</span><span style="font-size:24px;font-weight:800">총 등록 금액</span></div>
+  <div><span class="px">Title 19/700</span><span style="font-size:19px;font-weight:700">카드 제목</span></div>
+  <div><span class="px">Body 15/400</span><span style="font-size:15px">기본 본문·입력값</span></div>
+  <div><span class="px">Label 14/700</span><span style="font-size:14px;font-weight:700">버튼·필드 라벨</span></div>
+  <div><span class="px">Caption 13/400</span><span style="font-size:13px;color:var(--ink2)">보조 설명</span></div>
+  <div><span class="px">Micro 12/600</span><span style="font-size:12px;font-weight:600;color:var(--ink3)">태그·단위</span></div>
+</div>
+<p style="font-size:13.5px;color:var(--ink3)">※ 11px 이하는 폐기(모바일 가독 한계). 최소 본문 13px.</p>
+
+<h3>② 컬러 역할 — "쓸 곳"을 정함</h3>
+<div class="swatches">
+  <div class="sw"><div class="c" style="background:#2f6bff"></div><div class="t"><b>Brand</b>#2f6bff · 주요 액션</div></div>
+  <div class="sw"><div class="c" style="background:#1b4fd1"></div><div class="t"><b>Brand-press</b>#1b4fd1 · 눌림</div></div>
+  <div class="sw"><div class="c" style="background:#eef3ff"></div><div class="t" style="color:#1b4fd1"><b>Brand-soft</b>#eef3ff · 선택배경</div></div>
+  <div class="sw"><div class="c" style="background:#16233d"></div><div class="t"><b>Ink</b>#16233d · 제목</div></div>
+  <div class="sw"><div class="c" style="background:#4e5968"></div><div class="t"><b>Ink-2</b>#4e5968 · 본문</div></div>
+  <div class="sw"><div class="c" style="background:#9aa3b2"></div><div class="t" style="color:#4e5968"><b>Ink-3</b>#9aa3b2 · 보조</div></div>
+  <div class="sw"><div class="c" style="background:#1f9d57"></div><div class="t"><b>Good</b>완료</div></div>
+  <div class="sw"><div class="c" style="background:#e0455a"></div><div class="t"><b>Bad</b>오류·삭제</div></div>
+</div>
+<p>텍스트 회색은 <b>3단계(제목/본문/보조)</b>로만. 파랑은 <b>1개 + 진하기 2단계</b>. 빨강은 오류·삭제에만(현재 "구성원 추가"가 빨강인 건 의미 충돌 → 점선+중립색 권장).</p>
+
+<h3>③ 점진적 노출 — 기본은 접어두기</h3>
+<ul>
+  <li><b>자동값이 있는 건 접기</b>: 투숙 인원(인원수 자동), 입금 방식 상세, 예시 이미지는 기본 접힘 + "필요하면 펼치기".</li>
+  <li><b>한 화면 = 한 결정</b>: 스크롤 한 구간에 핵심 1개만. 보조 안내는 ⓘ 도움말로.</li>
+  <li><b>금액은 항상 하단 고정 요약 1곳</b>으로 모음(여러 카드에 흩어진 금액 표기 정리).</li>
+</ul>
+
+<h3>④ 간격·그리드 — 8px 리듬 + 모서리 2종</h3>
+<ul>
+  <li>간격은 <b>4·8·12·16·24·32</b>만 사용(들쭉날쭉 padding 제거).</li>
+  <li>모서리: <b>카드 16px / 버튼·입력 12px</b> 2종으로 통일(현재 lg·xl·2xl 혼용).</li>
+  <li>카드 외곽선 1px + 아주 옅은 그림자 1종 → 카드 간 경계는 명확하되 무겁지 않게.</li>
+</ul>
+
+<h2>3. 화면별 개선안</h2>
+
+<h3>개인 / 그룹 등록</h3>
+<div class="ba">
+  <div class="before"><h4>지금</h4><ul><li>방 선택·투숙·설악·입금방식 카드가 모두 펼쳐져 길다</li><li>카드마다 금액 표기가 달라 합계 추적이 어려움</li><li>버튼 색(파랑/검정/빨강)이 규칙 없이 섞임</li></ul></div>
+  <div class="after"><h4>개선</h4><ul><li>투숙·입금 상세는 기본 접기(자동값 노출 + "변경")</li><li>하단 <b>고정 금액 요약 바</b> 1곳으로 합계·1인 평균 집약</li><li>주요 액션=Brand, 보조=중립 외곽선, 위험=Bad로 일관</li></ul></div>
+</div>
+
+<h3>조회 · 수정</h3>
+<div class="ba">
+  <div class="before"><h4>지금</h4><ul><li>구성원 카드마다 동일 필드가 반복돼 길고 빽빽</li><li>"내가 입금할 금액"·"그룹 총액"·"공동비용" 용어가 함께 떠 혼란</li></ul></div>
+  <div class="after"><h4>개선</h4><ul><li>구성원은 <b>요약 행(이름·부서·금액)</b>으로 접고, 탭하면 펼쳐 수정</li><li>금액 용어 2개로 축소: <b>"내 입금액"</b> + <b>"그룹 합계(대표자)"</b></li></ul></div>
+</div>
+
+<h3>관리자</h3>
+<div class="ba">
+  <div class="before"><h4>지금</h4><ul><li>탭·통계·보드·리스트가 한 번에 많음(운영자용이라 밀도 OK지만 라벨 모호)</li></ul></div>
+  <div class="after"><h4>개선</h4><ul><li>밀도는 유지하되 <b>섹션 타이틀 + 색 코딩</b>(미입금=warn, 확정=good)으로 스캔성↑</li></ul></div>
+</div>
+
+<h2>4. 적용 우선순위</h2>
+<table>
+  <tr><th>순위</th><th>작업</th><th>효과 / 리스크</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>타입 스케일 6단계 + 회색 3·파랑 1 토큰화(공용 클래스/상수)</td><td class="good">전 화면 즉시 정돈 / 낮음(시각만)</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>모서리·간격 토큰 통일(12/16, 8px 리듬)</td><td class="good">정돈감↑ / 낮음</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>점진적 노출: 투숙·입금상세·예시 기본 접기</td><td class="good">길이 체감 30~40%↓ / 중간</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>하단 고정 금액 요약 바 + 금액 용어 정리</td><td class="good">직관성↑ / 중간</td></tr>
+  <tr><td><span class="pill p2">P2</span></td><td>조회 구성원 카드 → 접이식 요약 행</td><td class="good">조회화면 정돈 / 중간</td></tr>
+</table>
+
+<div class="card" style="background:var(--brand-soft);border-color:#d8e3ff;margin-top:18px">
+  <h3 style="margin-top:0">권장 진행</h3>
+  <p style="color:var(--ink)"><b>P0(토큰화)부터</b> 적용하면 코드 변경은 크지만 <b>리스크가 낮고(시각 일관성만 바뀜)</b> 전 화면이 한 번에 정돈됩니다. P1·P2는 동작이 바뀌므로 배포 후 화면 보며 단계 적용을 권합니다.</p>
+</div>
+
+<p class="foot">이 페이지 자체가 제안한 규칙(타입 6단계·회색 3·파랑 1·8px 리듬)으로 그려졌습니다 — 같은 결을 앱에 이식하는 작업입니다.</p>
+</div>
+</body>
+</html>

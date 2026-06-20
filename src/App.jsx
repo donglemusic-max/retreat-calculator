@@ -2181,6 +2181,7 @@ function AdminApp() {
   const [mailTpl, setMailTpl] = useState(null) // #26/#30 메일 템플릿(관리자 편집)
   const [mailDef, setMailDef] = useState({}) // 기본값(초기화용)
   const [mailMsg, setMailMsg] = useState('')
+  const [mailPrev, setMailPrev] = useState({}) // 메일별 전체 미리보기 펼침
   const loadMailTpl = async () => { setMailMsg('불러오는 중…'); const j = await post({ action: 'mailTplGet', pin }); if (j.ok) { setMailTpl(j.tpl); setMailDef(j.defaults || {}); setMailMsg('') } else setMailMsg('오류: ' + (j.error || '')) }
   const saveMailTpl = async () => { setMailMsg('저장 중…'); const j = await post({ action: 'mailTplSet', pin, tpl: mailTpl }); setMailMsg(j.ok ? '✓ 저장되었습니다 (이후 발송부터 적용)' : '오류: ' + (j.error || '')) }
   const [undoStack, setUndoStack] = useState([]) // 실행 취소: 방/입금 컬럼 작업의 직전 값 스냅샷
@@ -3383,6 +3384,14 @@ function AdminApp() {
                   const body = (k, rows = 6) => <textarea value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} rows={rows} className={inputCls + ' resize-y text-[12px] leading-relaxed font-mono'} />
                   const subj = (k) => <input value={mailTpl[k] || ''} onChange={(e) => set(k, e.target.value)} className={inputCls + ' text-[13px] mb-2'} />
                   const MAILS = [['submit', '접수 메일 (신규 신청)'], ['update', '수정 메일 (본인 정보)'], ['add', '구성원 추가 메일'], ['delete', '구성원 취소 메일'], ['groupset', '그룹설정 변경 메일 (객실/인원/설악)']]
+                  // 전체 미리보기: 본문의 {…} 자리에 샘플 값을 넣어 실제 발송 모습 그대로 보여줌
+                  const SAMPLE = {
+                    name: '김바울', gid: 'A1234',
+                    guide: '▸ 등록비    김바울   278,000원  (장년부)\n▸ 버스비    김바울    38,000원\n총 등록 금액: 316,000원\n입금 계좌: 우리은행 1005803168121 주님의 교회',
+                    summary: '[최종 등록 내역]\n· 인원 2명: 김바울, 김노아\n· 객실: 소노벨 스위트\n\n▸ 등록비        546,000원\n▸ 객실선택       60,000원\n─────────────────\n총 합계: 606,000원\n입금 계좌: 우리은행 1005803168121 주님의 교회',
+                    changes: '\n\n[변경된 항목]\n▸ 버스: 자차 → 신청',
+                  }
+                  const fill = (s) => String(s || '').replace(/\{(\w+)\}/g, (mm, key) => key === 'vision' ? (mailTpl.vision ? '\n\n' + mailTpl.vision : '') : key === 'foot' ? (mailTpl.foot || '') : (SAMPLE[key] != null ? SAMPLE[key] : ''))
                   return (
                     <>
                       <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
@@ -3399,8 +3408,16 @@ function AdminApp() {
                           <div className="flex items-center justify-between mb-2"><div className="text-[13px] font-bold text-[#191f28]">{label}</div>{reset(k + '_body')}</div>
                           <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">제목</div>
                           {subj(k + '_subject')}
-                          <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">본문</div>
+                          <div className="text-[11px] font-bold text-[#5f6b7a] mb-1">본문 <span className="font-normal text-[#9ca3af]">(이 본문이 메일 전체 내용입니다)</span></div>
                           {body(k + '_body', 7)}
+                          <button onClick={() => setMailPrev({ ...mailPrev, [k]: !mailPrev[k] })} className="mt-2 text-[12px] font-bold text-[#1d4ed8]">{mailPrev[k] ? '▲ 전체 미리보기 접기' : '▼ 전체 미리보기 (실제 발송 모습)'}</button>
+                          {mailPrev[k] && (
+                            <div className="mt-2 rounded-xl border border-[#e5e8eb] overflow-hidden">
+                              <div className="bg-[#f9fafb] px-3 py-2 border-b border-[#eef0f3] text-[12px] font-bold text-[#374151]">제목: {fill(mailTpl[k + '_subject'])}</div>
+                              <div className="px-3 py-3 text-[12px] leading-relaxed text-[#374151] whitespace-pre-wrap">{fill(mailTpl[k + '_body'])}</div>
+                              <div className="bg-[#fffbeb] px-3 py-1.5 text-[11px] text-[#92400e]">※ 위 김바울·금액·내역은 예시이며, 실제로는 신청자 정보로 자동 채워집니다.</div>
+                            </div>
+                          )}
                         </div>
                       ))}
                       <div className="sticky bottom-2 bg-white rounded-2xl border border-[#e5e8eb] shadow-lg p-3 flex items-center gap-2">

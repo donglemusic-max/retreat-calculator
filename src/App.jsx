@@ -225,11 +225,14 @@ function HelpIcon({ title, body }) {
 }
 
 // ── 공통 UI ────────────────────────────────────────────────────
-function Card({ title, badge, help, helpTitle, children }) {
+function Card({ title, badge, help, helpTitle, children, step }) {
   return (
     <section className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-5 mb-4">
       {title && (
         <div className="flex items-center gap-2 mb-4">
+          {step != null && (
+            <span className="shrink-0 w-6 h-6 rounded-full bg-[#191f28] text-white text-[12px] font-extrabold flex items-center justify-center">{step}</span>
+          )}
           <h2 className="text-[16px] font-bold text-[#191f28] tracking-tight">{title}</h2>
           {badge != null && (
             <span className="bg-[#3182f6] text-white text-[12px] px-2 py-0.5 rounded-full font-bold">{badge}</span>
@@ -254,11 +257,14 @@ function OptionRow({ active, onClick, title, sub, right }) {
     >
       <div className="min-w-0">
         <div className={`text-[15px] font-bold ${active ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>{title}</div>
-        {sub && <div className="text-[13px] text-[#8b95a1] mt-0.5 leading-snug">{sub}</div>}
+        {sub && <div className="text-[13px] text-[#5f6b7a] mt-0.5 leading-snug">{sub}</div>}
       </div>
-      {right != null && (
-        <div className={`text-[14px] font-bold whitespace-nowrap ${active ? 'text-[#1b64da]' : 'text-[#8b95a1]'}`}>{right}</div>
-      )}
+      <div className="flex items-center gap-2 shrink-0">
+        {right != null && (
+          <div className={`text-[14px] font-bold whitespace-nowrap ${active ? 'text-[#1b64da]' : 'text-[#5f6b7a]'}`}>{right}</div>
+        )}
+        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${active ? 'bg-[#3182f6] text-white' : 'border border-[#d1d8e0] text-transparent'}`}>✓</span>
+      </div>
     </button>
   )
 }
@@ -273,10 +279,10 @@ function Toggle({ on, onChange, label, sub, price }) {
     >
       <div className="text-left">
         <div className={`text-[15px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>{label}</div>
-        {sub && <div className="text-[13px] text-[#8b95a1] mt-0.5">{sub}</div>}
+        {sub && <div className="text-[13px] text-[#5f6b7a] mt-0.5">{sub}</div>}
       </div>
       <div className="flex items-center gap-2">
-        {price && <span className={`text-[14px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#8b95a1]'}`}>{price}</span>}
+        {price && <span className={`text-[14px] font-bold ${on ? 'text-[#1b64da]' : 'text-[#5f6b7a]'}`}>{price}</span>}
         <div className={`w-12 h-7 rounded-full p-0.5 transition-all ${on ? 'bg-[#3182f6]' : 'bg-[#d1d8e0]'}`}>
           <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
         </div>
@@ -303,7 +309,7 @@ function DeptSelect({ value, onChange }) {
 
 // ── 입력 필드 헬퍼 ─────────────────────────────────────────────
 const inputCls =
-  'w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]'
+  'w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] text-[#16233d] placeholder:text-[#aeb6c2] placeholder:font-normal focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]'
 
 function Field({ label, required, children, id, error }) {
   return (
@@ -333,9 +339,9 @@ function StickyBar({ total, count, perPerson, hint, cta, onCta }) {
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#e5e8eb] bg-white/95 backdrop-blur-sm">
         <div className="max-w-[480px] mx-auto px-4 py-3 flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] text-[#8b95a1] leading-none mb-1">{hint || '총 등록 금액'}</div>
+            <div className="text-[12px] text-[#5f6b7a] leading-none mb-1">{hint || '총 등록 금액'}</div>
             <div className="text-[22px] font-extrabold text-[#191f28] leading-none truncate">
-              {won(total)}{count > 1 && <span className="text-[12px] font-medium text-[#8b95a1] ml-2">1인 평균 {won(perPerson)}</span>}
+              {won(total)}{count > 1 && <span className="text-[12px] font-medium text-[#5f6b7a] ml-2">1인 평균 {won(perPerson)}</span>}
             </div>
           </div>
           <button onClick={onCta} className="shrink-0 px-6 py-3.5 rounded-2xl bg-[#191f28] text-white font-bold text-[15px] hover:bg-black shadow-lg active:scale-[0.98] transition">
@@ -355,7 +361,7 @@ function SegPicker({ value, onChange, options, render }) {
           key={o}
           onClick={() => onChange(o)}
           className={`flex-1 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
-            value === o ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+            value === o ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
           }`}
         >
           {render ? render(o) : o}
@@ -382,7 +388,7 @@ function ConfirmSheet({ open, onClose, onConfirm, calc, subtitle, memberSummary,
       >
         <div className="w-10 h-1 bg-[#e5e8eb] rounded-full mx-auto mb-5" />
         <h3 className="text-[18px] font-extrabold text-[#191f28] mb-1">이 내용으로 신청하시나요?</h3>
-        <p className="text-[13px] text-[#8b95a1] mb-5">내용을 확인하고 제출해 주세요.</p>
+        <p className="text-[13px] text-[#5f6b7a] mb-5">내용을 확인하고 제출해 주세요.</p>
 
         {memberSummary && (
           <div className="bg-[#f9fafb] rounded-2xl p-4 mb-4">
@@ -398,7 +404,7 @@ function ConfirmSheet({ open, onClose, onConfirm, calc, subtitle, memberSummary,
               <div key={i} className="flex items-center justify-between">
                 <span className="text-[13px] text-[#4e5968]">
                   <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-1.5 py-0.5 rounded-md mr-1.5">{l.cat}</span>
-                  {l.payer}{l.note ? <span className="text-[#8b95a1]"> ({l.note})</span> : ''}
+                  {l.payer}{l.note ? <span className="text-[#5f6b7a]"> ({l.note})</span> : ''}
                 </span>
                 <span className="text-[14px] font-bold text-[#191f28]">{won(l.amt)}</span>
               </div>
@@ -409,7 +415,7 @@ function ConfirmSheet({ open, onClose, onConfirm, calc, subtitle, memberSummary,
             <span className="text-[22px] font-extrabold text-[#191f28]">{won(calc.total)}</span>
           </div>
           {calc.count > 1 && (
-            <div className="mt-1 text-right text-[13px] text-[#8b95a1]">1인 평균 {won(calc.perPerson)} · {calc.count}명</div>
+            <div className="mt-1 text-right text-[13px] text-[#5f6b7a]">1인 평균 {won(calc.perPerson)} · {calc.count}명</div>
           )}
         </div>
 
@@ -523,7 +529,7 @@ function IndividualMode() {
         <div className="text-center py-4">
           <div className="text-[48px] mb-3">✅</div>
           <div className="text-[17px] font-bold text-[#191f28] mb-2">신청서가 제출되었습니다</div>
-          <div className="text-[14px] text-[#8b95a1]">
+          <div className="text-[14px] text-[#5f6b7a]">
             접수번호 {submitDone.groupId} · 총 {won(submitDone.total || 0)}
           </div>
           <p className="text-[14px] text-[#4e5968] mt-4 leading-relaxed">
@@ -538,14 +544,14 @@ function IndividualMode() {
   const memberSummary = (
     <div className="text-[14px] text-[#191f28]">
       <span className="font-bold">{name.trim() || '(이름 미입력)'}</span>
-      <span className="text-[#8b95a1] ml-2">{gender} · {dept} · {campus.replace(' 캠퍼스', '')} 캠퍼스</span>
+      <span className="text-[#5f6b7a] ml-2">{gender} · {dept} · {campus.replace(' 캠퍼스', '')} 캠퍼스</span>
     </div>
   )
 
   return (
     <>
-      <Card title="소속 부서" help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
-        <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">부서에 따라 1인 등록비가 달라집니다.</p>
+      <Card title="소속 부서" step={1} help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
+        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">부서에 따라 1인 등록비가 달라집니다.</p>
         <DeptSelect value={dept} onChange={setDept} />
         <div className="mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3">
           <span className="text-[13px] text-[#4e5968]">선택한 등록비</span>
@@ -553,8 +559,8 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="방 선택" help={HELP.room} helpTitle="객실 종류 안내">
-        <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+      <Card title="방 선택" step={2} help={HELP.room} helpTitle="객실 종류 안내">
+        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
           혼자 등록하시면 교회에서 방을 배정해 드립니다. 원하는 방이 있으면 선택하세요. (추가 비용 발생 가능)
         </p>
         <div className="space-y-2">
@@ -571,7 +577,7 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="교통 / 설악산뷰" help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
+      <Card title="교통 / 설악산뷰" step={3} help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
         <div className="space-y-3">
           <Toggle
             on={bus}
@@ -590,7 +596,7 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="신청자 정보">
+      <Card title="신청자 정보" step={4}>
         <Field label="이름" required id="f-name" error={showErr && !name.trim() ? '이름을 입력해 주세요.' : ''}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={errCls(!name.trim())} />
         </Field>
@@ -612,7 +618,7 @@ function IndividualMode() {
       </Card>
 
       {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
-      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
+      <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
       <StickyBar total={calc.total} count={1} hint="총 등록 금액" cta="신청 내용 확인" onCta={tryNext} />
 
       <ConfirmSheet
@@ -751,7 +757,7 @@ function GroupMode() {
         <div className="text-center py-4">
           <div className="text-[48px] mb-3">✅</div>
           <div className="text-[17px] font-bold text-[#191f28] mb-2">신청서가 제출되었습니다</div>
-          <div className="text-[14px] text-[#8b95a1]">
+          <div className="text-[14px] text-[#5f6b7a]">
             접수번호 {submitDone.groupId} · {submitDone.rows}명 · 총 {won(submitDone.total || 0)}
           </div>
           <p className="text-[14px] text-[#4e5968] mt-4 leading-relaxed">
@@ -768,7 +774,7 @@ function GroupMode() {
       {members.map((m, i) => (
         <div key={i} className="flex items-center gap-2 text-[14px]">
           <span className="font-bold text-[#191f28]">{m.name.trim() || `(${i+1}번 이름 미입력)`}</span>
-          <span className="text-[#8b95a1]">{m.gender} · {m.dept}{m.bus ? ' · 버스' : ''}</span>
+          <span className="text-[#5f6b7a]">{m.gender} · {m.dept}{m.bus ? ' · 버스' : ''}</span>
           {i === 0 && <span className="text-[12px] text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 font-bold">대표</span>}
         </div>
       ))}
@@ -777,8 +783,8 @@ function GroupMode() {
 
   return (
     <>
-      <Card title="대표자 정보">
-        <p className="text-[13px] text-[#8b95a1] mb-4 leading-relaxed">
+      <Card title="대표자 정보" step={1}>
+        <p className="text-[13px] text-[#5f6b7a] mb-4 leading-relaxed">
           가족·그룹을 대표해서 신청하는 분의 정보입니다. 공동비용 입금 시 이 이름으로 입금합니다.
         </p>
         <Field label="대표자 이름" required id="f-leader" error={showErr && !leader.trim() ? '대표자 이름을 입력해 주세요.' : ''}>
@@ -799,7 +805,7 @@ function GroupMode() {
       </Card>
 
       <div id="f-members" className="scroll-mt-24" />
-      <Card title="구성원" badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
+      <Card title="구성원" step={2} badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
         {showErr && memberIncomplete && (
           <p className="text-[12px] font-semibold text-[#f04452] mb-2">모든 구성원의 이름과 성별을 입력해 주세요.</p>
         )}
@@ -826,7 +832,7 @@ function GroupMode() {
                     key={g}
                     onClick={() => updateMember(i, { gender: g })}
                     className={`flex-1 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
-                      m.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+                      m.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
                     }`}
                   >
                     {g}
@@ -835,7 +841,7 @@ function GroupMode() {
               </div>
               <DeptSelect value={m.dept} onChange={(v) => updateMember(i, { dept: v })} />
               <div className="mt-3">
-                <div className="text-[12px] font-bold text-[#8b95a1] mb-1.5">캠퍼스 {(m.campus || campus) ? '' : '(미선택 시 대표자와 동일)'}</div>
+                <div className="text-[12px] font-bold text-[#5f6b7a] mb-1.5">캠퍼스 {(m.campus || campus) ? '' : '(미선택 시 대표자와 동일)'}</div>
                 <div className="flex gap-2">
                   {CAMPUSES.map((c) => {
                     const active = (m.campus || campus) === c
@@ -843,7 +849,7 @@ function GroupMode() {
                       <button
                         key={c}
                         onClick={() => updateMember(i, { campus: c })}
-                        className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border transition-all min-h-[44px] ${active ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}
+                        className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border transition-all min-h-[44px] ${active ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}
                       >
                         {c.replace(' 캠퍼스', '')}
                       </button>
@@ -854,7 +860,7 @@ function GroupMode() {
               <button
                 onClick={() => updateMember(i, { bus: !m.bus })}
                 className={`w-full mt-3 py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[48px] ${
-                  m.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'
+                  m.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'
                 }`}
               >
                 버스 이용하겠습니다{m.bus ? ' ✓' : ''} <span className="font-normal text-[13px]">(왕복 {won(BUS_FEE)})</span>
@@ -870,25 +876,25 @@ function GroupMode() {
         </button>
       </Card>
 
-      <Card title="몇 분이 한 방을 쓰나요?" help={HELP.occupancy} helpTitle="투숙 인원 / 방배정 안내">
+      <Card title="몇 분이 한 방을 쓰나요?" step={3} help={HELP.occupancy} helpTitle="투숙 인원 / 방배정 안내">
         <div className="bg-[#f2f8ff] rounded-2xl px-4 py-4 mb-3 flex items-center justify-between">
           <div>
             <div className="text-[13px] text-[#4e5968] mb-0.5">{partial ? '부분 그룹 신청' : '현재 구성원 수 기준 자동 적용'}</div>
             <div className="text-[17px] font-extrabold text-[#1b64da]">
               {partial ? (
-                <>나머지는 교회 배정<span className="text-[14px] font-bold text-[#8b95a1] ml-2">추가비용 추후 결정</span></>
+                <>나머지는 교회 배정<span className="text-[14px] font-bold text-[#5f6b7a] ml-2">추가비용 추후 결정</span></>
               ) : (
                 <>
                   {effOcc.label} 투숙
                   {effOcc.fee > 0
-                    ? <span className="text-[14px] font-bold text-[#f04452] ml-2">+{won(effOcc.fee)}</span>
+                    ? <span className="text-[14px] font-bold text-[#1b64da] ml-2">+{won(effOcc.fee)}</span>
                     : <span className="text-[14px] font-bold text-[#15803d] ml-2">추가비용 없음</span>
                   }
                 </>
               )}
             </div>
             {!partial && occOverride != null && (
-              <div className="text-[12px] text-[#8b95a1] mt-0.5">(수동 선택 중)</div>
+              <div className="text-[12px] text-[#5f6b7a] mt-0.5">(수동 선택 중)</div>
             )}
           </div>
           {!partial && occOverride != null && (
@@ -901,6 +907,13 @@ function GroupMode() {
           )}
         </div>
 
+        {!partial && effOcc.fee > 0 && (
+          <div className="bg-[#f7f8fa] rounded-xl px-4 py-3 mb-3 text-[13px] text-[#4e5968] leading-relaxed">
+            한 방에 <b>적은 인원</b>이 투숙할수록 방값을 나눠 내는 사람이 적어 1인당 부담이 올라갑니다.
+            <span className="block text-[12px] text-[#5f6b7a] mt-1">이 방 기준 1인당 약 {won(Math.round(effOcc.fee / count))} · 인원이 늘면 자동으로 낮아져요.</span>
+          </div>
+        )}
+
         {/* #7 부분그룹 체크박스 */}
         <button
           onClick={() => setPartial((v) => !v)}
@@ -909,7 +922,7 @@ function GroupMode() {
           <span className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center text-[12px] font-bold shrink-0 ${partial ? 'bg-[#3182f6] text-white' : 'border border-[#c4c9d0] text-transparent'}`}>✓</span>
           <span className="text-[13px] font-bold text-[#333d4b] leading-snug">
             나머지 멤버는 교회에서 배정해주시면 좋겠습니다.
-            <span className="block text-[12px] font-normal text-[#8b95a1] mt-0.5">이 경우 추가금(그룹 투숙비)은 추후 결정됩니다.</span>
+            <span className="block text-[12px] font-normal text-[#5f6b7a] mt-0.5">이 경우 추가금(그룹 투숙비)은 추후 결정됩니다.</span>
           </span>
         </button>
 
@@ -920,12 +933,12 @@ function GroupMode() {
               className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-[#f9fafb] border border-[#e5e8eb] text-[13px] font-bold text-[#4e5968] min-h-[48px]"
             >
               <span>직접 선택하기</span>
-              <span className={`text-[#8b95a1] text-[12px] transition-transform ${occOpen ? 'rotate-180' : ''}`}>▼</span>
+              <span className={`text-[#5f6b7a] text-[12px] transition-transform ${occOpen ? 'rotate-180' : ''}`}>▼</span>
             </button>
 
             {occOpen && (
               <div className="mt-3">
-                <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+                <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
                   방에 실제로 투숙하는 인원에 따라 추가비용이 달라집니다. 7~8명이면 추가비용 없음.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -938,11 +951,11 @@ function GroupMode() {
                       }`}
                     >
                       {o.label}<br />
-                      <span className="text-[13px] font-normal text-[#8b95a1]">{o.fee > 0 ? `+${o.fee/10000}만원` : '추가없음'}</span>
+                      <span className="text-[13px] font-normal text-[#5f6b7a]">{o.fee > 0 ? `+${o.fee/10000}만원` : '추가없음'}</span>
                     </button>
                   ))}
                 </div>
-                <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed">
+                <p className="text-[13px] text-[#5f6b7a] mt-3 leading-relaxed">
                   * 일부만 함께 쓰는 경우는 위 체크박스를 이용하거나 문의사항에 적어주세요.
                 </p>
               </div>
@@ -950,13 +963,13 @@ function GroupMode() {
           </>
         )}
         {partial && (
-          <p className="text-[13px] text-[#8b95a1] leading-relaxed">
+          <p className="text-[13px] text-[#5f6b7a] leading-relaxed">
             나머지 인원은 교회에서 배정해드립니다. 투숙 인원에 따른 추가비용은 최종 방배정 후 결정됩니다.
           </p>
         )}
       </Card>
 
-      <Card title="방 선택" help={HELP.room} helpTitle="객실 종류 안내">
+      <Card title="방 선택" step={4} help={HELP.room} helpTitle="객실 종류 안내">
         <div className="space-y-2">
           {ROOMS.map((r, i) => (
             <OptionRow
@@ -972,7 +985,7 @@ function GroupMode() {
           ))}
         </div>
         {partial && (
-          <p className="text-[13px] text-[#8b95a1] mt-3 leading-relaxed">
+          <p className="text-[13px] text-[#5f6b7a] mt-3 leading-relaxed">
             * 부분 그룹은 <b>1인 기준</b> 객실 추가비용을 참고로 보여드립니다. 입금 안내는 방(그룹) 기준으로 안내되며, 최종 방배정 후 조정될 수 있습니다.
           </p>
         )}
@@ -983,7 +996,7 @@ function GroupMode() {
         )}
       </Card>
 
-      <Card title="설악산 뷰" help={HELP.seorakGroup} helpTitle="설악산뷰 안내">
+      <Card title="설악산 뷰" step={5} help={HELP.seorakGroup} helpTitle="설악산뷰 안내">
         <Toggle
           on={seorak}
           onChange={setSeorak}
@@ -993,7 +1006,7 @@ function GroupMode() {
         />
       </Card>
 
-      <Card title="등록비 입금은 어떻게 하실 건가요?" help={HELP.depositMode} helpTitle="입금 방식 안내">
+      <Card title="등록비 입금은 어떻게 하실 건가요?" step={6} help={HELP.depositMode} helpTitle="입금 방식 안내">
         <div className="space-y-2">
           <button
             onClick={() => setDepositMode('leader')}
@@ -1004,7 +1017,7 @@ function GroupMode() {
             <div className={`text-[15px] font-bold ${depositMode === 'leader' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>
               대표자가 한꺼번에 입금
             </div>
-            <div className="text-[13px] text-[#8b95a1] mt-0.5">
+            <div className="text-[13px] text-[#5f6b7a] mt-0.5">
               모든 항목을 대표자({who}) 이름으로 입금
             </div>
           </button>
@@ -1017,7 +1030,7 @@ function GroupMode() {
             <div className={`text-[15px] font-bold ${depositMode === 'split' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>
               각자 등록비를 본인 이름으로 입금
             </div>
-            <div className="text-[13px] text-[#8b95a1] mt-0.5">
+            <div className="text-[13px] text-[#5f6b7a] mt-0.5">
               등록비만 각자, 공동비용(방·그룹비)은 대표자 이름
             </div>
           </button>
@@ -1035,14 +1048,14 @@ function GroupMode() {
                   className={`w-full px-4 py-3 rounded-xl text-left text-[14px] font-bold border min-h-[52px] ${busSeorakBy === 'each' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}
                 >
                   개인별로 등록비에 합해서 입금
-                  <span className="block text-[12px] font-normal text-[#8b95a1] mt-0.5">버스·설악산뷰를 각자 본인 이름으로</span>
+                  <span className="block text-[12px] font-normal text-[#5f6b7a] mt-0.5">버스·설악산뷰를 각자 본인 이름으로</span>
                 </button>
                 <button
                   onClick={() => setBusSeorakBy('leader')}
                   className={`w-full px-4 py-3 rounded-xl text-left text-[14px] font-bold border min-h-[52px] ${busSeorakBy === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}
                 >
                   대표자가 모아서 입금
-                  <span className="block text-[12px] font-normal text-[#8b95a1] mt-0.5">버스·설악산뷰를 대표자({who}) 이름으로</span>
+                  <span className="block text-[12px] font-normal text-[#5f6b7a] mt-0.5">버스·설악산뷰를 대표자({who}) 이름으로</span>
                 </button>
               </div>
             </div>
@@ -1051,7 +1064,7 @@ function GroupMode() {
       </Card>
 
       {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
-      <p className="text-[12px] text-[#8b95a1] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
+      <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다. 상세 입금 안내는 제출 완료 화면에 표시됩니다.</p>
       <StickyBar total={calc.total} count={count} perPerson={calc.perPerson} hint="총 등록 금액" cta="신청 내용 확인" onCta={tryNext} />
 
       <ConfirmSheet
@@ -1187,7 +1200,7 @@ function ResultPanel({ calc, subtitle }) {
             <p className="text-[13px] text-[#1b64da] font-semibold leading-relaxed">{subtitle}</p>
           </div>
         )}
-        <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+        <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
           아래 항목별로 <b>각각 따로</b> 입금해 주세요. 입금자명 형식: "항목 이름"
         </p>
         <DepositExample />
@@ -1198,7 +1211,7 @@ function ResultPanel({ calc, subtitle }) {
                 <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[13px] font-bold px-2.5 py-1 rounded-lg mr-2">
                   {l.cat} {l.payer}
                 </span>
-                {l.note && <span className="text-[12px] text-[#8b95a1]">{l.note}</span>}
+                {l.note && <span className="text-[12px] text-[#5f6b7a]">{l.note}</span>}
               </div>
               <span className="text-[15px] font-bold text-[#191f28]">{won(l.amt)}</span>
             </div>
@@ -1210,7 +1223,7 @@ function ResultPanel({ calc, subtitle }) {
         </div>
 
         <div className="mt-4 bg-[#f9fafb] rounded-2xl p-4">
-          <div className="text-[13px] text-[#8b95a1] font-semibold mb-1">입금 계좌</div>
+          <div className="text-[13px] text-[#5f6b7a] font-semibold mb-1">입금 계좌</div>
           <div className="text-[15px] font-bold text-[#191f28]">{ACCOUNT}</div>
         </div>
 
@@ -1248,7 +1261,7 @@ function SubmitSection({ payload, valid, missing }) {
   if (!SUBMIT_URL) {
     return (
       <Card title="신청서 제출">
-        <p className="text-[12px] text-[#8b95a1] leading-relaxed">
+        <p className="text-[12px] text-[#5f6b7a] leading-relaxed">
           제출 기능 준비 중입니다.<br />
           <span className="text-[#b0b8c1]">(관리자: Apps Script 웹앱 배포 후 Vercel 환경변수 <code>VITE_SUBMIT_URL</code> 설정)</span>
         </p>
@@ -1262,10 +1275,10 @@ function SubmitSection({ payload, valid, missing }) {
         <div className="text-center py-3">
           <div className="text-[40px] mb-2">✅</div>
           <div className="text-[15px] font-bold text-[#191f28] mb-1">신청서가 제출되었습니다</div>
-          <div className="text-[12px] text-[#8b95a1]">
+          <div className="text-[12px] text-[#5f6b7a]">
             접수번호 {result?.groupId} · {result?.rows}명 · 총 {won(result?.total || 0)}
           </div>
-          <p className="text-[12px] text-[#8b95a1] mt-3 leading-relaxed">
+          <p className="text-[12px] text-[#5f6b7a] mt-3 leading-relaxed">
             입금까지 완료해야 등록이 확정됩니다.<br />위 "입금 안내"대로 항목별로 입금해 주세요.
           </p>
         </div>
@@ -1288,7 +1301,7 @@ function SubmitSection({ payload, valid, missing }) {
       >
         {status === 'loading' ? '제출 중…' : '신청서 제출하기'}
       </button>
-      <p className="text-[11px] text-[#8b95a1] mt-3 leading-relaxed">
+      <p className="text-[11px] text-[#5f6b7a] mt-3 leading-relaxed">
         * 제출 후에도 입금을 완료해야 등록이 확정됩니다. 가족/그룹은 구성원 정보를 정확히 입력해 주세요.
       </p>
     </Card>
@@ -1350,7 +1363,7 @@ function EditCard({ data, onDelete, hideSeorak }) {
           {data.isSelf && <span className="ml-1.5 text-[11px] font-bold text-white bg-[#3182f6] rounded-full px-1.5 py-0.5 align-middle">본인</span>}
         </span>
         <div className="flex items-center gap-2">
-          {data.rep && <span className="text-[12px] text-[#8b95a1]">대표 {data.rep}</span>}
+          {data.rep && <span className="text-[12px] text-[#5f6b7a]">대표 {data.rep}</span>}
           {onDelete && (
             <button onClick={onDelete} className="text-[13px] font-bold text-[#f04452] min-w-[44px] min-h-[44px] flex items-center justify-end">삭제</button>
           )}
@@ -1368,18 +1381,18 @@ function EditCard({ data, onDelete, hideSeorak }) {
         <div className="space-y-1">
           {feeBreakdown.map((f, i) => (
             <div key={i} className="flex items-center justify-between text-[13px]">
-              <span className="text-[#4e5968]">{f.label}{f.note ? <span className="text-[#8b95a1]"> ({f.note})</span> : ''}</span>
+              <span className="text-[#4e5968]">{f.label}{f.note ? <span className="text-[#5f6b7a]"> ({f.note})</span> : ''}</span>
               <span className="font-bold text-[#4e5968]">{won(f.amt)}</span>
             </div>
           ))}
         </div>
         {isGroupRoom && isRep && data.groupTotal > 0 && (
-          <div className="mt-2 pt-2 border-t border-[#c8deff] text-[13px] text-[#8b95a1]">
+          <div className="mt-2 pt-2 border-t border-[#c8deff] text-[13px] text-[#5f6b7a]">
             그룹 전체 총액: {won(data.groupTotal)}
           </div>
         )}
         {isGroupRoom && !isRep && (
-          <div className="mt-2 pt-2 border-t border-[#c8deff] text-[13px] text-[#8b95a1]">
+          <div className="mt-2 pt-2 border-t border-[#c8deff] text-[13px] text-[#5f6b7a]">
             방·그룹비는 대표자({data.rep || '-'})가 납부
           </div>
         )}
@@ -1392,20 +1405,20 @@ function EditCard({ data, onDelete, hideSeorak }) {
       <Field label="소속부서"><DeptSelect value={deptName} onChange={setDeptName} /></Field>
       <Field label={hideSeorak ? '버스' : '버스 / 설악산뷰'}>
         <div className="flex gap-2">
-          <button onClick={() => setBus(!bus)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+          <button onClick={() => setBus(!bus)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>
             버스{bus ? ' ✓' : ''}
           </button>
           {!hideSeorak && (
-            <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+            <button onClick={() => setSeorak(!seorak)} className={`flex-1 py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorak ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>
               설악산뷰{seorak ? ' ✓' : ''}
             </button>
           )}
         </div>
-        {hideSeorak && <p className="text-[12px] text-[#8b95a1] mt-1.5">설악산뷰는 그룹 공통입니다. 위 "설악산뷰(그룹 전체)"에서 변경하세요.</p>}
+        {hideSeorak && <p className="text-[12px] text-[#5f6b7a] mt-1.5">설악산뷰는 그룹 공통입니다. 위 "설악산뷰(그룹 전체)"에서 변경하세요.</p>}
       </Field>
       <Field label="문의사항"><textarea value={inquiry} onChange={(e) => setInquiry(e.target.value)} rows={2} className={inputCls + ' resize-none'} /></Field>
 
-      <div className="text-[13px] text-[#8b95a1] bg-white rounded-xl p-3 mb-3 leading-relaxed">
+      <div className="text-[13px] text-[#5f6b7a] bg-white rounded-xl p-3 mb-3 leading-relaxed">
         선택한 방: {roomShort || '-'} · 방 종류·투숙인원·입금자명 변경은 별도 문의 바랍니다.
       </div>
 
@@ -1459,7 +1472,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
 
   return (
     <Card title={title || `그룹 편집 (${members.length}명)`}>
-      <p className="text-[12px] text-[#8b95a1] mb-3 leading-relaxed">방(객실)과 투숙 인원을 정하고, 구성원을 추가·삭제할 수 있습니다. 투숙 인원은 방 크기로, 등록 인원과 다르게(부분 그룹) 정할 수 있어요.</p>
+      <p className="text-[12px] text-[#5f6b7a] mb-3 leading-relaxed">방(객실)과 투숙 인원을 정하고, 구성원을 추가·삭제할 수 있습니다. 투숙 인원은 방 크기로, 등록 인원과 다르게(부분 그룹) 정할 수 있어요.</p>
       <Field label="객실 종류">
         <select value={roomName} onChange={(e) => setRoomName(e.target.value)} className={inputCls}>
           {ROOMS.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
@@ -1469,7 +1482,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         <div className="flex gap-2 mb-2">
           {[['confirmed', '확정'], ['pending', '미정']].map(([v, lbl]) => (
             <button key={v} onClick={() => setOccStatus(v)}
-              className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border ${occStatus === v ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+              className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border ${occStatus === v ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>
               {lbl}
             </button>
           ))}
@@ -1483,12 +1496,12 @@ function GroupEditor({ members, auth, onRefresh, title }) {
             <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls} disabled>
               {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} (추가비용 추후결정됨)</option>)}
             </select>
-            <p className="text-[12px] text-[#8b95a1] mt-2 leading-relaxed">나머지 인원은 교회에서 배정해드립니다. 투숙 추가비용은 최종 방배정 후 결정됩니다.</p>
+            <p className="text-[12px] text-[#5f6b7a] mt-2 leading-relaxed">나머지 인원은 교회에서 배정해드립니다. 투숙 추가비용은 최종 방배정 후 결정됩니다.</p>
           </>
         )}
       </Field>
       <Field label="설악산뷰 (그룹 전체)">
-        <button onClick={() => setSeorakAll((v) => !v)} className={`w-full py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorakAll ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>
+        <button onClick={() => setSeorakAll((v) => !v)} className={`w-full py-3 rounded-xl text-[14px] font-bold border min-h-[48px] ${seorakAll ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>
           설악산뷰 신청{seorakAll ? ' ✓' : ''} <span className="font-normal text-[12px]">(전원 적용 · 1인 {won(SEORAK_FEE)})</span>
         </button>
       </Field>
@@ -1505,11 +1518,11 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         <input value={add.name} onChange={(e) => setAdd({ ...add, name: e.target.value })} placeholder="이름" className={inputCls + ' mb-2'} />
         <div className="flex gap-2 mb-2">
           {['남', '여'].map((g) => (
-            <button key={g} onClick={() => setAdd({ ...add, gender: g })} className={`flex-1 py-2 rounded-xl text-[12px] font-bold border ${add.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>{g}</button>
+            <button key={g} onClick={() => setAdd({ ...add, gender: g })} className={`flex-1 py-2 rounded-xl text-[12px] font-bold border ${add.gender === g ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>{g}</button>
           ))}
         </div>
         <DeptSelect value={add.dept} onChange={(v) => setAdd({ ...add, dept: v })} />
-        <button onClick={() => setAdd({ ...add, bus: !add.bus })} className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border ${add.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>버스 신청 {add.bus ? '✓' : ''}</button>
+        <button onClick={() => setAdd({ ...add, bus: !add.bus })} className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border ${add.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>버스 신청 {add.bus ? '✓' : ''}</button>
         <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#fff5f5] text-[#f04452] border-2 border-dashed border-[#f04452]/40 hover:bg-[#ffecec] font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '+ 구성원 추가'}</button>
       </div>
     </Card>
@@ -1563,18 +1576,18 @@ function LookupDeposit({ results }) {
             className={`w-full px-4 py-4 rounded-2xl text-left transition-all min-h-[64px] border ${mode === 'leader' ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'}`}
           >
             <div className={`text-[15px] font-bold ${mode === 'leader' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>대표자({repName})가 한꺼번에 입금</div>
-            <div className="text-[13px] text-[#8b95a1] mt-0.5">모든 항목을 대표자 이름으로</div>
+            <div className="text-[13px] text-[#5f6b7a] mt-0.5">모든 항목을 대표자 이름으로</div>
           </button>
           <button
             onClick={() => setMode('each')}
             className={`w-full px-4 py-4 rounded-2xl text-left transition-all min-h-[64px] border ${mode === 'each' ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'}`}
           >
             <div className={`text-[15px] font-bold ${mode === 'each' ? 'text-[#1b64da]' : 'text-[#333d4b]'}`}>각자 등록비를 본인 이름으로 입금</div>
-            <div className="text-[13px] text-[#8b95a1] mt-0.5">공동비용(방·그룹비)은 대표자 이름</div>
+            <div className="text-[13px] text-[#5f6b7a] mt-0.5">공동비용(방·그룹비)은 대표자 이름</div>
           </button>
         </div>
       )}
-      <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
+      <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
         아래 항목별로 <b>각각 따로</b> 입금해 주세요.
       </p>
       <div className="space-y-2 mb-4">
@@ -1590,7 +1603,7 @@ function LookupDeposit({ results }) {
         </div>
       </div>
       <div className="bg-[#f9fafb] rounded-xl p-4 mb-3">
-        <div className="text-[13px] text-[#8b95a1] font-semibold mb-1">입금 계좌</div>
+        <div className="text-[13px] text-[#5f6b7a] font-semibold mb-1">입금 계좌</div>
         <div className="text-[15px] font-bold text-[#191f28]">{ACCOUNT}</div>
       </div>
       <button
@@ -1724,7 +1737,7 @@ function PersonChip({ p, warn }) {
       {warn && <span title="신청한 객실 옵션과 다른 방">⚠️</span>}
       {p.name}
       {p.route === '미제출' && <span className="text-[9px] font-bold text-white bg-[#f04452] rounded px-1">미제출</span>}
-      <span className="text-[10px] text-[#8b95a1] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
+      <span className="text-[10px] text-[#5f6b7a] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
       <span className="text-[10px] text-[#1b64da] font-normal">{roomTypeShort(reqRoomType(p.roomLabel))}</span>
       {p.list && <span title={p.list}>📝</span>}
     </div>
@@ -1735,7 +1748,7 @@ function PersonChip({ p, warn }) {
 function ReadChip({ p }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-bold border border-[#e5e8eb] bg-[#f9fafb] text-[#4e5968]">
-      {p.name}<span className="text-[10px] text-[#8b95a1] font-normal">{p.gender}·{deptName(p.deptLabel)}</span>
+      {p.name}<span className="text-[10px] text-[#5f6b7a] font-normal">{p.gender}·{deptName(p.deptLabel)}</span>
     </span>
   )
 }
@@ -1746,8 +1759,8 @@ function RoomDrop({ id, title, sub, count, cap, danger, children }) {
   return (
     <div ref={setNodeRef} className={`rounded-2xl border p-3 mb-2 transition-colors ${isOver ? 'border-2 border-[#3182f6] bg-[#eaf3ff]' : danger ? 'border-[#f04452] bg-[#fff5f5]' : 'border-[#e5e8eb] bg-white'}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-bold text-[#191f28]">{title}{sub && <span className="text-[11px] text-[#8b95a1] font-normal ml-1">{sub}</span>}</span>
-        {cap != null && <span className={`text-[12px] font-bold ${danger ? 'text-[#f04452]' : 'text-[#8b95a1]'}`}>{count}/{cap}명</span>}
+        <span className="text-[13px] font-bold text-[#191f28]">{title}{sub && <span className="text-[11px] text-[#5f6b7a] font-normal ml-1">{sub}</span>}</span>
+        {cap != null && <span className={`text-[12px] font-bold ${danger ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{count}/{cap}명</span>}
       </div>
       <div className="flex flex-wrap gap-1.5 min-h-[34px]">{children}</div>
     </div>
@@ -1770,8 +1783,8 @@ function Collapsible({ title, count, defaultOpen, children }) {
   return (
     <div className="bg-white rounded-2xl border border-[#f2f4f6] mb-3 overflow-hidden">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3">
-        <span className="text-[13px] font-bold text-[#191f28]">{title}{count != null && <span className="text-[#8b95a1] font-normal"> · {count}</span>}</span>
-        <span className={`text-[#8b95a1] text-[12px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+        <span className="text-[13px] font-bold text-[#191f28]">{title}{count != null && <span className="text-[#5f6b7a] font-normal"> · {count}</span>}</span>
+        <span className={`text-[#5f6b7a] text-[12px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </div>
@@ -2128,9 +2141,9 @@ function AdminApp() {
 
   const stat = (label, value, sub) => (
     <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-      <div className="text-[11px] text-[#8b95a1] font-semibold mb-1">{label}</div>
+      <div className="text-[11px] text-[#5f6b7a] font-semibold mb-1">{label}</div>
       <div className="text-[20px] font-extrabold text-[#191f28] leading-none">{value}</div>
-      {sub && <div className="text-[11px] text-[#8b95a1] mt-1">{sub}</div>}
+      {sub && <div className="text-[11px] text-[#5f6b7a] mt-1">{sub}</div>}
     </div>
   )
 
@@ -2145,7 +2158,7 @@ function AdminApp() {
           <div className="bg-white w-full max-w-[480px] rounded-2xl my-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-2 sticky top-0 bg-white rounded-t-2xl">
               <div className="text-[17px] font-extrabold text-[#191f28]">📖 리트릿 관리자 사용법</div>
-              <button onClick={() => setShowGuide(false)} className="text-[13px] font-bold text-[#8b95a1]">닫기 ✕</button>
+              <button onClick={() => setShowGuide(false)} className="text-[13px] font-bold text-[#5f6b7a]">닫기 ✕</button>
             </div>
             <div className="px-5 pb-6 text-[13px] text-[#4e5968] leading-relaxed space-y-4">
               <div>
@@ -2153,7 +2166,7 @@ function AdminApp() {
                 <div className="bg-[#f9fafb] rounded-xl p-3">
                   <p><b className="text-[#1b64da]">그룹</b> = <b>비용</b>을 함께 내는 단위(가족 등). 합치면 객실 그룹가 등 <b>비용이 다시 계산</b>돼요.</p>
                   <p className="mt-1.5"><b className="text-[#7c3aed]">방</b> = <b>같이 자는</b> 단위. 비용과 무관하게 방 번호만 같이 붙입니다.</p>
-                  <p className="mt-1.5 text-[12px] text-[#8b95a1]">→ "돈도 같이"는 <b>그룹정리</b>, "방만 같이"는 <b>같은 방 요청</b> 탭.</p>
+                  <p className="mt-1.5 text-[12px] text-[#5f6b7a]">→ "돈도 같이"는 <b>그룹정리</b>, "방만 같이"는 <b>같은 방 요청</b> 탭.</p>
                 </div>
               </div>
               <div>
@@ -2164,7 +2177,7 @@ function AdminApp() {
                   <li><b>방배정</b> — 교회가 정해줄 사람을 방에 배치(자동배치 + 드래그)</li>
                   <li><b>입금·확인</b> — 입금 확인하고, 미제출자 연락</li>
                 </ol>
-                <p className="text-[12px] text-[#8b95a1] mt-1">요약 탭의 <b>'확인 리스트'</b>를 위에서부터 누르면 해당 탭으로 갑니다.</p>
+                <p className="text-[12px] text-[#5f6b7a] mt-1">요약 탭의 <b>'확인 리스트'</b>를 위에서부터 누르면 해당 탭으로 갑니다.</p>
               </div>
               <div>
                 <div className="font-bold text-[#191f28] mb-1">③ 자주 하는 일</div>
@@ -2181,8 +2194,8 @@ function AdminApp() {
               <div>
                 <div className="font-bold text-[#191f28] mb-1">④ 신호 색</div>
                 <p>🔴 먼저 풀어야 함 · 🟡 확인 후 진행 · 🟢/✅ 바로 가능·완료</p>
-                <p className="mt-1 text-[12px] text-[#8b95a1]">합치기·이동·일괄저장은 누르면 <b>확인창</b>이 떠요. "비용이 바뀜/안 바뀜"을 보고 진행하세요.</p>
-                <p className="mt-1 text-[12px] text-[#8b95a1]">방·입금 작업(방배정·방 맞추기·입금확인)은 헤더 <b>‘↩ 되돌리기’</b>로 직전 작업을 되돌릴 수 있어요.</p>
+                <p className="mt-1 text-[12px] text-[#5f6b7a]">합치기·이동·일괄저장은 누르면 <b>확인창</b>이 떠요. "비용이 바뀜/안 바뀜"을 보고 진행하세요.</p>
+                <p className="mt-1 text-[12px] text-[#5f6b7a]">방·입금 작업(방배정·방 맞추기·입금확인)은 헤더 <b>‘↩ 되돌리기’</b>로 직전 작업을 되돌릴 수 있어요.</p>
               </div>
               <div>
                 <div className="font-bold text-[#191f28] mb-1">⑤ 이럴 땐 웹앱 제작자에게</div>
@@ -2215,12 +2228,12 @@ function AdminApp() {
               <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968] whitespace-nowrap">새로고침</button>
             </div>
           </div>
-          <p className="text-[12px] text-[#8b95a1] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
+          <p className="text-[12px] text-[#5f6b7a] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
         </header>
 
         <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
           {TAB_ORDER.map((t) => (
-            <button key={t} onClick={() => goTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#8b95a1]'}`}>{TAB_LABEL[t]}</button>
+            <button key={t} onClick={() => goTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#5f6b7a]'}`}>{TAB_LABEL[t]}</button>
           ))}
         </div>
 
@@ -2238,7 +2251,7 @@ function AdminApp() {
               return (
                 <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                   <div className="text-[13px] font-bold text-[#191f28] mb-1">✅ 확인 리스트 {left === 0 ? '— 다 끝났어요 🎉' : `(${left}가지)`}</div>
-                  <div className="text-[11px] text-[#8b95a1] mb-2">위에서부터 차례로 누르면 그 탭으로 갑니다.</div>
+                  <div className="text-[11px] text-[#5f6b7a] mb-2">위에서부터 차례로 누르면 그 탭으로 갑니다.</div>
                   {todo.map((t, i) => (
                     <button key={i} onClick={() => t.n > 0 && goTab(t.tab)} disabled={t.n === 0}
                       className="w-full flex items-center gap-2 py-2 border-b border-[#f7f8fa] last:border-0 text-left">
@@ -2263,17 +2276,17 @@ function AdminApp() {
             </div>
             {(m.seoRooms.length > 0 || m.seoUnassigned.length > 0) && (
               <Collapsible title="🏔️ 설악산뷰 방 현황" count={`확정 ${m.seoRooms.length}개 방`}>
-                <p className="text-[11px] text-[#8b95a1] mb-2">설악산뷰는 인원보다 <b>방 수</b>가 중요합니다. 확정된 방과 아직 방이 안 정해진 인원을 함께 봅니다.</p>
+                <p className="text-[11px] text-[#5f6b7a] mb-2">설악산뷰는 인원보다 <b>방 수</b>가 중요합니다. 확정된 방과 아직 방이 안 정해진 인원을 함께 봅니다.</p>
                 {m.seoRooms.map((rm, i) => (
                   <div key={i} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
                     <span className="text-[13px] font-bold text-[#191f28] shrink-0">{rm.label}</span>
-                    <span className="text-[11px] text-[#8b95a1] min-w-0">{rm.campus} · {rm.people.length}명 ({rm.people.join(', ')})</span>
+                    <span className="text-[11px] text-[#5f6b7a] min-w-0">{rm.campus} · {rm.people.length}명 ({rm.people.join(', ')})</span>
                   </div>
                 ))}
                 {m.seoUnassigned.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-[#f2f4f6]">
                     <div className="text-[12px] font-bold text-[#b45309] mb-1">⚠ 미배정 {m.seoUnassigned.length}명 — 방 정하면 방 수가 늘어요</div>
-                    <div className="text-[11px] text-[#8b95a1] leading-relaxed">{m.seoUnassigned.map((r) => `${r.name}(${(r.campus || '').replace(' 캠퍼스', '')})`).join(', ')}</div>
+                    <div className="text-[11px] text-[#5f6b7a] leading-relaxed">{m.seoUnassigned.map((r) => `${r.name}(${(r.campus || '').replace(' 캠퍼스', '')})`).join(', ')}</div>
                   </div>
                 )}
               </Collapsible>
@@ -2283,15 +2296,15 @@ function AdminApp() {
               if (!vm.length && !dismissed.size) return null
               return (
                 <Collapsible title="📋 미제출 추정 명단" count={`${vm.length}명`}>
-                  <p className="text-[11px] text-[#8b95a1] mb-2">명단에는 적혔으나 아직 본인 신청서가 없는 사람입니다. '미제출 추가'하면 방배정 대상이 되고, 이름이 아니거나 이미 제출된 사람은 '제외'하세요.{dismissed.size > 0 && <button onClick={clearDismissed} className="text-[#3182f6] font-semibold ml-1">제외 {dismissed.size}건 되돌리기</button>}</p>
+                  <p className="text-[11px] text-[#5f6b7a] mb-2">명단에는 적혔으나 아직 본인 신청서가 없는 사람입니다. '미제출 추가'하면 방배정 대상이 되고, 이름이 아니거나 이미 제출된 사람은 '제외'하세요.{dismissed.size > 0 && <button onClick={clearDismissed} className="text-[#3182f6] font-semibold ml-1">제외 {dismissed.size}건 되돌리기</button>}</p>
                   {vm.map((x, i) => (
                     <div key={i} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0">
-                      <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{x.name}<span className="text-[10px] text-[#8b95a1] ml-1">{x.from} 명단</span></span>
+                      <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{x.name}<span className="text-[10px] text-[#5f6b7a] ml-1">{x.from} 명단</span></span>
                       <button onClick={() => addPlaceholderName(x.name)} className="text-[11px] font-bold text-white bg-[#3182f6] rounded-lg px-2.5 py-1 shrink-0">미제출 추가</button>
-                      <button onClick={() => dismissMissing(x.name)} className="text-[11px] font-bold text-[#8b95a1] bg-[#f2f4f6] rounded-lg px-2.5 py-1 shrink-0">제외</button>
+                      <button onClick={() => dismissMissing(x.name)} className="text-[11px] font-bold text-[#5f6b7a] bg-[#f2f4f6] rounded-lg px-2.5 py-1 shrink-0">제외</button>
                     </div>
                   ))}
-                  {!vm.length && <p className="text-[12px] text-[#8b95a1] text-center py-2">모두 처리됨 ✓</p>}
+                  {!vm.length && <p className="text-[12px] text-[#5f6b7a] text-center py-2">모두 처리됨 ✓</p>}
                 </Collapsible>
               )
             })()}
@@ -2388,7 +2401,7 @@ function AdminApp() {
 • ⚠ 의사결정 = 교회만 아는 정보(누가 한 가족인지 등) 확인 필요 항목.
 ※ 미제출 = 명단엔 있으나 본인 신청서 없는 사람.`}</HelpToggle>
               <div className="bg-[#eef5ff] border border-[#d0e2ff] rounded-xl px-3 py-2 mb-3 text-[12px] text-[#1b64da]">
-                📅 <b>기준: 2026-06-19</b> 구글폼 원본 정리 · 그룹 41 · 부분 5 · 개인 23 · 중복 5 <span className="text-[#8b95a1] font-normal">(이후 신청·변경은 미반영 — 운영자 확정 스냅샷)</span>
+                📅 <b>기준: 2026-06-19</b> 구글폼 원본 정리 · 그룹 41 · 부분 5 · 개인 23 · 중복 5 <span className="text-[#5f6b7a] font-normal">(이후 신청·변경은 미반영 — 운영자 확정 스냅샷)</span>
               </div>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {stat('그룹', G.length + '개')}
@@ -2400,7 +2413,7 @@ function AdminApp() {
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[13px] font-bold text-[#191f28]">{g[0]}</span>
-                      <span className="text-[11px] text-[#8b95a1]">{g[1]} · {g[4]}</span>
+                      <span className="text-[11px] text-[#5f6b7a]">{g[1]} · {g[4]}</span>
                       <span className={`inline-block text-[10px] font-bold rounded px-1.5 py-0.5 text-white ${statusCls(g[5])}`}>{g[5]}</span>
                     </div>
                     <div className="text-[12px] text-[#4e5968] mt-0.5">{g[2]}</div>
@@ -2412,7 +2425,7 @@ function AdminApp() {
                 {P.map((g, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <span className="text-[13px] font-bold text-[#191f28]">{g[0]}</span>
-                    <span className="text-[11px] text-[#8b95a1] ml-1">{g[3]}</span>
+                    <span className="text-[11px] text-[#5f6b7a] ml-1">{g[3]}</span>
                     <div className="text-[12px] text-[#4e5968] mt-0.5">{g[1]} <span className="text-[11px] text-[#1b64da]">— {g[2]}</span></div>
                   </div>
                 ))}
@@ -2427,7 +2440,7 @@ function AdminApp() {
               </Collapsible>
               <Collapsible title="④ 중복 (집계 제외)" count={`${DUP.length}건`}>
                 {DUP.map((d, i) => (
-                  <div key={i} className="text-[12px] text-[#4e5968] py-0.5">{d[0]} <span className="text-[11px] text-[#8b95a1]">— {d[1]}</span></div>
+                  <div key={i} className="text-[12px] text-[#4e5968] py-0.5">{d[0]} <span className="text-[11px] text-[#5f6b7a]">— {d[1]}</span></div>
                 ))}
               </Collapsible>
               <Collapsible title="⑤ ⚠ 의사결정 필요" count={`${DEC.length}건`} defaultOpen>
@@ -2461,31 +2474,31 @@ function AdminApp() {
                 </p>
                 {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{saveMsg}</p>}
               </div>
-              {!clusters.length && <p className="text-[13px] text-[#8b95a1] text-center py-10">처리할 방배정 요청이 없습니다.</p>}
+              {!clusters.length && <p className="text-[13px] text-[#5f6b7a] text-center py-10">처리할 방배정 요청이 없습니다.</p>}
               {clusters.map((c, i) => (
                 <div key={i} className={`rounded-2xl border p-4 mb-2.5 ${c.done ? 'border-[#e5e8eb] bg-[#f9fafb]' : c.block ? 'border-[#f04452] bg-[#fff5f5]' : c.conflicts.length ? 'border-[#f59e0b] bg-[#fffbeb]' : 'border-[#e5e8eb] bg-white'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[13px] font-bold text-[#191f28]">{c.done ? '✅' : c.block ? '🔴' : c.conflicts.length ? '🟡' : '🟢'} {c.members.map((p) => p.name).join(', ')}{c.done && <span className="text-[11px] font-normal text-[#1b64da] ml-1">이미 같은 방: {c.room}</span>}</span>
-                    <span className={`text-[12px] font-bold ${c.members.length > c.cap ? 'text-[#f04452]' : 'text-[#8b95a1]'}`}>{roomTypeShort(c.roomType)} {c.members.length}/{c.cap}</span>
+                    <span className={`text-[12px] font-bold ${c.members.length > c.cap ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{roomTypeShort(c.roomType)} {c.members.length}/{c.cap}</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {c.members.map((p) => (
                       <span key={p.row} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-bold border border-[#e5e8eb] bg-white">
-                        {p.name}<span className="text-[10px] text-[#8b95a1] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
+                        {p.name}<span className="text-[10px] text-[#5f6b7a] font-normal">{(p.campus || '').replace(' 캠퍼스', '').slice(0, 2)}·{p.gender}·{deptName(p.deptLabel)}</span>
                         {p.assigned && <span className="text-[9px] text-[#1b64da] font-normal">📍{p.assigned}</span>}
                       </span>
                     ))}
                   </div>
                   {c.members.filter((p) => p.list || p.inquiry).map((p) => (
-                    <div key={'m' + p.row} className="text-[11px] text-[#8b95a1] leading-snug mb-0.5">📝 {p.name}: {p.list || p.inquiry}</div>
+                    <div key={'m' + p.row} className="text-[11px] text-[#5f6b7a] leading-snug mb-0.5">📝 {p.name}: {p.list || p.inquiry}</div>
                   ))}
                   {c.conflicts.map((cf, j) => (
-                    <div key={j} className={`text-[12px] font-semibold mt-1 ${cf.lv === 'block' ? 'text-[#f04452]' : cf.lv === 'check' ? 'text-[#b45309]' : 'text-[#8b95a1]'}`}>
+                    <div key={j} className={`text-[12px] font-semibold mt-1 ${cf.lv === 'block' ? 'text-[#f04452]' : cf.lv === 'check' ? 'text-[#b45309]' : 'text-[#5f6b7a]'}`}>
                       {cf.lv === 'block' ? '🔴' : cf.lv === 'check' ? '🟡' : '⚪'} {cf.msg}
                       {cf.names && cf.names.map((nm) => (
                         <span key={nm} className="inline-flex items-center gap-0.5 ml-1">
                           <button onClick={() => addPlaceholderName(nm)} className="text-[11px] text-white bg-[#f04452] rounded px-1.5 py-0.5">+ {nm} 추가</button>
-                          <button onClick={() => dismissMissing(nm)} className="text-[11px] text-[#8b95a1] bg-[#f2f4f6] rounded px-1.5 py-0.5">제외</button>
+                          <button onClick={() => dismissMissing(nm)} className="text-[11px] text-[#5f6b7a] bg-[#f2f4f6] rounded px-1.5 py-0.5">제외</button>
                         </span>
                       ))}
                     </div>
@@ -2500,12 +2513,12 @@ function AdminApp() {
                             className="text-[12px] font-bold text-white bg-[#1b64da] rounded-lg px-3 py-1.5">추천 {c.fillCandidates.length}명 이 방에 추가</button>
                         </>
                       ) : (
-                        <div className="text-[11px] text-[#8b95a1]">조정 제안: 조건(같은 성별·캠퍼스) 맞는 미배정자가 없어요. → 객실을 {c.members.length}인으로 줄이거나, 빈자리로 두거나, 다른 부분그룹과 합치세요.</div>
+                        <div className="text-[11px] text-[#5f6b7a]">조정 제안: 조건(같은 성별·캠퍼스) 맞는 미배정자가 없어요. → 객실을 {c.members.length}인으로 줄이거나, 빈자리로 두거나, 다른 부분그룹과 합치세요.</div>
                       )}
                     </div>
                   )}
                   <button onClick={() => assignRoom(c.members.map((p) => p.row), c.label)} disabled={c.block || c.done}
-                    className={`w-full mt-3 py-2.5 rounded-xl font-bold text-[13px] ${c.block || c.done ? 'bg-[#e5e8eb] text-[#8b95a1]' : 'bg-[#3182f6] text-white'}`}>
+                    className={`w-full mt-3 py-2.5 rounded-xl font-bold text-[13px] ${c.block || c.done ? 'bg-[#e5e8eb] text-[#5f6b7a]' : 'bg-[#3182f6] text-white'}`}>
                     {c.block ? '충돌 해소 후 묶기 가능' : c.done ? '✓ 이미 같은 방으로 배정됨' : `이 방 같이 쓰기 (비용은 각자) → ${c.label}`}
                   </button>
                 </div>
@@ -2576,7 +2589,7 @@ function AdminApp() {
                 <Collapsible title="이미 구성된 그룹 (편집·합치기)" count={`${bookedList.length}방`}>
                   {(() => { const selN = Object.keys(mergeSel).filter((g) => mergeSel[g]).length; return (
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[11px] text-[#8b95a1]">떨어진 그룹 체크 → 합치기</span>
+                      <span className="text-[11px] text-[#5f6b7a]">떨어진 그룹 체크 → 합치기</span>
                       <button onClick={mergeSelected} disabled={selN < 2} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN >= 2 ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}그룹 합치기</button>
                     </div>
                   ) })()}
@@ -2588,7 +2601,7 @@ function AdminApp() {
                         <div className="flex items-center justify-between mb-1">
                           <label className="flex items-center gap-1.5 cursor-pointer">
                             <input type="checkbox" checked={!!mergeSel[gid]} onChange={() => toggleMerge(gid)} className="w-4 h-4" />
-                            <span className="text-[12px] font-bold text-[#191f28]">{rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#8b95a1]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></span>
+                            <span className="text-[12px] font-bold text-[#191f28]">{rep || mem[0].name} 그룹 <span className="text-[11px] font-normal text-[#5f6b7a]">· {roomTypeShort(type)} {mem.length}/{cap}명</span></span>
                           </label>
                           <button onClick={() => setEditGid(gid)} className="text-[11px] font-bold text-[#3182f6]">편집</button>
                         </div>
@@ -2657,11 +2670,11 @@ function AdminApp() {
               </div>
 
               <Collapsible title="⚠ 확인이 필요해요 (의심 목록)" count={`${s1.length + s3.length}건`} defaultOpen>
-                {s1.length === 0 && s3.length === 0 && <p className="text-[12px] text-[#8b95a1]">의심 항목 없음</p>}
+                {s1.length === 0 && s3.length === 0 && <p className="text-[12px] text-[#5f6b7a]">의심 항목 없음</p>}
                 {s1.map((s, i) => (
                   <div key={'s1' + i} className="py-2 border-b border-[#f7f8fa]">
                     <div className="text-[12px] font-bold text-[#191f28] mb-1">📞 같은 번호인데 {s.gids.length}개 그룹으로 나뉨</div>
-                    <div className="text-[11px] text-[#8b95a1] mb-1">{s.gids.map((g) => labelOf(g)).join(' / ')}</div>
+                    <div className="text-[11px] text-[#5f6b7a] mb-1">{s.gids.map((g) => labelOf(g)).join(' / ')}</div>
                     <button onClick={() => ask('이 그룹들을 합칠까요?', `같은 번호로 묶인 ${s.gids.length}개 그룹을 한 그룹으로 합칩니다.\n⚠ 비용이 다시 계산됩니다.`, () => { setMergeMsg('합치는 중…'); post({ action: 'mergeGroups', pin, gids: s.gids }).then((j) => { setMergeMsg(j.ok ? `✓ ${j.merged}명 합침` : '오류'); reload() }) }, '합치기')}
                       className="text-[12px] font-bold text-white bg-[#191f28] rounded-lg px-3 py-1.5">이 그룹들 합치기</button>
                   </div>
@@ -2669,7 +2682,7 @@ function AdminApp() {
                 {s3.map((gid) => (
                   <div key={'s3' + gid} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <div className="text-[12px] font-bold text-[#191f28]">📝 {repOf(groups[gid])} 그룹 · 명단보다 제출 적음</div>
-                    <div className="text-[11px] text-[#8b95a1]">{(groups[gid].find((r) => r.note) || {}).note || '명단에 미제출자 있음 — 미제출 추가/확인'}</div>
+                    <div className="text-[11px] text-[#5f6b7a]">{(groups[gid].find((r) => r.note) || {}).note || '명단에 미제출자 있음 — 미제출 추가/확인'}</div>
                   </div>
                 ))}
               </Collapsible>
@@ -2677,7 +2690,7 @@ function AdminApp() {
               {/* 그룹 기준 방 일괄 맞춤 */}
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                 <div className="text-[13px] font-bold text-[#191f28] mb-1">🛏️ 그룹 기준으로 방 맞추기</div>
-                <div className="text-[11px] text-[#8b95a1] mb-2">예전에 합치거나 시트에서 직접 수정한 그룹은 방이 안 따라왔을 수 있어요. 지금 묶인 그룹대로 배정방(=대표 방)을 한 번에 맞춥니다. (개인 1명은 안 건드림)</div>
+                <div className="text-[11px] text-[#5f6b7a] mb-2">예전에 합치거나 시트에서 직접 수정한 그룹은 방이 안 따라왔을 수 있어요. 지금 묶인 그룹대로 배정방(=대표 방)을 한 번에 맞춥니다. (개인 1명은 안 건드림)</div>
                 <button onClick={syncAllRooms} disabled={!roomOutOfSync.length}
                   className={`w-full py-2.5 rounded-xl font-bold text-[13px] ${roomOutOfSync.length ? 'bg-[#191f28] text-white' : 'bg-[#f2f4f6] text-[#b0b8c1]'}`}>
                   {roomOutOfSync.length ? `방 안 맞는 ${roomOutOfSync.length}개 그룹 일괄 정렬` : '모든 그룹이 방과 동기화됨 ✓'}
@@ -2687,18 +2700,18 @@ function AdminApp() {
               {/* 이름 검색 → 대상 그룹도 이름 검색 → 이동 */}
               <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
                 <div className="text-[13px] font-bold text-[#191f28] mb-1">🔎 이름으로 이동</div>
-                <div className="text-[11px] text-[#8b95a1] mb-2">그룹을 옮기거나 합치면 방 배정도 자동으로 같이 맞춰집니다.</div>
+                <div className="text-[11px] text-[#5f6b7a] mb-2">그룹을 옮기거나 합치면 방 배정도 자동으로 같이 맞춰집니다.</div>
                 {!movePick ? (
                   <>
-                    <div className="text-[11px] text-[#8b95a1] mb-1.5">① 옮길 사람을 검색해 선택하세요</div>
+                    <div className="text-[11px] text-[#5f6b7a] mb-1.5">① 옮길 사람을 검색해 선택하세요</div>
                     <input value={moveQ} onChange={(e) => setMoveQ(e.target.value)} placeholder="옮길 사람 이름 검색" className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2" />
                     {moveQ.trim() && (() => {
                       const matches = live.filter((r) => r.name.indexOf(moveQ.trim()) >= 0).slice(0, 12)
-                      if (!matches.length) return <p className="text-[12px] text-[#8b95a1]">일치하는 이름 없음</p>
+                      if (!matches.length) return <p className="text-[12px] text-[#5f6b7a]">일치하는 이름 없음</p>
                       return matches.map((p) => (
                         <button key={p.row} onClick={() => { setMovePick(p); setMoveTargetQ('') }}
                           className="w-full flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 text-left">
-                          <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{p.name}<span className="text-[10px] text-[#8b95a1] ml-1">현재: {repOf(groups[p.gid] || [p])} 그룹 · {deptName(p.deptLabel)}</span></span>
+                          <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{p.name}<span className="text-[10px] text-[#5f6b7a] ml-1">현재: {repOf(groups[p.gid] || [p])} 그룹 · {deptName(p.deptLabel)}</span></span>
                           <span className="text-[12px] font-bold text-[#3182f6] shrink-0">선택 →</span>
                         </button>
                       ))
@@ -2707,10 +2720,10 @@ function AdminApp() {
                 ) : (
                   <>
                     <div className="flex items-center gap-2 mb-2 bg-[#eef5ff] rounded-xl px-3 py-2">
-                      <span className="text-[13px] text-[#191f28] flex-1 min-w-0"><b>{movePick.name}</b><span className="text-[10px] text-[#8b95a1] ml-1">현재: {repOf(groups[movePick.gid] || [movePick]) } 그룹</span></span>
-                      <button onClick={() => { setMovePick(null); setMoveQ(''); setMoveTargetQ('') }} className="text-[11px] text-[#8b95a1] underline shrink-0">다른 사람</button>
+                      <span className="text-[13px] text-[#191f28] flex-1 min-w-0"><b>{movePick.name}</b><span className="text-[10px] text-[#5f6b7a] ml-1">현재: {repOf(groups[movePick.gid] || [movePick]) } 그룹</span></span>
+                      <button onClick={() => { setMovePick(null); setMoveQ(''); setMoveTargetQ('') }} className="text-[11px] text-[#5f6b7a] underline shrink-0">다른 사람</button>
                     </div>
-                    <div className="text-[11px] text-[#8b95a1] mb-1.5">② 옮길 그룹을 검색하세요 (그 그룹 사람 이름)</div>
+                    <div className="text-[11px] text-[#5f6b7a] mb-1.5">② 옮길 그룹을 검색하세요 (그 그룹 사람 이름)</div>
                     <input value={moveTargetQ} onChange={(e) => setMoveTargetQ(e.target.value)} placeholder="대상 그룹의 아무 구성원 이름" className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-3 py-2.5 text-[14px] mb-2" />
                     <button onClick={() => { moveMember(movePick.name, '__solo__'); setMovePick(null); setMoveQ(''); setMoveTargetQ('') }}
                       className="w-full text-[12px] text-[#4e5968] bg-[#f2f4f6] rounded-lg py-2 mb-2">{movePick.name}님 단독으로 분리</button>
@@ -2718,11 +2731,11 @@ function AdminApp() {
                       const hit = live.filter((r) => r.name.indexOf(moveTargetQ.trim()) >= 0 && r.gid !== movePick.gid)
                       const seen = {}; const tgts = []
                       hit.forEach((r) => { if (!seen[r.gid]) { seen[r.gid] = true; tgts.push(r.gid) } })
-                      if (!tgts.length) return <p className="text-[12px] text-[#8b95a1]">일치하는 그룹 없음</p>
+                      if (!tgts.length) return <p className="text-[12px] text-[#5f6b7a]">일치하는 그룹 없음</p>
                       return tgts.slice(0, 12).map((g) => (
                         <button key={g} onClick={() => { moveMember(movePick.name, g, labelOf(g)); setMovePick(null); setMoveQ(''); setMoveTargetQ('') }}
                           className="w-full flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 text-left">
-                          <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{labelOf(g)}<span className="text-[10px] text-[#8b95a1] ml-1">{(groups[g] || []).length}명</span></span>
+                          <span className="text-[13px] text-[#191f28] flex-1 min-w-0">{labelOf(g)}<span className="text-[10px] text-[#5f6b7a] ml-1">{(groups[g] || []).length}명</span></span>
                           <span className="text-[12px] font-bold text-[#3182f6] shrink-0">여기로 이동 →</span>
                         </button>
                       ))
@@ -2732,7 +2745,7 @@ function AdminApp() {
               </div>
 
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[11px] text-[#8b95a1]">합칠 그룹 체크</span>
+                <span className="text-[11px] text-[#5f6b7a]">합칠 그룹 체크</span>
                 <button onClick={mergeSelected} disabled={selN < 2} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN >= 2 ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}그룹 합치기</button>
               </div>
 
@@ -2745,7 +2758,7 @@ function AdminApp() {
                   </label>
                   {groups[gid].map((p) => (
                     <div key={p.row} className="flex items-center gap-2 py-1 border-b border-[#f7f8fa] last:border-0">
-                      <span className="text-[13px] text-[#191f28] flex-1">{p.name}<span className="text-[10px] text-[#8b95a1] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{deptName(p.deptLabel)}</span></span>
+                      <span className="text-[13px] text-[#191f28] flex-1">{p.name}<span className="text-[10px] text-[#5f6b7a] ml-1">{(p.campus || '').replace(' 캠퍼스', '')}·{deptName(p.deptLabel)}</span></span>
                       <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) moveMember(p.name, v, v === '__solo__' ? '' : labelOf(v)) }}
                         className="bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1 text-[11px] max-w-[130px]">
                         <option value="">이동 ▾</option>
@@ -2769,17 +2782,17 @@ function AdminApp() {
 • '확인 필요': 명단엔 있는데 본인 신청서가 없는 그룹 — 연락해 신청을 받거나 미제출로 추가하세요.`}</HelpToggle>
             {(() => { const selN = Object.keys(sel).filter((r) => sel[r]).length; return (
               <Collapsible title="미입금" count={`${m.unpaid.length}명`} defaultOpen>
-                {m.unpaid.length === 0 ? <p className="text-[12px] text-[#8b95a1]">전원 입금확인 완료</p> : (
+                {m.unpaid.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">전원 입금확인 완료</p> : (
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <button onClick={() => setSel(Object.fromEntries(m.unpaid.map((r) => [r.row, true])))} className="text-[11px] font-bold text-[#3182f6] bg-[#f2f8ff] px-2.5 py-1.5 rounded-lg">전체선택</button>
-                      <button onClick={() => setSel({})} className="text-[11px] font-bold text-[#8b95a1] bg-[#f2f4f6] px-2.5 py-1.5 rounded-lg">해제</button>
+                      <button onClick={() => setSel({})} className="text-[11px] font-bold text-[#5f6b7a] bg-[#f2f4f6] px-2.5 py-1.5 rounded-lg">해제</button>
                       <button onClick={batchConfirmPaid} disabled={!selN} className={`ml-auto text-[12px] font-bold px-3 py-1.5 rounded-lg ${selN ? 'bg-[#191f28] text-white' : 'bg-[#e5e8eb] text-[#b0b8c1]'}`}>선택 {selN}명 입금확인</button>
                     </div>
                     {m.unpaid.map((r) => (
                       <label key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 cursor-pointer">
                         <input type="checkbox" checked={!!sel[r.row]} onChange={() => toggleSel(r.row)} className="w-4 h-4" />
-                        <span className="text-[13px] font-bold text-[#191f28] flex-1">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.pay ? ` · 입금자명 ${r.pay}` : ''}</span></span>
+                        <span className="text-[13px] font-bold text-[#191f28] flex-1">{r.name} <span className="text-[11px] text-[#5f6b7a] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.pay ? ` · 입금자명 ${r.pay}` : ''}</span></span>
                       </label>
                     ))}
                   </>
@@ -2787,11 +2800,11 @@ function AdminApp() {
               </Collapsible>
             ) })()}
             <Collapsible title="확인필요 (명단 > 제출)" count={`${m.checkGroups.length}건`}>
-              {m.checkGroups.length === 0 ? <p className="text-[12px] text-[#8b95a1]">없음</p> :
+              {m.checkGroups.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> :
                 m.checkGroups.map((g) => (
                   <div key={g.gid} className="py-1.5 border-b border-[#f7f8fa] last:border-0">
-                    <div className="text-[13px] font-bold text-[#191f28]">{g.rep} <span className="text-[11px] text-[#8b95a1] font-normal">그룹</span></div>
-                    <div className="text-[11px] text-[#8b95a1] leading-snug">{g.note}</div>
+                    <div className="text-[13px] font-bold text-[#191f28]">{g.rep} <span className="text-[11px] text-[#5f6b7a] font-normal">그룹</span></div>
+                    <div className="text-[11px] text-[#5f6b7a] leading-snug">{g.note}</div>
                   </div>
                 ))}
             </Collapsible>
@@ -2827,11 +2840,11 @@ function AdminApp() {
             const noiseN = (grouped.none || []).length
             const Card = (r) => (
               <div key={r.row} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#8b95a1] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
+                <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#5f6b7a] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
                 <div className="text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed">{r.inquiry}</div>
               </div>
             )
-            if (qs.length === 0) return <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#8b95a1]">문의사항 없음</p></div>
+            if (qs.length === 0) return <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#5f6b7a]">문의사항 없음</p></div>
             return (
               <div className="space-y-4">
                 <HelpToggle>{`성도들이 남긴 문의를 맥락에 따라 자동으로 나눠 묶었습니다(입금 문의 / 입금 보고 / 방배정 요청 / 방배정 질문 / 기타).
@@ -2841,21 +2854,21 @@ function AdminApp() {
 • 방배정 요청은 '같은 방 요청' 탭에서 실제로 처리합니다.`}</HelpToggle>
                 <label className="flex items-center gap-2 bg-white rounded-2xl border border-[#f2f4f6] p-3 text-[12px] text-[#4e5968] cursor-pointer">
                   <input type="checkbox" checked={showNoise} onChange={(e) => setShowNoise(e.target.checked)} className="w-4 h-4" />
-                  내용 없는 문의("없음/없습니다") 보기 <span className="text-[#8b95a1]">({noiseN}건 숨김)</span>
+                  내용 없는 문의("없음/없습니다") 보기 <span className="text-[#5f6b7a]">({noiseN}건 숨김)</span>
                 </label>
                 {CATS.map((cat) => {
                   const items = grouped[cat.key] || []
                   if (!items.length) return null
                   return (
                     <div key={cat.key}>
-                      <div className="text-[13px] font-bold text-[#191f28] mb-1.5 px-1">{cat.label} <span className="text-[11px] text-[#8b95a1] font-normal">{items.length}건 {cat.hint}</span></div>
+                      <div className="text-[13px] font-bold text-[#191f28] mb-1.5 px-1">{cat.label} <span className="text-[11px] text-[#5f6b7a] font-normal">{items.length}건 {cat.hint}</span></div>
                       <div className="space-y-2">{items.map(Card)}</div>
                     </div>
                   )
                 })}
                 {showNoise && noiseN > 0 && (
                   <div>
-                    <div className="text-[13px] font-bold text-[#8b95a1] mb-1.5 px-1">🗒️ 내용 없음 <span className="text-[11px] font-normal">{noiseN}건</span></div>
+                    <div className="text-[13px] font-bold text-[#5f6b7a] mb-1.5 px-1">🗒️ 내용 없음 <span className="text-[11px] font-normal">{noiseN}건</span></div>
                     <div className="space-y-2">{grouped.none.map(Card)}</div>
                   </div>
                 )}
@@ -2871,7 +2884,7 @@ function AdminApp() {
               return (
                 <div key={campus} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
                   <div className="text-[13px] font-bold text-[#191f28] mb-2">{campus.replace(' 캠퍼스', '')} 버스 {list.length}명</div>
-                  {list.length === 0 ? <p className="text-[12px] text-[#8b95a1]">없음</p> :
+                  {list.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> :
                     <div className="text-[12px] text-[#4e5968] leading-relaxed">{list.map((r) => `${r.name}(${deptName(r.deptLabel)})`).join(', ')}</div>}
                 </div>
               )
@@ -2900,7 +2913,7 @@ export default function App() {
           <div className="mt-3 bg-white rounded-2xl border border-[#f2f4f6] p-4 text-[14px] text-[#4e5968] leading-relaxed">
             7/21(화)~23(목) · 델피노 리조트<br />
             등록기간 6/7~6/28 (선착순) · 문의 이흥배 목사 010-9584-7575<br />
-            <span className="text-[#8b95a1] text-[13px]">* 새가족 과정 수료자에 한해 등록 가능</span>
+            <span className="text-[#5f6b7a] text-[13px]">* 새가족 과정 수료자에 한해 등록 가능</span>
             <GuideButton />
           </div>
         </header>
@@ -2916,7 +2929,7 @@ export default function App() {
               key={k}
               onClick={() => setMode(k)}
               className={`flex-1 py-3.5 text-[14px] font-bold rounded-[12px] transition-all min-h-[48px] ${
-                mode === k ? 'bg-white text-[#3182f6] shadow-md' : 'text-[#8b95a1]'
+                mode === k ? 'bg-white text-[#3182f6] shadow-md' : 'text-[#5f6b7a]'
               }`}
             >
               {t}
@@ -2926,7 +2939,7 @@ export default function App() {
 
         {mode === '개인' ? <IndividualMode /> : mode === '그룹' ? <GroupMode /> : <LookupMode />}
 
-        <p className="text-[13px] text-[#8b95a1] text-center mt-6 leading-relaxed">
+        <p className="text-[13px] text-[#5f6b7a] text-center mt-6 leading-relaxed">
           제출 후 <b>입금까지 완료</b>해야 등록이 확정됩니다.<br />
           환불은 등록기간 이후 어렵습니다.<br />
           가족·그룹은 대표자가 구성원을 모두 입력해 한 번에 제출합니다.

@@ -1900,6 +1900,10 @@ function AdminApp() {
   const [qUnpaid, setQUnpaid] = useState('') // #1 미입금 검색(이름·입금자명)
   const [qList, setQList] = useState('') // #1 정리안 검색
   const [doneInq, setDoneInq] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_done_inq') || '[]')) } catch { return new Set() } }) // #8 문의 완료
+  const [onlyUndoneInq, setOnlyUndoneInq] = useState(true) // #8 미처리만 보기
+  const toggleDoneInq = (key) => { const ns = new Set(doneInq); ns.has(key) ? ns.delete(key) : ns.add(key); setDoneInq(ns); try { localStorage.setItem('retreat_done_inq', JSON.stringify([...ns])) } catch (e) {} }
+  const [boarded, setBoarded] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('retreat_boarded') || '[]')) } catch { return new Set() } }) // #9 버스 탑승 체크
+  const toggleBoarded = (key) => { const ns = new Set(boarded); ns.has(key) ? ns.delete(key) : ns.add(key); setBoarded(ns); try { localStorage.setItem('retreat_boarded', JSON.stringify([...ns])) } catch (e) {} }
   const [extraRooms, setExtraRooms] = useState([]) // 빈 방 라벨
   const [editGid, setEditGid] = useState(null) // 관리자 그룹 편집 대상
   const [mergeSel, setMergeSel] = useState({}) // 합치기 선택 gid→bool
@@ -2991,12 +2995,19 @@ function AdminApp() {
             ]
             const grouped = {}; qs.forEach((r) => { const c = classify(r.inquiry); (grouped[c] = grouped[c] || []).push(r) })
             const noiseN = (grouped.none || []).length
-            const Card = (r) => (
-              <div key={r.row} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#5f6b7a] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
-                <div className="text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed">{r.inquiry}</div>
+            const Card = (r) => {
+              const done = doneInq.has(r.row)
+              return (
+              <div key={r.row} className={`bg-white rounded-2xl border border-[#f2f4f6] p-4 ${done ? 'opacity-55' : ''}`}>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold text-[#191f28]">{r.name} <span className="text-[11px] text-[#5f6b7a] font-normal">{(r.campus || '').replace(' 캠퍼스', '')}·{deptName(r.deptLabel)}{r.contact ? ` · ${fmtPhone(r.contact)}` : ''}</span></div>
+                    <div className={`text-[12px] text-[#4e5968] mt-1 whitespace-pre-wrap leading-relaxed ${done ? 'line-through' : ''}`}>{r.inquiry}</div>
+                  </div>
+                  <button onClick={() => toggleDoneInq(r.row)} className={`shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg ${done ? 'bg-[#e7f5ec] text-[#1d7a4d]' : 'bg-[#f2f4f6] text-[#5f6b7a]'}`}>{done ? '완료 ✓' : '완료'}</button>
+                </div>
               </div>
-            )
+            ) }
             if (qs.length === 0) return <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4"><p className="text-[12px] text-[#5f6b7a]">문의사항 없음</p></div>
             return (
               <div className="space-y-4">
@@ -3005,12 +3016,18 @@ function AdminApp() {
 • '없음/없습니다' 같은 빈 문의는 기본 숨김 — 아래 체크박스로 켜고 끌 수 있어요.
 • 자동 분류라 가끔 틀릴 수 있으니 참고용으로 보세요.
 • 방배정 요청은 '같은 방 요청' 탭에서 실제로 처리합니다.`}</HelpToggle>
-                <label className="flex items-center gap-2 bg-white rounded-2xl border border-[#f2f4f6] p-3 text-[12px] text-[#4e5968] cursor-pointer">
-                  <input type="checkbox" checked={showNoise} onChange={(e) => setShowNoise(e.target.checked)} className="w-4 h-4" />
-                  내용 없는 문의("없음/없습니다") 보기 <span className="text-[#5f6b7a]">({noiseN}건 숨김)</span>
-                </label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 bg-white rounded-2xl border border-[#f2f4f6] p-3 text-[12px] text-[#4e5968] cursor-pointer">
+                    <input type="checkbox" checked={onlyUndoneInq} onChange={(e) => setOnlyUndoneInq(e.target.checked)} className="w-4 h-4" />
+                    미처리만 보기 <span className="text-[#5f6b7a]">(완료 {doneInq.size}건 숨김)</span>
+                  </label>
+                  <label className="flex items-center gap-2 bg-white rounded-2xl border border-[#f2f4f6] p-3 text-[12px] text-[#4e5968] cursor-pointer">
+                    <input type="checkbox" checked={showNoise} onChange={(e) => setShowNoise(e.target.checked)} className="w-4 h-4" />
+                    내용 없는 문의("없음/없습니다") 보기 <span className="text-[#5f6b7a]">({noiseN}건 숨김)</span>
+                  </label>
+                </div>
                 {CATS.map((cat) => {
-                  const items = grouped[cat.key] || []
+                  const items = (grouped[cat.key] || []).filter((r) => !onlyUndoneInq || !doneInq.has(r.row))
                   if (!items.length) return null
                   return (
                     <div key={cat.key}>
@@ -3032,13 +3049,32 @@ function AdminApp() {
 
         {tab === '버스명단' && (
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-[#5f6b7a]">탑승 체크는 이 기기에만 저장됩니다. 당일 현장용.</p>
+              <button onClick={() => window.print()} className="text-[11px] font-bold text-[#4e5968] bg-white border border-[#e5e8eb] px-3 py-1.5 rounded-lg">🖨 인쇄</button>
+            </div>
             {Object.keys(m.byCampus).map((campus) => {
               const list = m.busList.filter((r) => (r.campus || '기타') === campus)
+              const onN = list.filter((r) => boarded.has(r.row)).length
               return (
                 <div key={campus} className="bg-white rounded-2xl border border-[#f2f4f6] p-4">
-                  <div className="text-[13px] font-bold text-[#191f28] mb-2">{campus.replace(' 캠퍼스', '')} 버스 {list.length}명</div>
-                  {list.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> :
-                    <div className="text-[12px] text-[#4e5968] leading-relaxed">{list.map((r) => `${r.name}(${deptName(r.deptLabel)})`).join(', ')}</div>}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[13px] font-bold text-[#191f28]">{campus.replace(' 캠퍼스', '')} 버스 {list.length}명</div>
+                    {list.length > 0 && <span className="text-[12px] font-extrabold text-[#1b64da]">탑승 {onN}/{list.length}</span>}
+                  </div>
+                  {list.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : (
+                    <div>
+                      {list.map((r) => {
+                        const on = boarded.has(r.row)
+                        return (
+                          <label key={r.row} className="flex items-center gap-2 py-1.5 border-b border-[#f7f8fa] last:border-0 cursor-pointer">
+                            <input type="checkbox" checked={on} onChange={() => toggleBoarded(r.row)} className="w-4 h-4" />
+                            <span className={`text-[13px] flex-1 ${on ? 'text-[#5f6b7a] line-through' : 'text-[#191f28]'}`}>{r.name} <span className="text-[11px] text-[#5f6b7a]">{deptName(r.deptLabel)}</span></span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}

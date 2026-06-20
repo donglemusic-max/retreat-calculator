@@ -225,9 +225,9 @@ function HelpIcon({ title, body }) {
 }
 
 // ── 공통 UI ────────────────────────────────────────────────────
-function Card({ title, badge, help, helpTitle, children, step }) {
+function Card({ title, badge, help, helpTitle, children, step, id }) {
   return (
-    <section className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-5 mb-4">
+    <section id={id} className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-5 mb-4 scroll-mt-[120px]">
       {title && (
         <div className="flex items-center gap-2 mb-4">
           {step != null && (
@@ -329,6 +329,40 @@ function scrollToId(id) {
   var el = document.getElementById(id); if (!el) return
   var y = el.getBoundingClientRect().top + window.scrollY - 80
   window.scrollTo({ top: y < 0 ? 0 : y, behavior: 'smooth' })
+}
+
+// 긴 폼 상단 진행 가이드(#10): 섹션 칩 + 스크롤 시 현재 섹션 강조 + 탭하면 이동.
+function StepGuide({ steps }) {
+  const [active, setActive] = useState(0)
+  useEffect(() => {
+    const onScroll = () => {
+      var cur = 0
+      for (var i = 0; i < steps.length; i++) {
+        var el = document.getElementById(steps[i].id)
+        if (el && el.getBoundingClientRect().top <= 150) cur = i
+      }
+      setActive(cur)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [steps])
+  return (
+    <div className="sticky top-[60px] z-[9] -mx-4 px-4 py-2 bg-[#f2f4f6]/95 backdrop-blur-sm mb-3 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 w-max">
+        {steps.map((s, i) => (
+          <React.Fragment key={s.id}>
+            <button onClick={() => scrollToId(s.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap transition-all ${i === active ? 'bg-[#191f28] text-white' : 'bg-white text-[#5f6b7a] border border-[#e5e8eb]'}`}>
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${i === active ? 'bg-white text-[#191f28]' : 'bg-[#e9ecef] text-[#5f6b7a]'}`}>{i + 1}</span>
+              {s.label}
+            </button>
+            {i < steps.length - 1 && <span className="text-[#c4c9d0] text-[11px]">›</span>}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // 화면 하단 고정 금액 요약 바 (#1) + 단일 주 버튼(#2). 옵션 바꾸면 total이 즉시 갱신됨.
@@ -550,7 +584,8 @@ function IndividualMode() {
 
   return (
     <>
-      <Card title="소속 부서" step={1} help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
+      <StepGuide steps={[{ id: 'sec-dept', label: '부서' }, { id: 'sec-room', label: '방' }, { id: 'sec-move', label: '이동' }, { id: 'sec-info', label: '정보' }]} />
+      <Card title="소속 부서" id="sec-dept" step={1} help={HELP.dept} helpTitle="소속부서 / 등록비 안내">
         <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">부서에 따라 1인 등록비가 달라집니다.</p>
         <DeptSelect value={dept} onChange={setDept} />
         <div className="mt-3 bg-[#f2f8ff] rounded-xl px-4 py-3">
@@ -559,7 +594,7 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="방 선택" step={2} help={HELP.room} helpTitle="객실 종류 안내">
+      <Card title="방 선택" id="sec-room" step={2} help={HELP.room} helpTitle="객실 종류 안내">
         <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
           혼자 등록하시면 교회에서 방을 배정해 드립니다. 원하는 방이 있으면 선택하세요. (추가 비용 발생 가능)
         </p>
@@ -577,7 +612,7 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="교통 / 설악산뷰" step={3} help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
+      <Card title="교통 / 설악산뷰" id="sec-move" step={3} help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
         <div className="space-y-3">
           <Toggle
             on={bus}
@@ -596,7 +631,7 @@ function IndividualMode() {
         </div>
       </Card>
 
-      <Card title="신청자 정보" step={4}>
+      <Card title="신청자 정보" id="sec-info" step={4}>
         <Field label="이름" required id="f-name" error={showErr && !name.trim() ? '이름을 입력해 주세요.' : ''}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={errCls(!name.trim())} />
         </Field>
@@ -645,6 +680,7 @@ function GroupMode() {
   const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
   const [busSeorakBy, setBusSeorakBy] = useState('leader') // split일 때만: 'leader'(대표자 모아서) | 'each'(개인별)
   const [partial, setPartial] = useState(false) // 부분그룹: 나머지는 교회 배정(투숙비 추후결정)
+  const [fillByChurch, setFillByChurch] = useState(false) // 확정그룹 + 큰 방, 빈자리는 교회가 채움
   const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
   const [campus, setCampus] = useState('')
@@ -659,6 +695,8 @@ function GroupMode() {
   const count = members.length
   const effOcc = occOverride != null ? OCCUPANCY.find((o) => o.label === occOverride) : deriveOcc(count)
   const who = leader.trim() || '대표자'
+  // 방 정원이 등록 인원보다 클 때의 빈자리 수 (확정그룹 + 큰 방, 빈자리 교회배정)
+  const roomGap = (!partial && effOcc && effOcc.people > count) ? (effOcc.people - count) : 0
 
   const updateMember = (i, patch) =>
     setMembers((m) => m.map((mm, idx) => (idx === i ? { ...mm, ...patch } : mm)))
@@ -691,7 +729,7 @@ function GroupMode() {
   const submission = {
     mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
     roomLabel: room.label, occLabel: partial ? OCC_PARTIAL : effOcc.formLabel, seorak, depositMode,
-    roster: partial ? roster + ' [부분그룹·나머지 교회배정]' : roster,
+    roster: partial ? roster + ' [부분그룹·나머지 교회배정]' : (fillByChurch && roomGap > 0 ? roster + ' [빈자리 ' + roomGap + '자리 교회배정 요청]' : roster),
     members: members.map((m) => ({ name: m.name.trim(), gender: m.gender, deptLabel: DEPTS.find((d) => d.name === m.dept).label, bus: m.bus, campus: m.campus || campus })),
   }
 
@@ -783,7 +821,8 @@ function GroupMode() {
 
   return (
     <>
-      <Card title="대표자 정보" step={1}>
+      <StepGuide steps={[{ id: 'sec-leader', label: '대표자' }, { id: 'sec-members', label: '구성원' }, { id: 'sec-room', label: '방' }, { id: 'sec-deposit', label: '입금' }]} />
+      <Card title="대표자 정보" id="sec-leader" step={1}>
         <p className="text-[13px] text-[#5f6b7a] mb-4 leading-relaxed">
           가족·그룹을 대표해서 신청하는 분의 정보입니다. 공동비용 입금 시 이 이름으로 입금합니다.
         </p>
@@ -805,7 +844,7 @@ function GroupMode() {
       </Card>
 
       <div id="f-members" className="scroll-mt-24" />
-      <Card title="구성원" step={2} badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
+      <Card title="구성원" id="sec-members" step={2} badge={count} help={HELP.members} helpTitle="가족 · 그룹 신청 안내">
         {showErr && memberIncomplete && (
           <p className="text-[12px] font-semibold text-[#f04452] mb-2">모든 구성원의 이름과 성별을 입력해 주세요.</p>
         )}
@@ -967,9 +1006,24 @@ function GroupMode() {
             나머지 인원은 교회에서 배정해드립니다. 투숙 인원에 따른 추가비용은 최종 방배정 후 결정됩니다.
           </p>
         )}
+        {/* 확정그룹 + 큰 방: 빈자리 교회배정 요청 (예: 4명인데 6~8인 방) */}
+        {roomGap > 0 && (
+          <div className="mt-3">
+            <button
+              onClick={() => setFillByChurch((v) => !v)}
+              className={`w-full flex items-start gap-2 text-left px-4 py-3 rounded-xl border transition-all ${fillByChurch ? 'border-2 border-[#3182f6] bg-[#f2f8ff]' : 'border border-[#e5e8eb] bg-white'}`}
+            >
+              <span className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center text-[12px] font-bold shrink-0 ${fillByChurch ? 'bg-[#3182f6] text-white' : 'border border-[#c4c9d0] text-transparent'}`}>✓</span>
+              <span className="text-[13px] font-bold text-[#333d4b] leading-snug">
+                남는 {roomGap}자리는 교회에서 다른 분으로 배정해 주세요
+                <span className="block text-[12px] font-normal text-[#5f6b7a] mt-0.5">우리 {count}명은 한 방으로 확정하고, 빈자리({roomGap}자리)는 교회가 채워줍니다. 추가되는 분은 본인 등록비를 따로 냅니다.</span>
+              </span>
+            </button>
+          </div>
+        )}
       </Card>
 
-      <Card title="방 선택" step={4} help={HELP.room} helpTitle="객실 종류 안내">
+      <Card title="방 선택" id="sec-room" step={4} help={HELP.room} helpTitle="객실 종류 안내">
         <div className="space-y-2">
           {ROOMS.map((r, i) => (
             <OptionRow
@@ -1006,7 +1060,7 @@ function GroupMode() {
         />
       </Card>
 
-      <Card title="등록비 입금은 어떻게 하실 건가요?" step={6} help={HELP.depositMode} helpTitle="입금 방식 안내">
+      <Card title="등록비 입금은 어떻게 하실 건가요?" id="sec-deposit" step={6} help={HELP.depositMode} helpTitle="입금 방식 안내">
         <div className="space-y-2">
           <button
             onClick={() => setDepositMode('leader')}
@@ -2898,7 +2952,8 @@ function AdminApp() {
 
 // ── 메인 ───────────────────────────────────────────────────────
 export default function App() {
-  const [mode, setMode] = useState('개인')
+  const [top, setTop] = useState('등록')  // '등록' | '조회' (#9)
+  const [reg, setReg] = useState('개인')   // '개인' | '그룹'
   if (typeof window !== 'undefined' && window.location.hash.replace(/^#\/?/, '') === 'admin') return <AdminApp />
 
   return (
@@ -2918,26 +2973,38 @@ export default function App() {
           </div>
         </header>
 
-        {/* 모드 탭 */}
-        <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[16px] mb-4 sticky top-2 z-10">
-          {[
-            { k: '개인', t: '개인 등록' },
-            { k: '그룹', t: '가족·그룹' },
-            { k: '조회', t: '조회·수정' },
-          ].map(({ k, t }) => (
-            <button
-              key={k}
-              onClick={() => setMode(k)}
-              className={`flex-1 py-3.5 text-[14px] font-bold rounded-[12px] transition-all min-h-[48px] ${
-                mode === k ? 'bg-white text-[#3182f6] shadow-md' : 'text-[#5f6b7a]'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        {/* 상단 탭: 등록 ↔ 조회·수정 분리 (#9) */}
+        <div className="flex items-center gap-2 mb-3 sticky top-2 z-10">
+          <button
+            onClick={() => setTop('등록')}
+            className={`flex-1 py-3.5 text-[15px] font-bold rounded-[14px] transition-all min-h-[48px] ${top === '등록' ? 'bg-[#191f28] text-white shadow-md' : 'bg-white text-[#5f6b7a] border border-[#e5e8eb]'}`}
+          >
+            등록하기
+          </button>
+          <button
+            onClick={() => setTop('조회')}
+            className={`px-4 py-3.5 text-[14px] font-bold rounded-[14px] transition-all min-h-[48px] ${top === '조회' ? 'bg-[#191f28] text-white shadow-md' : 'bg-white text-[#5f6b7a] border border-[#e5e8eb]'}`}
+          >
+            조회·수정
+          </button>
         </div>
 
-        {mode === '개인' ? <IndividualMode /> : mode === '그룹' ? <GroupMode /> : <LookupMode />}
+        {/* 등록 하위: 개인 / 가족·그룹 */}
+        {top === '등록' && (
+          <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4">
+            {[{ k: '개인', t: '개인' }, { k: '그룹', t: '가족·그룹' }].map(({ k, t }) => (
+              <button
+                key={k}
+                onClick={() => setReg(k)}
+                className={`flex-1 py-3 text-[14px] font-bold rounded-[11px] transition-all min-h-[44px] ${reg === k ? 'bg-white text-[#3182f6] shadow-sm' : 'text-[#5f6b7a]'}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {top === '조회' ? <LookupMode /> : reg === '개인' ? <IndividualMode /> : <GroupMode />}
 
         <p className="text-[13px] text-[#5f6b7a] text-center mt-6 leading-relaxed">
           제출 후 <b>입금까지 완료</b>해야 등록이 확정됩니다.<br />

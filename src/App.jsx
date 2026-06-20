@@ -687,6 +687,7 @@ function GroupMode() {
   const [depositMode, setDepositMode] = useState('leader') // 'leader' | 'split'
   const [busSeorakBy, setBusSeorakBy] = useState('leader') // split일 때만: 'leader'(대표자 모아서) | 'each'(개인별)
   const [partial, setPartial] = useState(false) // 부분그룹: 나머지는 교회 배정(투숙비 추후결정)
+  const [partialPref, setPartialPref] = useState('') // 부분그룹 희망 방 인원(추후결정, 참고용)
   const [fillByChurch, setFillByChurch] = useState(false) // 확정그룹 + 큰 방, 빈자리는 교회가 채움
   const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
@@ -736,7 +737,7 @@ function GroupMode() {
   const submission = {
     mode: '그룹', email: email.trim(), contact: contact.trim(), campus, leader: leader.trim(), inquiry: inquiry.trim(),
     roomLabel: room.label, occLabel: partial ? OCC_PARTIAL : effOcc.formLabel, seorak, depositMode,
-    roster: partial ? roster + ' [부분그룹·나머지 교회배정]' : (fillByChurch && roomGap > 0 ? roster + ' [빈자리 ' + roomGap + '자리 교회배정 요청]' : roster),
+    roster: partial ? roster + ' [부분그룹·나머지 교회배정' + (partialPref ? '·희망 ' + (partialPref === '상관없음' ? '인원무관' : partialPref) : '') + ']' : (fillByChurch && roomGap > 0 ? roster + ' [빈자리 ' + roomGap + '자리 교회배정 요청]' : roster),
     members: members.map((m) => ({ name: m.name.trim(), gender: m.gender, deptLabel: DEPTS.find((d) => d.name === m.dept).label, bus: m.bus, campus: m.campus || campus })),
   }
 
@@ -1009,9 +1010,30 @@ function GroupMode() {
           </>
         )}
         {partial && (
-          <p className="text-[13px] text-[#5f6b7a] leading-relaxed">
-            나머지 인원은 교회에서 배정해드립니다. 투숙 인원에 따른 추가비용은 최종 방배정 후 결정됩니다.
-          </p>
+          <div>
+            <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
+              나머지 인원은 교회에서 배정해드립니다. 원하는 방 인원이 있으면 골라주세요. <b>추가비용은 최종 방배정 후 결정</b>됩니다.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {OCCUPANCY.map((o) => (
+                <button
+                  key={o.label}
+                  onClick={() => setPartialPref(o.label)}
+                  className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${partialPref === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}
+                >
+                  {o.label}<br />
+                  <span className="text-[12px] font-normal text-[#5f6b7a]">추후 결정됨</span>
+                </button>
+              ))}
+              <button
+                onClick={() => setPartialPref('상관없음')}
+                className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${partialPref === '상관없음' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}
+              >
+                인원은 상관없습니다<br />
+                <span className="text-[12px] font-normal text-[#5f6b7a]">추후 결정됨</span>
+              </button>
+            </div>
+          </div>
         )}
         {/* 확정그룹 + 큰 방: 빈자리 교회배정 요청 (예: 4명인데 6~8인 방) */}
         {roomGap > 0 && (

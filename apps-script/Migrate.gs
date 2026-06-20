@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v16-testrow'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v17-keepadmin'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -355,7 +355,7 @@ function enrichSheet() {
   var width = maxCol - minCol + 1;
   var body = [];
   for (var r3 = 1; r3 < data.length; r3++) {
-    var line = new Array(width).fill('');
+    var line = data[r3].slice(minCol, maxCol + 1); // 기존 값에서 시작 → 기록 범위 안의 비앱컬럼(배정방/입금확인/관리자메모)을 덮지 않고 보존
     var o = out[r3] || {};
     APP_COLS.forEach(function (l) { line[appColIdx[l] - minCol] = (o[l] !== undefined ? o[l] : ''); });
     body.push(line);

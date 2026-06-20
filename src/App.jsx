@@ -3239,9 +3239,12 @@ function AdminApp() {
                   const mem = roomMap[lab]
                   const type = (/소노캄/.test(lab) ? '소노캄 스위트' : /스위트/.test(lab) ? '소노벨 스위트' : /패밀리/.test(lab) ? '소노벨 패밀리' : null) || roomTypeOfMembers(mem)
                   const cap = ROOM_CAP[type]
+                  // 씨앗 방: 부분그룹(다른 성도와 함께 배정 요청)이 든 방 → '추가 배정 필요' 표시 + 남은 자리
+                  const seed = mem.some((p) => /나머지는 교회에서 배정|부분적으로/.test(p.occLabel || ''))
+                  const sub = roomTypeShort(type) + (seed ? ` · 🟡 부분·추가 ${Math.max(0, cap - mem.length)}자리` : '')
                   return (
-                    <RoomDrop key={lab} id={lab} title={lab} sub={roomTypeShort(type)} count={mem.length} cap={cap} danger={mem.length > cap} onDelete={() => removeRoom(lab)}>
-                      {mem.map((p) => <PersonChip key={p.row} p={p} warn={reqRoomType(p.roomLabel) !== type} />)}
+                    <RoomDrop key={lab} id={lab} title={lab} sub={sub} count={mem.length} cap={cap} danger={mem.length > cap} onDelete={() => removeRoom(lab)}>
+                      {mem.map((p) => <PersonChip key={p.row} p={p} warn={!seed && reqRoomType(p.roomLabel) !== type} />)}
                     </RoomDrop>
                   )
                 })}

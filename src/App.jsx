@@ -334,6 +334,11 @@ function SegPicker({ value, onChange, options, render }) {
 
 // ── 제출 전 확인 바텀시트 ──────────────────────────────────────
 function ConfirmSheet({ open, onClose, onConfirm, calc, subtitle, memberSummary, loading }) {
+  const [copied, setCopied] = useState(false)
+  const copyGuide = async () => {
+    try { await navigator.clipboard.writeText(depositGuideText(calc, subtitle)); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+    catch { alert('복사에 실패했습니다. 길게 눌러 직접 복사해 주세요.') }
+  }
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
@@ -384,11 +389,17 @@ function ConfirmSheet({ open, onClose, onConfirm, calc, subtitle, memberSummary,
         )}
 
         <button
+          onClick={copyGuide}
+          className="w-full py-3.5 rounded-2xl bg-[#f2f8ff] text-[#1b64da] font-bold text-[15px] border border-[#d8e8ff] mb-2 min-h-[52px]"
+        >
+          {copied ? '✓ 복사 완료' : '입금 안내 문구 복사하기'}
+        </button>
+        <button
           onClick={onConfirm}
           disabled={loading}
           className="w-full py-4 rounded-2xl bg-[#191f28] text-white font-bold text-[16px] shadow-lg mb-2"
         >
-          {loading ? '제출 중…' : '제출하기'}
+          {loading ? '제출 중…' : '저장하고 제출하기'}
         </button>
         <button onClick={onClose} className="w-full py-3 rounded-2xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[14px]">
           돌아가서 수정하기
@@ -716,7 +727,7 @@ function GroupMode() {
           가족·그룹을 대표해서 신청하는 분의 정보입니다. 공동비용 입금 시 이 이름으로 입금합니다.
         </p>
         <Field label="대표자 이름" required>
-          <input value={leader} onChange={(e) => setLeader(e.target.value)} placeholder="예: 김바울" className={inputCls} />
+          <input value={leader} onChange={(e) => { setLeader(e.target.value); updateMember(0, { name: e.target.value }) }} placeholder="예: 김바울" className={inputCls} />
         </Field>
         <Field label="연락처" required>
           <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" className={inputCls} />
@@ -747,7 +758,7 @@ function GroupMode() {
               <input
                 value={m.name}
                 onChange={(e) => updateMember(i, { name: e.target.value })}
-                placeholder={i === 0 ? '이름 (대표자 본인이면 위와 동일하게)' : '이름'}
+                placeholder={i === 0 ? '대표자 이름 (위에서 자동 입력)' : '이름'}
                 className="w-full bg-white border border-[#e5e8eb] rounded-xl px-3 py-3 text-[15px] mb-3 focus:ring-2 focus:ring-[#3182f6] focus:outline-none min-h-[48px]"
               />
               <div className="flex gap-2 mb-3">
@@ -943,17 +954,21 @@ function GroupMode() {
 }
 
 // ── 결과 / 입금 안내 ──────────────────────────────────────────
+// 입금 안내 복사 문구 (ResultPanel / ConfirmSheet 공용). 첫 줄에 컬럼 범례(#2).
+function depositGuideText(calc, subtitle) {
+  const legend = '▸ [항목]  입금자명   금액   (설명)'
+  const lines = calc.lines
+    .map((l) => `▸ ${l.cat}  ${l.payer}   ${won(l.amt)}${l.note ? `   (${l.note})` : ''}`)
+    .join('\n')
+  const perLine = calc.count > 1 ? `\n(1인 평균 ${won(calc.perPerson)} · ${calc.count}명)` : ''
+  const sub = subtitle ? `${subtitle}\n` : ''
+  return `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n${sub}\n${legend}\n${lines}\n─────────────────\n총 합계: ${won(calc.total)}${perLine}\n\n* 원활한 등록 관리를 위하여, 위 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.`
+}
+
 function ResultPanel({ calc, subtitle }) {
   const [copied, setCopied] = useState(false)
 
-  const guideText = useMemo(() => {
-    const lines = calc.lines
-      .map((l) => `▸ ${l.cat} ${l.payer}   ${won(l.amt)}${l.note ? `  (${l.note})` : ''}`)
-      .join('\n')
-    const perLine = calc.count > 1 ? `\n(1인 평균 ${won(calc.perPerson)} · ${calc.count}명)` : ''
-    const sub = subtitle ? `${subtitle}\n` : ''
-    return `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n${sub}\n${lines}\n─────────────────\n총 합계: ${won(calc.total)}${perLine}\n\n* 위 항목별로 구분하여 따로 입금해 주세요.`
-  }, [calc, subtitle])
+  const guideText = useMemo(() => depositGuideText(calc, subtitle), [calc, subtitle])
 
   const copy = async () => {
     try {
@@ -1212,7 +1227,7 @@ function EditCard({ data, onDelete }) {
       <button
         onClick={save}
         disabled={saving}
-        className={`w-full py-4 rounded-2xl font-bold text-[15px] min-h-[52px] ${saved ? 'bg-[#15803d] text-white' : 'bg-[#3182f6] text-white hover:bg-[#1b64da]'}`}
+        className={`w-full py-4 rounded-2xl font-bold text-[15px] min-h-[52px] ${saved ? 'bg-[#15803d] text-white' : 'bg-[#191f28] text-white hover:bg-black'}`}
       >
         {saving ? '저장 중…' : saved ? '✓ 저장됨' : '이 내용으로 수정 저장'}
       </button>
@@ -1267,7 +1282,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
           {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} {o.fee > 0 ? `(그룹 +${o.fee / 10000}만)` : '(추가없음)'}</option>)}
         </select>
       </Field>
-      <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#3182f6] text-white font-bold text-[13px] mb-1">
+      <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#191f28] hover:bg-black text-white font-bold text-[13px] mb-1">
         {busy === 'group' ? '저장 중…' : '객실/투숙 저장'}
       </button>
       {msg && <p className="text-[12px] text-[#1b64da] font-semibold my-2">{msg}</p>}
@@ -1285,7 +1300,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         </div>
         <DeptSelect value={add.dept} onChange={(v) => setAdd({ ...add, dept: v })} />
         <button onClick={() => setAdd({ ...add, bus: !add.bus })} className={`w-full mt-2 py-2 rounded-xl text-[12px] font-bold border ${add.bus ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#8b95a1]'}`}>버스 신청 {add.bus ? '✓' : ''}</button>
-        <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '구성원 추가'}</button>
+        <button onClick={addMember} disabled={busy === 'add'} className="w-full mt-2 py-2.5 rounded-xl bg-[#fff5f5] text-[#f04452] border-2 border-dashed border-[#f04452]/40 hover:bg-[#ffecec] font-bold text-[13px]">{busy === 'add' ? '추가 중…' : '+ 구성원 추가'}</button>
       </div>
     </Card>
   )
@@ -1324,9 +1339,9 @@ function LookupDeposit({ results }) {
   }
   const total = lines.reduce((s, l) => s + l.amt, 0)
 
-  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n방식: ${mode === 'leader' && multi ? '대표자 일괄' : '항목별/각자'}\n\n` +
-    lines.map((l) => `▸ ${l.cat} ${l.payer}   ${won(l.amt)}`).join('\n') +
-    `\n─────────────────\n총 합계: ${won(total)}\n\n* 항목별로 구분하여 따로 입금해 주세요. (입금자명: "항목 이름")`
+  const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n방식: ${mode === 'leader' && multi ? '대표자 일괄' : '항목별/각자'}\n\n▸ [항목]  입금자명   금액\n` +
+    lines.map((l) => `▸ ${l.cat}  ${l.payer}   ${won(l.amt)}`).join('\n') +
+    `\n─────────────────\n총 합계: ${won(total)}\n\n* 원활한 등록 관리를 위하여, 위 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.`
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { alert('복사 실패 — 길게 눌러 복사해 주세요.') } }
 
   return (

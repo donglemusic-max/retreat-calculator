@@ -1701,17 +1701,18 @@ function LookupMode() {
 
   return (
     <>
-      <Card title="내 신청 조회">
+      <Card title="내 신청 조회·수정">
         <p className="text-[14px] text-[#4e5968] mb-4 leading-relaxed">
-          신청하실 때 입력한 이름과 이메일로 조회합니다.<br />
-          가족·그룹은 대표자 이름으로 조회하세요.
+          신청하실 때 적으신 <b className="text-[#191f28]">이름</b>과 <b className="text-[#191f28]">이메일</b>로 확인하실 수 있어요.<br />
+          가족·그룹은 <b className="text-[#1b64da]">대표자 이름</b>이나 <b className="text-[#1b64da]">구성원 이름</b> 무엇으로든 모두 조회됩니다.
         </p>
-        <Field label="이름" required>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김바울" className={inputCls} />
+        <Field label="이름">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="신청서에 적은 이름 (예: 김바울)" className={inputCls} />
         </Field>
-        <Field label="이메일" required>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" inputMode="email" className={inputCls} />
+        <Field label="이메일">
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="신청서에 적은 이메일" inputMode="email" className={inputCls} />
         </Field>
+        <p className="text-[12px] text-[#5f6b7a] mb-3 -mt-1">* 가족·그룹은 대표자가 신청 시 적은 이메일로 함께 조회돼요.</p>
         <button
           onClick={lookup}
           disabled={!name.trim() || !email.trim() || status === 'loading'}
@@ -1724,10 +1725,11 @@ function LookupMode() {
 
       {status === 'loaded' && (
         results.length === 0 ? (
-          <Card title="조회 결과 없음">
+          <Card title="조회 결과가 없어요">
             <p className="text-[14px] text-[#4e5968] leading-relaxed">
-              해당 이름과 이메일로 제출된 신청이 없습니다.<br />
-              입력 내용을 다시 확인하시거나, 안내데스크로 문의해 주세요.
+              <b className="text-[#191f28]">{name.trim() || '입력하신 이름'}</b>님의 신청을 찾지 못했어요. 😢<br />
+              이름·이메일에 오타가 없는지 확인해 주세요. 가족·그룹이면 <b>구성원 이름</b>으로도 조회할 수 있어요.<br />
+              그래도 안 되면 안내데스크로 편하게 문의해 주세요.
             </p>
           </Card>
         ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (

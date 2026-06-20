@@ -16,13 +16,23 @@ const DEPTS = [
 ]
 
 const ROOMS = [
-  { name: '소노벨 패밀리', group: 0, indiv: 0, max: 6, desc: '최대 6인 · 원룸(더블 2개) · 예배실 도보 3~5분',
+  { name: '소노벨 패밀리', group: 0, indiv: 0, max: 6, desc: '최대 6인 · 원룸(더블 2개) · 예배실 도보 3~5분', plan: 'floorplan/family.png',
     label: '소노벨 패밀리 (최대 인원 6인 원룸. 더블침대 2개) - 객실당 추가 비용은 없음 (인원에 따른 추가 비용은 선택에 따라 발생)' },
-  { name: '소노벨 스위트', group: 60000, indiv: 10000, max: 8, desc: '최대 8인 · 투룸(온돌 / 더블·싱글) · 예배실 도보 3~5분',
+  { name: '소노벨 스위트', group: 60000, indiv: 10000, max: 8, desc: '최대 8인 · 투룸(온돌 / 더블·싱글) · 예배실 도보 3~5분', plan: 'floorplan/suite.png',
     label: '소노벨 스위트 (최대 인원 8인 투룸. 침실A: 온돌 / 침실B: 더블 1개 or 싱글 2개) - 객실당 추가로 [그룹의 경우] 6만원 혹은 [개인비용] 1만원' },
-  { name: '소노캄 스위트', group: 240000, indiv: 40000, max: 8, desc: '최대 8인 · 투룸(싱글2 / 더블) · 예배실 옆 건물',
+  { name: '소노캄 스위트', group: 240000, indiv: 40000, max: 8, desc: '최대 8인 · 투룸(싱글2 / 더블) · 예배실 옆 건물', plan: 'floorplan/sonokam.png',
     label: '소노캄 스위트 (최대 인원 8인 투룸. 침실A: 싱글 2개, 침실B: 더블 1개) - 객실당 추가로 [그룹의 경우] 24만원 혹은 [개인의 경우] 4만원' },
 ]
+// 선택한 객실 평면도 (방 선택 아래 표시)
+function FloorPlan({ room }) {
+  if (!room || !room.plan) return null
+  return (
+    <div className="mt-3">
+      <div className="text-[12px] font-bold text-[#5f6b7a] mb-1.5">📐 {room.name} 평면도</div>
+      <img src={room.plan} alt={`${room.name} 평면도`} loading="lazy" className="w-full rounded-xl border border-[#e5e8eb] bg-white" />
+    </div>
+  )
+}
 
 // 투숙 인원별 그룹 추가비용 (객실당). formLabel = 시트 정본 문자열
 const OCCUPANCY = [
@@ -633,6 +643,7 @@ function IndividualMode() {
             />
           ))}
         </div>
+        <FloorPlan room={room} />
       </Card>
 
       <Card title="교통 / 설악산뷰" id="sec-move" step={4} help={HELP.move} helpTitle="버스 / 설악산뷰 안내">
@@ -1069,6 +1080,7 @@ function GroupMode() {
             />
           ))}
         </div>
+        <FloorPlan room={room} />
         {partial && (
           <p className="text-[13px] text-[#5f6b7a] mt-3 leading-relaxed">
             * 부분 그룹은 <b>1인 기준</b> 객실 추가비용을 참고로 보여드립니다. 입금 안내는 방(그룹) 기준으로 안내되며, 최종 방배정 후 조정될 수 있습니다.
@@ -1592,6 +1604,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
         <select value={roomName} onChange={(e) => setRoomName(e.target.value)} className={inputCls}>
           {ROOMS.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
         </select>
+        <FloorPlan room={ROOMS.find((r) => r.name === roomName)} />
       </Field>
       <Field label="투숙 인원 (방 크기)">
         <div className="flex gap-2 mb-2">

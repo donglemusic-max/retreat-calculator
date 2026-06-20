@@ -1887,9 +1887,10 @@ const COST_EXAMPLES = [
     lines: [
       { label: '기본 등록비 (5명)', calc: '27.8 × 5명', amount: '139.0' },
       { label: '버스', calc: '3.8 × 5명', amount: '19.0' },
-      { label: '객실 선택비 (소노캄 스위트 · 5인 한 방)', calc: '그룹당 1개', amount: '24' },
+      { label: '객실 선택비 (소노캄 스위트 · 그룹)', calc: '그룹당 1개', amount: '24' },
+      { label: '투숙 인원별 (5인 한 방)', calc: '그룹당 1개', amount: '10' },
     ],
-    total: '182.0만원', payNote: '등록비·버스비는 1인당 비용을 모아 대표자 이름으로 항목별로 입금해 주세요. 객실 선택비는 방 하나당 비용이므로 대표자 이름으로 한 번만 입금해 주시면 됩니다.',
+    total: '192.0만원', payNote: '등록비·버스비는 1인당 비용을 모아 대표자 이름으로 항목별로 입금해 주세요. 객실 선택비·투숙 인원별 비용은 방 하나당(그룹당) 비용이라 대표자 이름으로 한 번씩 입금해 주시면 됩니다.',
   },
   {
     tab: '부분', tab2: '등록', badgeText: '예시 4 · 부분 등록', badgeBg: '#fef2f2', badgeColor: '#b91c1c',
@@ -1908,8 +1909,15 @@ function CostExamples() {
   const secLabel = { fontSize: 13, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.02em', marginBottom: 14 }
   const chip = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', borderRadius: 10, padding: '12px 14px' }
   const ex = COST_EXAMPLES[tab]
+  const payRows = [
+    ['입금자명', '반드시 신청자(또는 그룹 대표자) 본인 이름으로 입금해 주세요.', true],
+    ['항목별로', '등록비 · 버스비 · 설악산 · 객실선택을 나누어 입금해 주세요. (그룹은 + 그룹비용)', true],
+    ['개인', '본인 이름으로 항목별 입금.', false],
+    ['가족', '대표자 한 분이 가족 비용을 모아 항목별 입금.', false],
+    ['그룹', '등록비·버스비는 1인당 모아 대표자 이름으로, 객실·그룹비용은 그룹당 대표자 이름으로 입금.', false],
+  ]
   return (
-    <div style={{ fontFamily: "'Pretendard',-apple-system,sans-serif" }}>
+    <div id="cost-guide-print" style={{ fontFamily: "'Pretendard',-apple-system,sans-serif" }}>
       <div style={{ marginBottom: 22 }}>
         <h2 style={{ margin: '0 0 8px', fontSize: 22, lineHeight: 1.3, fontWeight: 800, color: '#111827', letterSpacing: '-0.02em' }}>등록비는 이렇게 구성됩니다</h2>
         <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#4b5563' }}>기본 등록비에 원하시는 선택을 더하는 방식입니다. 아래에서 <strong style={{ color: '#1d4ed8' }}>상황과 비슷한 예시</strong>를 보시면 한눈에 이해하실 수 있습니다. <span style={{ color: '#6b7280' }}>(단위: 만원)</span></p>
@@ -1936,7 +1944,23 @@ function CostExamples() {
         </div>
         <div style={{ marginTop: 14, display: 'flex', gap: 9, alignItems: 'flex-start', background: '#eff6ff', borderRadius: 10, padding: '11px 13px' }}>
           <span style={{ flex: 'none', fontSize: 14 }}>💡</span>
-          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#1e40af' }}>셀·성도분들이 <strong>한 방을 통째로</strong> 쓰는 그룹 신청이시면, 객실비는 1인당이 아니라 <strong>방 하나당(그룹당)</strong>으로 계산됩니다. (예: 소노캄 스위트 5인 한 방 = 24)</span>
+          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#1e40af' }}>셀·성도분들이 <strong>한 방을 통째로</strong> 쓰는 그룹 신청은 계산 방식이 달라집니다. 아래 <strong>3번</strong>을 참고해 주세요.</span>
+        </div>
+      </div>
+      <div style={card}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#4338ca', letterSpacing: '0.02em', marginBottom: 6 }}>3 · 그룹(방 전체)으로 신청하시면 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(그룹당)</span></div>
+        <p style={{ margin: '0 0 16px', fontSize: 13.5, lineHeight: 1.6, color: '#6b7280' }}>셀·성도가 한 방을 통째로 쓰실 때는 아래 두 비용이 <strong>방 하나당(그룹당)</strong>으로 붙습니다. 개인(1인당) 객실비는 적용되지 않습니다.</p>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280', marginBottom: 9 }}>Ⓐ 투숙 인원별 추가 비용 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(적게 쓸수록 큽니다)</span></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 18 }}>
+          {[['7~8인 · 비선택', '0', '#6b7280'], ['6인', '5', '#111827'], ['5인', '10', '#111827'], ['4인', '20', '#111827'], ['3인', '30', '#111827'], ['2인', '40', '#111827'], ['1인', '50', '#111827']].map(([n, v, c]) => (
+            <div key={n} style={{ ...chip, alignItems: 'baseline', padding: '10px 13px' }}><span style={{ fontSize: 14, color: '#374151' }}>{n}</span><span style={{ fontSize: 15, fontWeight: 700, color: c }}>{v}</span></div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280', marginBottom: 9 }}>Ⓑ 객실 선택비 <span style={{ color: '#9ca3af', fontWeight: 500 }}>(그룹당)</span></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>소노벨 패밀리 <span style={{ color: '#9ca3af', fontSize: 13 }}>(기본)</span></span><span style={{ fontSize: 15, fontWeight: 700, color: '#6b7280' }}>0</span></div>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>소노벨 스위트</span><span style={{ fontSize: 15, fontWeight: 700, color: '#4338ca' }}>6</span></div>
+          <div style={chip}><span style={{ fontSize: 14, color: '#374151' }}>소노캄 스위트</span><span style={{ fontSize: 15, fontWeight: 700, color: '#4338ca' }}>24</span></div>
         </div>
       </div>
       <div style={{ margin: '26px 0 14px' }}>
@@ -1976,6 +2000,22 @@ function CostExamples() {
           <span style={{ flex: 'none', fontSize: 16 }}>💳</span>
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#92400e' }}>{ex.payNote}</p>
         </div>
+      </div>
+      <div style={card}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309', letterSpacing: '0.02em', marginBottom: 14 }}>입금은 이렇게 해주세요</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {payRows.map(([k, v, warn]) => (
+            <div key={k} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: warn ? '#fffbeb' : '#f9fafb', borderRadius: 10, padding: '12px 14px' }}>
+              <span style={{ flex: 'none', width: 76, fontSize: 13.5, fontWeight: 700, color: warn ? '#b45309' : '#374151' }}>{k}</span>
+              <span style={{ fontSize: 13.5, lineHeight: 1.5, color: warn ? '#92400e' : '#4b5563' }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={card} className="no-print">
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', marginBottom: 4 }}>전체 비용표 한 장으로 보기</div>
+        <p style={{ margin: '0 0 14px', fontSize: 13.5, lineHeight: 1.6, color: '#6b7280' }}>표로 한눈에 보거나 단톡방에 공유하고 싶으실 때. 아래 버튼으로 이 안내 전체를 <strong>PDF로 저장하거나 인쇄</strong>하실 수 있고, 화면을 그대로 캡처해 공유하셔도 됩니다.</p>
+        <button onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, padding: 14, borderRadius: 11, cursor: 'pointer' }}>🖨 비용표 PDF로 저장 · 인쇄</button>
       </div>
       <p style={{ margin: '16px 4px 0', fontSize: 12.5, lineHeight: 1.6, color: '#9ca3af' }}>※ 그룹(방 전체) 객실 선택비는 투숙 인원·객실 종류에 따라 달라집니다.</p>
     </div>

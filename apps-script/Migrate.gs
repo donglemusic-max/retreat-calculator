@@ -262,7 +262,7 @@ function enrichSheet() {
     // 대표자 추정: 대표자칸 → 입금자명 토큰(멤버이름 일치) → 장년부 → 첫행
     var rep = '';
     for (var i = 0; i < members.length && !rep; i++) {
-      var v = get(members[i], 'rep'); var mm = v.match(/[가-힣]{2,4}/); if (mm) rep = mm[0];
+      var v = get(members[i], 'rep'); var mm = v.match(/[가-힣]{2,4}[A-Za-z0-9]*/); if (mm) rep = mm[0]; // 접미사/숫자 보존(박테스트1·이한나A)
     }
     if (!rep) {
       outer:

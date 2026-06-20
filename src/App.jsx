@@ -549,7 +549,7 @@ function IndividualMode() {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(submission),
+        body: JSON.stringify({ ...submission, guideText: depositGuideText(calc, '※ ' + subtitle) }),
       })
       const j = await res.json()
       if (j.ok) { setSubmitDone(j); setConfirmOpen(false) }
@@ -788,7 +788,7 @@ function GroupMode() {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(submission),
+        body: JSON.stringify({ ...submission, guideText: depositGuideText(calc, '※ ' + subtitle) }),
       })
       const j = await res.json()
       if (j.ok) { setSubmitDone(j); setConfirmOpen(false) }

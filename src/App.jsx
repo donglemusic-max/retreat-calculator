@@ -2211,6 +2211,9 @@ function AdminApp() {
 
   const TAB_ORDER = ['요약', '정리안', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단']
   const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스' }
+  // #11 워크플로우 단계 번호(① 그룹정리 → ② 같은방 → ③ 방배정 → ④ 입금) + 처리할 건수 배지
+  const TAB_STEP = { 그룹정리: 1, 요청조합: 2, 방배정: 3, 리마인드: 4 }
+  const tabCount = (t) => t === '리마인드' ? m.unpaid.length : t === '방배정' ? m.unassigned.length : t === '그룹정리' ? m.checkGroups.length : 0
   const goTab = (t) => { setTab(t); setMergeSel({}) } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
 
   return (
@@ -2293,15 +2296,39 @@ function AdminApp() {
           <p className="text-[12px] text-[#5f6b7a] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
         </header>
 
-        <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto">
-          {TAB_ORDER.map((t) => (
-            <button key={t} onClick={() => goTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#5f6b7a]'}`}>{TAB_LABEL[t]}</button>
-          ))}
+        <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto sticky top-0 z-20 shadow-sm">
+          {TAB_ORDER.map((t) => {
+            const cnt = tabCount(t)
+            const step = TAB_STEP[t]
+            return (
+              <button key={t} onClick={() => goTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] flex items-center justify-center gap-1 ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#5f6b7a]'}`}>
+                {step && <span className={`w-[15px] h-[15px] rounded-full text-[10px] font-extrabold flex items-center justify-center ${tab === t ? 'bg-[#3182f6] text-white' : 'bg-[#cbd2da] text-white'}`}>{step}</span>}
+                {TAB_LABEL[t]}
+                {cnt > 0 && <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${tab === t ? 'bg-[#fde7ea] text-[#dc2626]' : 'bg-[#dc2626] text-white'}`}>{cnt}</span>}
+              </button>
+            )
+          })}
         </div>
 
         {tab === '요약' && (
           <div>
             {saveMsg && <p className="text-[12px] text-[#1b64da] font-semibold mb-2">{saveMsg}</p>}
+            {/* #4 등록 진행률 막대 (제출 / 명단 예상) */}
+            {(() => {
+              const pct = m.expected > 0 ? Math.min(100, Math.round((m.totalPeople / m.expected) * 100)) : 0
+              return (
+                <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-[13px] font-bold text-[#191f28]">등록 진행률</span>
+                    <span className="text-[12px] text-[#5f6b7a]">제출 <b className="text-[#191f28]">{m.totalPeople}</b> / 예상 {m.expected}명</span>
+                  </div>
+                  <div className="h-3 rounded-full bg-[#eef0f3] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#3182f6] transition-all" style={{ width: pct + '%' }} />
+                  </div>
+                  <div className="text-[11px] text-[#5f6b7a] mt-1.5">{pct}% · 미제출 추정 {m.missing}명{m.unpaid.length > 0 ? ` · 미입금 ${m.unpaid.length}명` : ''}</div>
+                </div>
+              )
+            })()}
             {(() => {
               const todo = [
                 { n: m.checkGroups.length, label: '확인 필요한 그룹 점검', tab: '그룹정리' },

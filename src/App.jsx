@@ -1542,7 +1542,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const cur = members[0] || {}
   const gid = cur.gid || cur.groupId
   const [roomName, setRoomName] = useState(reqRoomType(cur.roomLabel))
-  const occInit = (() => { const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : (members.length || 8); return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
+  const occInit = (() => { if (/인원무관/.test(cur.occLabel || '')) return '상관없음'; const mm = (cur.occLabel || '').match(/(\d)인/); const ppl = mm ? +mm[1] : (members.length || 8); return (OCCUPANCY.find((o) => o.people === ppl || (ppl >= 7 && o.people === 8)) || OCCUPANCY[0]).label })()
   const [occSel, setOccSel] = useState(occInit)
   const [occStatus, setOccStatus] = useState(/인이 투숙/.test(cur.occLabel || '') ? 'confirmed' : 'pending') // #15 확정/미정
   const [seorakAll, setSeorakAll] = useState(members.some((m) => m.seorak)) // #11 설악 그룹 공통
@@ -1557,7 +1557,9 @@ function GroupEditor({ members, auth, onRefresh, title }) {
     setBusy('group'); setMsg('')
     const roomLabel = ROOMS.find((r) => r.name === roomName).label
     // #21 미정: 투숙비는 추후결정(OCC_PARTIAL)이되 희망 인원은 기록해 다음 조회 때 유지
-    const occLabel = occStatus === 'pending' ? (OCC_PARTIAL + (occSel ? ' · 희망 ' + occSel : '')) : OCCUPANCY.find((o) => o.label === occSel).formLabel
+    const occLabel = occStatus === 'pending'
+      ? (OCC_PARTIAL + (occSel === '상관없음' ? ' · 희망 인원무관' : occSel ? ' · 희망 ' + occSel : ''))
+      : (OCCUPANCY.find((o) => o.label === occSel) || OCCUPANCY[0]).formLabel
     const j = await post({ action: 'groupSet', gid, roomLabel, occLabel, seorak: seorakAll })
     setBusy(''); setMsg(j.ok ? '✓ 저장되었습니다' : '오류: ' + (j.error || '')); if (j.ok) onRefresh && onRefresh()
   }
@@ -1591,21 +1593,38 @@ function GroupEditor({ members, auth, onRefresh, title }) {
       <Field label="투숙 인원 (방 크기)">
         <div className="flex gap-2 mb-2">
           {[['confirmed', '확정'], ['pending', '미정']].map(([v, lbl]) => (
-            <button key={v} onClick={() => setOccStatus(v)}
+            <button key={v} onClick={() => { setOccStatus(v); if (v === 'confirmed' && occSel === '상관없음') setOccSel(occLabelFor(members.length || 8)) }}
               className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold border ${occStatus === v ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#5f6b7a]'}`}>
               {lbl}
             </button>
           ))}
         </div>
         {occStatus === 'confirmed' ? (
-          <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls}>
-            {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} {o.fee > 0 ? `(그룹 +${o.fee / 10000}만)` : '(추가없음)'}</option>)}
-          </select>
+          <div className="grid grid-cols-2 gap-2">
+            {OCCUPANCY.map((o) => (
+              <button key={o.label} onClick={() => setOccSel(o.label)}
+                className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${occSel === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}>
+                {o.label}<br />
+                <span className="text-[12px] font-normal text-[#5f6b7a]">{o.fee > 0 ? `그룹 +${o.fee / 10000}만` : '추가없음'}</span>
+              </button>
+            ))}
+          </div>
         ) : (
           <>
-            <select value={occSel} onChange={(e) => setOccSel(e.target.value)} className={inputCls}>
-              {OCCUPANCY.map((o) => <option key={o.label} value={o.label}>{o.label} (추가비용 추후결정됨)</option>)}
-            </select>
+            <div className="grid grid-cols-2 gap-2">
+              {OCCUPANCY.map((o) => (
+                <button key={o.label} onClick={() => setOccSel(o.label)}
+                  className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${occSel === o.label ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}>
+                  {o.label}<br />
+                  <span className="text-[12px] font-normal text-[#5f6b7a]">추후 결정됨</span>
+                </button>
+              ))}
+              <button onClick={() => setOccSel('상관없음')}
+                className={`py-3 rounded-xl text-[14px] font-bold border transition-all min-h-[52px] ${occSel === '상관없음' ? 'border-2 border-[#3182f6] bg-[#f2f8ff] text-[#1b64da]' : 'border border-[#e5e8eb] text-[#333d4b]'}`}>
+                인원은 상관없습니다<br />
+                <span className="text-[12px] font-normal text-[#5f6b7a]">추후 결정됨</span>
+              </button>
+            </div>
             <p className="text-[12px] text-[#5f6b7a] mt-2 leading-relaxed">원하는 인원을 고르면 참고용으로 기록돼요. 나머지 인원은 교회에서 배정해드리고, 투숙 추가비용은 최종 방배정 후 결정됩니다.</p>
           </>
         )}

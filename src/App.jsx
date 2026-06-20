@@ -541,6 +541,7 @@ function IndividualMode() {
     if (seorakAmt > 0) lines.push({ cat: '설악산', payer: who, amt: seorakAmt, note: '뷰 추가' })
     return { total, perPerson: total, lines, count: 1 }
   }, [d, room, bus, seorak, name])
+  const subtitle = `입금자명: ${name.trim() || '이름'} (본인 이름으로 입금)`
 
   const doSubmit = async () => {
     setSubmitLoading(true); setSubmitErr('')
@@ -652,9 +653,11 @@ function IndividualMode() {
         </Field>
       </Card>
 
+      <LiveSummary calc={calc} subtitle={subtitle} />
       <div className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-4 mb-3">
+        <div className="text-[13px] font-bold text-[#191f28] mb-2">💡 입금자명 예시</div>
         <DepositExample />
-        <p className="text-[12px] text-[#5f6b7a] leading-relaxed">입금자명 쓰는 법 미리 보기 · 계좌번호와 항목별 복사는 제출 완료 화면에 안내됩니다.</p>
+        <p className="text-[12px] text-[#5f6b7a] leading-relaxed mt-2">계좌번호와 항목별 복사는 제출 완료 화면에 안내됩니다.</p>
       </div>
       {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
       <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다.</p>
@@ -1121,9 +1124,11 @@ function GroupMode() {
         )}
       </Card>
 
+      <LiveSummary calc={calc} subtitle={subtitle} />
       <div className="bg-white rounded-[22px] shadow-sm border border-[#f2f4f6] p-4 mb-3">
+        <div className="text-[13px] font-bold text-[#191f28] mb-2">💡 입금자명 예시</div>
         <DepositExample />
-        <p className="text-[12px] text-[#5f6b7a] leading-relaxed">입금자명 쓰는 법 미리 보기 · 계좌번호와 항목별 복사는 제출 완료 화면에 안내됩니다.</p>
+        <p className="text-[12px] text-[#5f6b7a] leading-relaxed mt-2">계좌번호와 항목별 복사는 제출 완료 화면에 안내됩니다.</p>
       </div>
       {submitErr && <p className="text-[13px] text-[#f04452] font-semibold mb-2 leading-relaxed">제출 오류: {submitErr}</p>}
       <p className="text-[12px] text-[#5f6b7a] mb-2 leading-relaxed text-center">제출 후 입금까지 완료해야 등록이 확정됩니다.</p>
@@ -1183,41 +1188,55 @@ const DEPOSIT_EXAMPLE_HTML = `<!doctype html><html><head><meta charset="utf-8"><
 </div></div></body></html>`
 
 function DepositExample() {
-  const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
   const [scale, setScale] = useState(0)
   useEffect(() => {
-    if (!open) return
     const measure = () => { const w = wrapRef.current ? wrapRef.current.clientWidth : 0; if (w) setScale(w / 1080) }
     measure()
+    const t = setTimeout(measure, 60) // 레이아웃 안정 후 한 번 더
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
     if (ro && wrapRef.current) ro.observe(wrapRef.current)
     window.addEventListener('resize', measure)
-    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', measure) }
-  }, [open])
+    return () => { clearTimeout(t); if (ro) ro.disconnect(); window.removeEventListener('resize', measure) }
+  }, [])
   return (
-    <div className="mb-3">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-[#f2f8ff] border border-[#d8e8ff] text-[13px] font-bold text-[#1b64da] min-h-[48px]"
-      >
-        <span>💡 입금자명 예시 보기</span>
-        <span className={`text-[12px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
-      </button>
-      {open && (
-        <div
-          ref={wrapRef}
-          className="mt-2 rounded-2xl border border-[#e5e8eb] overflow-hidden"
-          style={{ position: 'relative', width: '100%', height: scale ? Math.round(1350 * scale) : 0 }}
-        >
-          <iframe
-            title="입금자명 예시"
-            srcDoc={DEPOSIT_EXAMPLE_HTML}
-            scrolling="no"
-            style={{ position: 'absolute', top: 0, left: 0, width: '1080px', height: '1350px', transformOrigin: 'top left', transform: `scale(${scale || 0.0001})`, border: 0 }}
-          />
-        </div>
-      )}
+    <div
+      ref={wrapRef}
+      className="rounded-2xl border border-[#e5e8eb] overflow-hidden"
+      style={{ position: 'relative', width: '100%', height: scale ? Math.round(1350 * scale) : 0 }}
+    >
+      <iframe
+        title="입금자명 예시"
+        srcDoc={DEPOSIT_EXAMPLE_HTML}
+        scrolling="no"
+        style={{ position: 'absolute', top: 0, left: 0, width: '1080px', height: '1350px', transformOrigin: 'top left', transform: `scale(${scale || 0.0001})`, border: 0 }}
+      />
+    </div>
+  )
+}
+
+// 폼에서 옵션 고르면 즉시 갱신되는 실시간 항목별 요약(입금 액션은 제출 완료 화면).
+function LiveSummary({ calc, subtitle }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-3">
+      <div className="text-[13px] font-bold text-[#191f28] mb-3">입금 예정 항목</div>
+      <div className="space-y-2">
+        {calc.lines.map((l, i) => (
+          <div key={i} className="flex items-center justify-between">
+            <span className="text-[13px] text-[#4e5968]">
+              <span className="inline-block bg-[#f2f8ff] text-[#1b64da] text-[12px] font-bold px-1.5 py-0.5 rounded-md mr-1.5">{l.cat}</span>
+              {l.payer}{l.note ? <span className="text-[#5f6b7a]"> ({l.note})</span> : ''}
+            </span>
+            <span className="text-[14px] font-bold text-[#191f28]">{won(l.amt)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-[#e5e8eb] flex items-center justify-between">
+        <span className="text-[14px] font-bold text-[#191f28]">총 합계</span>
+        <span className="text-[20px] font-extrabold text-[#191f28]">{won(calc.total)}</span>
+      </div>
+      {calc.count > 1 && <div className="mt-1 text-right text-[12px] text-[#5f6b7a]">1인 평균 {won(calc.perPerson)} · {calc.count}명</div>}
+      {subtitle && <div className="mt-3 bg-[#f2f8ff] rounded-xl px-3 py-2 text-[12px] text-[#1b64da] leading-relaxed">{subtitle}</div>}
     </div>
   )
 }

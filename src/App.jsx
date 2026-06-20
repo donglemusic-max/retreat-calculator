@@ -1052,6 +1052,59 @@ function depositGuideText(calc, subtitle) {
   return `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n${sub}\n${legend}\n${lines}\n─────────────────\n총 합계: ${won(calc.total)}${perLine}\n\n* 원활한 등록 관리를 위하여, 위 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.`
 }
 
+// #3 입금자명 예시 이미지 (Claude Design에서 받은 디자인을 자체포함 iframe으로 — pulseRing 애니메이션 유지)
+const DEPOSIT_EXAMPLE_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}html,body{margin:0;overflow:hidden;background:#e3ecfa}
+@keyframes pulseRing{0%{transform:scale(0.94);opacity:0.55}70%{transform:scale(1.06);opacity:1}100%{transform:scale(0.94);opacity:0.55}}
+#scaler{width:1080px;height:1350px;transform-origin:top left;transform:scale(calc(100vw / 1080))}
+</style></head><body><div id="scaler">
+<div style="width:1080px;height:1350px;background:linear-gradient(170deg,#eef3fb 0%,#e3ecfa 55%,#dbe7f8 100%);font-family:'Noto Sans KR',-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;padding:60px 80px 56px;position:relative;overflow:hidden;">
+<div style="position:absolute;top:-120px;right:-100px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,0.10),rgba(37,99,235,0) 70%);"></div>
+<div style="position:absolute;bottom:-140px;left:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,0.08),rgba(37,99,235,0) 70%);"></div>
+<div style="text-align:center;z-index:2;">
+<div style="display:inline-block;background:#2563eb;color:#fff;font-size:26px;font-weight:700;letter-spacing:1px;padding:12px 26px;border-radius:999px;margin-bottom:28px;">송금 안내</div>
+<h1 style="margin:0;font-size:72px;font-weight:900;color:#16233d;line-height:1.18;letter-spacing:-1.5px;">입금자명,<br>이렇게 적어주세요</h1>
+</div>
+<div style="margin-top:44px;width:470px;height:660px;background:#0f172a;border-radius:56px;padding:14px;box-shadow:0 40px 80px -20px rgba(15,40,90,0.35),0 0 0 2px rgba(255,255,255,0.5);z-index:2;position:relative;">
+<div style="width:100%;height:100%;background:#f5f7fb;border-radius:44px;overflow:hidden;display:flex;flex-direction:column;position:relative;">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:20px 34px 8px;font-size:22px;font-weight:700;color:#16233d;"><span>9:41</span><span style="display:flex;gap:7px;align-items:center;"><span style="font-size:17px;">●●●</span><span style="font-size:17px;">📶</span><span style="display:inline-block;width:34px;height:17px;border:2px solid #16233d;border-radius:5px;position:relative;"><span style="position:absolute;inset:2px;right:7px;background:#16233d;border-radius:1px;"></span></span></span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:12px 28px 18px;"><span style="font-size:30px;color:#16233d;">‹</span><span style="font-size:26px;font-weight:700;color:#16233d;">계좌이체</span></div>
+<div style="flex:1;background:#fff;border-radius:30px 30px 0 0;padding:34px 30px;display:flex;flex-direction:column;gap:22px;">
+<div><div style="font-size:19px;font-weight:500;color:#8a94a6;margin-bottom:9px;">받는 분</div><div style="display:flex;align-items:center;gap:14px;background:#f1f5fb;border-radius:16px;padding:18px 20px;"><div style="width:44px;height:44px;border-radius:12px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;">교</div><div><div style="font-size:25px;font-weight:700;color:#16233d;">주님의 교회</div><div style="font-size:17px;color:#8a94a6;margin-top:2px;">우리 1005-803-168121</div></div></div></div>
+<div><div style="font-size:19px;font-weight:500;color:#8a94a6;margin-bottom:9px;">보낼 금액</div><div style="background:#f1f5fb;border-radius:16px;padding:18px 20px;display:flex;align-items:baseline;gap:8px;"><span style="font-size:40px;font-weight:900;color:#16233d;letter-spacing:-1px;">278,000</span><span style="font-size:24px;font-weight:700;color:#16233d;">원</span></div></div>
+<div style="position:relative;"><div style="font-size:19px;font-weight:700;color:#2563eb;margin-bottom:9px;">입금자명</div><div style="position:relative;background:#eef4ff;border:3px solid #2563eb;border-radius:16px;padding:18px 20px;"><span style="font-size:28px;font-weight:900;color:#16233d;">등록비 김바울</span><div style="position:absolute;right:-16px;top:-16px;bottom:-16px;left:-16px;border:4px solid #2563eb;border-radius:22px;pointer-events:none;animation:pulseRing 1.8s ease-in-out infinite;"></div></div><div style="position:absolute;right:-8px;bottom:-58px;display:flex;align-items:center;gap:8px;"><span style="font-size:21px;font-weight:700;color:#2563eb;">항목 + 이름</span><span style="font-size:30px;color:#2563eb;transform:rotate(-12deg);">↖</span></div></div>
+<div style="margin-top:auto;background:#2563eb;color:#fff;text-align:center;font-size:26px;font-weight:700;padding:22px;border-radius:18px;">이체하기</div>
+</div></div></div>
+<div style="margin-top:44px;text-align:center;z-index:2;max-width:880px;">
+<p style="margin:0;font-size:34px;font-weight:700;color:#16233d;line-height:1.5;">항목마다 <span style="color:#2563eb;">따로 송금</span>하고,<br>입금자명은 <span style="color:#2563eb;">'항목 + 이름'</span> 으로!</p>
+<div style="margin-top:24px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;"><span style="background:#fff;border:2px solid #c9d8f2;color:#2c4a7d;font-size:24px;font-weight:700;padding:12px 24px;border-radius:999px;">등록비 김바울</span><span style="background:#fff;border:2px solid #c9d8f2;color:#2c4a7d;font-size:24px;font-weight:700;padding:12px 24px;border-radius:999px;">버스비 김바울</span><span style="background:#fff;border:2px solid #c9d8f2;color:#2c4a7d;font-size:24px;font-weight:700;padding:12px 24px;border-radius:999px;">객실선택 김바울</span></div>
+</div>
+</div></div></body></html>`
+
+function DepositExample() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-[#f2f8ff] border border-[#d8e8ff] text-[13px] font-bold text-[#1b64da] min-h-[48px]"
+      >
+        <span>💡 입금자명 예시 보기</span>
+        <span className={`text-[12px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {open && (
+        <iframe
+          title="입금자명 예시"
+          srcDoc={DEPOSIT_EXAMPLE_HTML}
+          className="w-full mt-2 rounded-2xl border border-[#e5e8eb]"
+          style={{ aspectRatio: '1080 / 1350', display: 'block' }}
+          scrolling="no"
+        />
+      )}
+    </div>
+  )
+}
+
 function ResultPanel({ calc, subtitle }) {
   const [copied, setCopied] = useState(false)
 
@@ -1095,6 +1148,7 @@ function ResultPanel({ calc, subtitle }) {
         <p className="text-[13px] text-[#8b95a1] mb-3 leading-relaxed">
           아래 항목별로 <b>각각 따로</b> 입금해 주세요. 입금자명 형식: "항목 이름"
         </p>
+        <DepositExample />
         <div className="space-y-3">
           {calc.lines.map((l, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-[#f2f4f6] last:border-0">

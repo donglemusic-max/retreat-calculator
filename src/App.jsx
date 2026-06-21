@@ -2442,7 +2442,15 @@ function AdminApp() {
   const [issues, setIssues] = useState(null)
   const [issueBusy, setIssueBusy] = useState(false)
   const loadIssues = async () => { const j = await post({ action: 'issueGet', pin }); if (j.ok) setIssues(j.issues || []) }
-  const scanIssues = async () => { setIssueBusy(true); try { const j = await post({ action: 'issueScan', pin }); if (j.ok) setIssues(j.issues || []) } finally { setIssueBusy(false) } }
+  const scanIssues = async () => {
+    setIssueBusy(true)
+    try {
+      // 정리안 '의사결정'(동명이인·대표 미제출·구버전·오기·비용분리 등)도 이슈로 함께 등록
+      const seed = (CURATED_SORT.decisions || []).map((d, i) => ({ key: '의사결정|' + (((d.match(/^(\d+)/) || [])[1]) || (i + 1)), type: '의사결정', target: '', content: d.replace(/^\d+\.\s*/, '') }))
+      const j = await post({ action: 'issueScan', pin, seed })
+      if (j.ok) setIssues(j.issues || [])
+    } finally { setIssueBusy(false) }
+  }
   const setIssue = async (key, patch) => { setIssues((arr) => (arr || []).map((x) => x.key === key ? { ...x, ...patch } : x)); await post({ action: 'issueSet', pin, key, ...patch }) }
   const [undoStack, setUndoStack] = useState([]) // 실행 취소: 방/입금 컬럼 작업의 직전 값 스냅샷
   const sensors = useSensors(

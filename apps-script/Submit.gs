@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv22-mailhtml'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv23-issueseed'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -265,8 +265,10 @@ function _scanIssues_(sheet, col, width) {
   for (var r2 = 1; r2 < n; r2++) { var row2 = vals[r2]; if (!_gv_(row2, col.name)) continue; if (_gv_(row2, col.route) === '중복' || (col.ver >= 0 && _isUncounted_(_gv_(row2, col.ver)))) continue; var occ = _gv_(row2, col.occ), list = _gv_(row2, col.list); if (/부분적으로|나머지는 교회에서 배정/.test(occ) || /배정해|방으로 배정|상관없|외 \d명|명은/.test(list)) out.push({ key: '부분|' + _gv_(row2, col.gid) + '|' + _gv_(row2, col.name), type: '부분그룹', target: _gv_(row2, col.name), content: list || occ }); }
   return out;
 }
-function _issueScan_(sheet, col, width) {
+function _issueScan_(body, sheet, col, width) {
   var sh = _issueSheet_(), ex = _issueRows_(sh), cur = _scanIssues_(sheet, col, width);
+  var seed = (body && body.seed) || []; // 프론트가 보낸 큐레이션 이슈(의사결정 등)도 함께 등록
+  seed.forEach(function (s) { if (s && s.key) cur.push({ key: String(s.key), type: s.type || '의사결정', target: s.target || '', content: s.content || '' }); });
   var now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm'), curKeys = {};
   cur.forEach(function (c) {
     curKeys[c.key] = 1; var e = ex.byKey[c.key];
@@ -309,7 +311,7 @@ function doPost(e) {
       if (action === 'mailTplSet') return _mailTplSet_(body);
       if (action === 'aiSort') return _aiSort_(body);
       if (action === 'aiSortGet') return _aiSortGet_();
-      if (action === 'issueScan') return _issueScan_(sheet, acol, width);
+      if (action === 'issueScan') return _issueScan_(body, sheet, acol, width);
       if (action === 'issueGet') return _issueGet_();
       if (action === 'issueSet') return _issueSet_(body);
       H = _ensureAdminCols_(sheet, H);

@@ -23,27 +23,53 @@ const ROOMS = [
   { name: '소노캄 스위트', group: 240000, indiv: 40000, max: 8, desc: '최대 8인 · 투룸(싱글2 / 더블) · 예배실 옆 건물', plan: 'floorplan/sonokam.png',
     label: '소노캄 스위트 (최대 인원 8인 투룸. 침실A: 싱글 2개, 침실B: 더블 1개) - 객실당 추가로 [그룹의 경우] 24만원 혹은 [개인의 경우] 4만원' },
 ]
-// 선택한 객실 평면도 (방 선택 아래 표시 · 탭하면 확대)
+// 선택한 객실 평면도 (방 선택 아래 표시 · 라이트박스에서 두 손가락 핀치로 이미지만 확대)
 function FloorPlan({ room }) {
   const [zoom, setZoom] = useState(false)
-  const [big, setBig] = useState(false)
+  const [tf, setTf] = useState({ s: 1, x: 0, y: 0 })
+  const tfRef = useRef({ s: 1, x: 0, y: 0 })
+  const ptrs = useRef(new Map())
+  const g = useRef(null)
   if (!room || !room.plan) return null
-  const close = () => { setZoom(false); setBig(false) }
+  const apply = (s, x, y) => { const v = { s, x, y }; tfRef.current = v; setTf(v) }
+  const close = () => { setZoom(false); apply(1, 0, 0); ptrs.current.clear(); g.current = null }
+  const baseline = () => {
+    const ps = [...ptrs.current.values()]
+    if (ps.length >= 2) g.current = { mode: 'pinch', d: Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y), s: tfRef.current.s, x: tfRef.current.x, y: tfRef.current.y }
+    else if (ps.length === 1) g.current = { mode: 'pan', px: ps[0].x, py: ps[0].y, x: tfRef.current.x, y: tfRef.current.y }
+    else g.current = null
+  }
+  const onDown = (e) => { e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); baseline() }
+  const onMove = (e) => {
+    if (!ptrs.current.has(e.pointerId)) return
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const ps = [...ptrs.current.values()]
+    if (ps.length >= 2 && g.current && g.current.mode === 'pinch') {
+      e.preventDefault()
+      const d = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y)
+      apply(Math.min(5, Math.max(1, g.current.s * d / (g.current.d || d))), g.current.x, g.current.y)
+    } else if (ps.length === 1 && g.current && g.current.mode === 'pan' && tfRef.current.s > 1) {
+      e.preventDefault()
+      apply(tfRef.current.s, g.current.x + (ps[0].x - g.current.px), g.current.y + (ps[0].y - g.current.py))
+    }
+  }
+  const onUp = (e) => { ptrs.current.delete(e.pointerId); if (tfRef.current.s <= 1.03) apply(1, 0, 0); baseline() }
   return (
     <div className="mt-3">
-      <div className="text-[12px] font-bold text-[#1b64da] mb-1.5">📐 {room.name} 평면도 <span className="font-normal text-[#3182f6]">· 탭하면 확대</span></div>
+      <div className="text-[12px] font-bold text-[#1b64da] mb-1.5">📐 {room.name} 평면도 <span className="font-normal text-[#3182f6]">· 탭하면 크게</span></div>
       <button type="button" onClick={() => setZoom(true)} className="block w-full">
         <img src={room.plan} alt={`${room.name} 평면도`} loading="lazy" className="w-full rounded-xl border border-[#cfe0ff] bg-white" />
       </button>
       {zoom && (
-        <div className="fixed inset-0 z-[70] bg-black/85 overflow-auto animate-fade-in" onClick={close}>
-          <div className="min-h-full flex items-start justify-center p-3 py-12">
-            <img src={room.plan} alt={`${room.name} 평면도`}
-              onClick={(e) => { e.stopPropagation(); setBig((b) => !b) }}
-              className={`rounded-lg bg-white cursor-zoom-in ${big ? 'max-w-none w-[200%] cursor-zoom-out' : 'w-full max-w-[920px]'}`} />
-          </div>
-          <button onClick={close} className="fixed top-3 right-4 text-white text-[30px] leading-none font-light">✕</button>
-          <div className="fixed bottom-4 left-0 right-0 text-center text-white/80 text-[13px] font-bold pointer-events-none">{room.name} 평면도 · 이미지 탭하면 {big ? '축소' : '더 확대'} · 빈 곳 탭하면 닫힘</div>
+        <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center overflow-hidden animate-fade-in" style={{ touchAction: 'none' }} onClick={close}>
+          <img src={room.plan} alt={`${room.name} 평면도`}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => { e.stopPropagation(); apply(tfRef.current.s > 1 ? 1 : 2, 0, 0) }}
+            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+            style={{ transform: `translate(${tf.x}px, ${tf.y}px) scale(${tf.s})`, transformOrigin: 'center center', touchAction: 'none', willChange: 'transform' }}
+            className="max-w-full max-h-full object-contain rounded-lg bg-white select-none" draggable={false} />
+          <button onClick={close} className="fixed top-3 right-4 text-white text-[30px] leading-none font-light z-10">✕</button>
+          <div className="fixed bottom-4 left-0 right-0 text-center text-white/80 text-[13px] font-bold pointer-events-none">두 손가락으로 확대 · 더블탭 확대/원래대로 · 빈 곳 탭하면 닫힘</div>
         </div>
       )}
     </div>

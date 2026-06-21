@@ -23,13 +23,23 @@ const ROOMS = [
   { name: '소노캄 스위트', group: 240000, indiv: 40000, max: 8, desc: '최대 8인 · 투룸(싱글2 / 더블) · 예배실 옆 건물', plan: 'floorplan/sonokam.png',
     label: '소노캄 스위트 (최대 인원 8인 투룸. 침실A: 싱글 2개, 침실B: 더블 1개) - 객실당 추가로 [그룹의 경우] 24만원 혹은 [개인의 경우] 4만원' },
 ]
-// 선택한 객실 평면도 (방 선택 아래 표시)
+// 선택한 객실 평면도 (방 선택 아래 표시 · 탭하면 확대)
 function FloorPlan({ room }) {
+  const [zoom, setZoom] = useState(false)
   if (!room || !room.plan) return null
   return (
     <div className="mt-3">
-      <div className="text-[12px] font-bold text-[#5f6b7a] mb-1.5">📐 {room.name} 평면도</div>
-      <img src={room.plan} alt={`${room.name} 평면도`} loading="lazy" className="w-full rounded-xl border border-[#e5e8eb] bg-white" />
+      <div className="text-[12px] font-bold text-[#1b64da] mb-1.5">📐 {room.name} 평면도 <span className="font-normal text-[#3182f6]">· 탭하면 확대</span></div>
+      <button type="button" onClick={() => setZoom(true)} className="block w-full">
+        <img src={room.plan} alt={`${room.name} 평면도`} loading="lazy" className="w-full rounded-xl border border-[#cfe0ff] bg-white" />
+      </button>
+      {zoom && (
+        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-3 animate-fade-in" onClick={() => setZoom(false)}>
+          <img src={room.plan} alt={`${room.name} 평면도`} className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+          <button onClick={() => setZoom(false)} className="absolute top-3 right-4 text-white text-[30px] leading-none font-light">✕</button>
+          <div className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-[13px] font-bold">{room.name} 평면도 · 빈 곳을 누르면 닫힙니다</div>
+        </div>
+      )}
     </div>
   )
 }

@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv21-issues'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv22-mailhtml'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -95,7 +95,10 @@ function _isUncounted_(v) { return _isVoid_(v) || _isTest_(v); }
 function _mailTo_(to, subject, body) {
   try {
     if (!to || String(to).indexOf('@') < 0) return;
-    var opts = { name: MAIL_SENDER_NAME };
+    // plain text는 ~78자에서 강제 줄바꿈돼 문장 중간이 끊김 → HTML(pre-wrap)로 보내 자연스럽게 줄바꿈
+    var esc = String(body).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var html = '<div style="white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; font-family:\'Apple SD Gothic Neo\',\'Malgun Gothic\',sans-serif; font-size:14px; line-height:1.7; color:#222;">' + esc + '</div>';
+    var opts = { name: MAIL_SENDER_NAME, htmlBody: html };
     if (MAIL_FROM) opts.from = MAIL_FROM;
     if (MAIL_REPLY_TO) opts.replyTo = MAIL_REPLY_TO;
     if (MAIL_NO_REPLY) opts.noReply = true;

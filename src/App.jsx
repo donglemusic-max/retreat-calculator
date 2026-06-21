@@ -1893,12 +1893,17 @@ function LookupMode() {
               그래도 안 되면 안내데스크로 편하게 문의해 주세요.
             </p>
           </Card>
-        ) : (results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (
-          <GroupEditor members={results} auth={{ verifyEmail: email.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
         ) : (
-          <Card title={`조회 결과 (${results.length}건)`}>
-            {results.map((r) => <EditCard key={r.row} data={r} />)}
-          </Card>
+          <>
+            <GroupCheckBanner results={results} />
+            {(results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (
+              <GroupEditor members={results} auth={{ verifyEmail: email.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
+            ) : (
+              <Card title={`조회 결과 (${results.length}건)`}>
+                {results.map((r) => <EditCard key={r.row} data={r} />)}
+              </Card>
+            )}
+          </>
         )
       )}
 
@@ -1907,7 +1912,35 @@ function LookupMode() {
   )
 }
 
-// 헤더 "등록 안내 전체보기" 버튼
+// 조회·수정 진입 시: 그룹 신청에 확인 필요한 점(객실 불일치/부분그룹/미제출)이 있으면 정리해 안내
+const _ckNorm = (s) => (s || '').replace(/\s/g, '').replace(/[A-Za-z0-9]+$/, '')
+const _ckJosa = (s) => (s || '').replace(/(와|과|은|는|이|가|도|만|의|들|님|랑|하고)$/, '')
+function GroupCheckBanner({ results }) {
+  if (!results || results.length === 0) return null
+  const roomTypes = [...new Set(results.map((r) => reqRoomType(r.roomLabel)))]
+  const roomMismatch = results.length >= 2 && roomTypes.length > 1
+  const partial = results.some((r) => /부분적으로|나머지는 교회에서 배정/.test(r.occLabel || ''))
+  const submitted = new Set(results.map((r) => _ckNorm(r.name)))
+  const listNames = []
+  results.forEach((r) => nameTokens(r.list).forEach((n) => { const t = _ckJosa(n); if (t.length >= 2 && !listNames.includes(t)) listNames.push(t) }))
+  const missing = listNames.filter((n) => !submitted.has(_ckNorm(n)))
+  if (!roomMismatch && !partial && !missing.length) return null
+  return (
+    <div className="bg-[#fffbeb] border border-[#fde68a] rounded-2xl p-4 mb-3">
+      <div className="text-[14px] font-bold text-[#b45309] mb-2">⚠ 확인이 필요한 신청이에요</div>
+      <div className="text-[13px] text-[#92400e] leading-relaxed space-y-2">
+        {roomMismatch && (
+          <div>· <b>같은 그룹인데 객실(방) 선택이 서로 달라요.</b>
+            <div className="text-[12px] mt-0.5 bg-white/60 rounded-lg px-2 py-1.5">{results.map((r) => `${r.name}: ${roomTypeShort(reqRoomType(r.roomLabel))}`).join('  ·  ')}</div>
+          </div>
+        )}
+        {partial && <div>· <b>"다른 성도와 함께 배정" 요청(부분 그룹)</b>이 있어요. 추가 인원·추가비용은 최종 방배정 후 결정됩니다.</div>}
+        {missing.length > 0 && <div>· <b>명단엔 있는데 아직 신청 안 한 분</b>: {missing.join(', ')}</div>}
+      </div>
+      <div className="text-[13px] text-[#1b64da] font-bold mt-3 leading-relaxed border-t border-[#fde68a] pt-2.5">👉 대표자·구성원이 상의해서 <b>객실·인원을 하나로 통일</b>한 뒤, <b>대표자 한 분이</b> 최종 내용으로 수정해 주세요. 헷갈리시면 안내데스크로 문의 부탁드려요.</div>
+    </div>
+  )
+}
 // 비용 안내 예시 (Claude Design '비용 안내.dc.html' 이식) — 탭형 예시 + 모달
 const COST_DEPTS = [
   ['장년부·청년부', '27.8'], ['중고등부', '26.8'], ['소년부', '25.8'], ['초등부', '24.8'],
@@ -2735,8 +2768,8 @@ function AdminApp() {
     </div>
   )
 
-  const TAB_ORDER = ['요약', '정리안', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단', '메일문구']
-  const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스', 메일문구: '✉️ 메일문구' }
+  const TAB_ORDER = ['요약', '정리안', '체크필요', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단', '메일문구']
+  const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 체크필요: '⚠️ 체크필요', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스', 메일문구: '✉️ 메일문구' }
   // #11 워크플로우 단계 번호(① 그룹정리 → ② 같은방 → ③ 방배정 → ④ 입금) + 처리할 건수 배지
   const TAB_STEP = { 그룹정리: 1, 요청조합: 2, 방배정: 3, 리마인드: 4 }
   const tabCount = (t) => t === '리마인드' ? m.unpaid.length : t === '방배정' ? m.unassigned.length : t === '그룹정리' ? m.checkGroups.length : 0
@@ -3075,6 +3108,58 @@ function AdminApp() {
               <Collapsible title="⑤ ⚠ 의사결정 필요" count={`${DEC.length}건`} defaultOpen>
                 {DEC.map((d, i) => (
                   <div key={i} className="text-[12px] text-[#4e5968] py-1.5 border-b border-[#f7f8fa] last:border-0 leading-relaxed">{d}</div>
+                ))}
+              </Collapsible>
+            </div>
+          )
+        })()}
+
+        {tab === '체크필요' && (() => {
+          const live = rows.filter((r) => r.route !== '중복')
+          const byG = {}; live.forEach((r) => { (byG[r.gid] = byG[r.gid] || []).push(r) })
+          const nm = (s) => (s || '').replace(/\s/g, '').replace(/[A-Za-z0-9]+$/, '')
+          const js = (s) => (s || '').replace(/(와|과|은|는|이|가|도|만|의|들|님|랑|하고)$/, '')
+          const missG = [], roomMis = []
+          Object.keys(byG).forEach((gid) => {
+            const g = byG[gid]; const rep = (g.find((r) => (r.gtotal || 0) > 0) || g[0]).rep || g[0].name
+            const sub = new Set(g.map((r) => nm(r.name)))
+            const ln = []; g.forEach((r) => nameTokens(r.list).forEach((n) => { const t = js(n); if (t.length >= 2 && !ln.includes(t)) ln.push(t) }))
+            const miss = ln.filter((n) => !sub.has(nm(n)))
+            if (miss.length) missG.push({ rep, miss })
+            const types = [...new Set(g.map((r) => reqRoomType(r.roomLabel)))]
+            if (g.length >= 2 && types.length > 1) roomMis.push({ rep, mem: g.map((r) => ({ name: r.name, room: roomTypeShort(reqRoomType(r.roomLabel)) })) })
+          })
+          const partials = live.filter((r) => /부분적으로|나머지는 교회에서 배정/.test(r.occLabel || '') || /배정해|방으로 배정|상관없|외 \d명|명은/.test(r.list || ''))
+          return (
+            <div>
+              <HelpToggle>{`그룹 신청에서 사람이 직접 확인·정리해야 하는 항목을 모았습니다.
+• 미제출 멤버 = 명단엔 있으나 본인 신청서가 없는 사람 (대표자에게 연락).
+• 객실 불일치 = 같은 그룹인데 구성원이 서로 다른 객실을 골라 제출함 (대표가 하나로 통일 필요).
+• 부분 그룹 = "다른 성도와 함께 배정" 요청 (방배정 탭에서 채워 넣기).
+※ 해당 성도가 조회·수정에 들어오면 같은 안내가 노란 배너로 표시됩니다.`}</HelpToggle>
+              <Collapsible title="① 신청서 미제출 그룹 멤버" count={`${missG.length}그룹`} defaultOpen>
+                {missG.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : missG.map((x, i) => (
+                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0 flex items-start gap-2">
+                    <span className="text-[13px] font-bold text-[#191f28] shrink-0">{x.rep}</span>
+                    <span className="text-[12px] text-[#f04452]">미신청: {x.miss.join(', ')}</span>
+                  </div>
+                ))}
+              </Collapsible>
+              <Collapsible title="② 같은 그룹 · 객실 신청 불일치" count={`${roomMis.length}그룹`} defaultOpen>
+                {roomMis.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : roomMis.map((x, i) => (
+                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                    <div className="text-[13px] font-bold text-[#191f28] mb-1">{x.rep} 그룹</div>
+                    <div className="flex flex-wrap gap-1">{x.mem.map((m, j) => <span key={j} className="text-[11px] bg-[#fff1f2] text-[#b91c1c] border border-[#fecdd3] rounded px-1.5 py-0.5">{m.name} · {m.room}</span>)}</div>
+                  </div>
+                ))}
+              </Collapsible>
+              <Collapsible title="③ 부분 그룹 (다른 성도와 함께 배정 요청)" count={`${partials.length}명`}>
+                {partials.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : partials.map((r, i) => (
+                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[13px] font-bold text-[#191f28]">{r.name}</span>
+                    <span className="text-[11px] text-[#1b64da] ml-1">{roomTypeShort(reqRoomType(r.roomLabel))}</span>
+                    {r.list && <div className="text-[12px] text-[#5f6b7a] mt-0.5 leading-snug">📝 {r.list}</div>}
+                  </div>
                 ))}
               </Collapsible>
             </div>

@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv25-dupfix'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv26-dupfix2'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -593,8 +593,10 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   // dedup by name + 구/삭제 집계 제외 (#16/#17)
   var ord = idxs.slice().sort(function (a, b) { return ((col.ver >= 0 && _gv_(vals[a], col.ver) === '구') ? 1 : 0) - ((col.ver >= 0 && _gv_(vals[b], col.ver) === '구') ? 1 : 0); });
   var seen = {}, counted = {}, names = [];
+  // 주의: 여기선 ver(구/삭제/테스트)만 제외한다. 'route=중복'은 recalc의 "출력"이지 입력이 아니다.
+  // (중복으로 잘못 박힌 행도 후보로 보고 재계산해야, 그 사람의 유일한 행이 살아난다 — 김리아 그룹 버그)
   ord.forEach(function (r) {
-    if (_rowUncounted_(vals[r], col)) return; // 구/삭제(ver) + 중복(route) + 테스트 제외
+    if (col.ver >= 0 && _isUncounted_(_gv_(vals[r], col.ver))) return; // 구/삭제 + 테스트만 제외
     var nm = _gv_(vals[r], col.name); if (nm && !seen[nm]) { seen[nm] = 1; counted[r] = 1; names.push(nm); }
   });
   var memberCount = names.length;
@@ -618,7 +620,7 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   var typeLabel = isPartialMarker ? '부분' : '그룹';
   idxs.forEach(function (r) {
     var row = vals[r]; var set = function (c, v) { if (c >= 0) row[c] = v; };
-    if (_rowUncounted_(row, col)) { // 구/삭제 + 중복 + 테스트: 금액 0, 폼/구분값 보존
+    if (col.ver >= 0 && _isUncounted_(_gv_(row, col.ver))) { // 구/삭제 + 테스트: 금액 0, 폼/구분값 보존 (route=중복은 여기서 재판정)
       set(col.ifee, 0); set(col.iroom, 0); set(col.mbus, 0); set(col.mseo, 0); set(col.common, 0); set(col.gtotal, 0);
       sheet.getRange(r + 1, 1, 1, width).setValues([row]); return;
     }
@@ -633,6 +635,7 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
     set(col.mseo, dup ? 0 : (seoOf(r) ? SEORAK_FEE : 0));
     set(col.common, r === repRow ? common : 0); set(col.gtotal, r === repRow ? total : 0);
     if (dup) { set(col.route, '중복'); set(col.note, '중복 재제출(집계 제외)'); }
+    else if (_gv_(row, col.route) === '중복') { set(col.route, '기존폼'); if (_gv_(row, col.note) === '중복 재제출(집계 제외)') set(col.note, ''); } // 집계 대상이 된 행의 잘못된 중복표시 복구
     sheet.getRange(r + 1, 1, 1, width).setValues([row]);
   });
   return total;

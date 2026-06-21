@@ -1692,6 +1692,21 @@ function GroupEditor({ members, auth, onRefresh, title }) {
           설악산뷰 신청{seorakAll ? ' ✓' : ''} <span className="font-normal text-[12px]">(전원 적용 · 1인 {won(SEORAK_FEE)})</span>
         </button>
       </Field>
+      {(() => {
+        const reg = members.reduce((s, mm) => s + (deptFeeOf(mm.deptLabel) || 0), 0)
+        const roomFee = (ROOMS.find((r) => r.name === roomName) || ROOMS[0]).group
+        const occFee = occStatus === 'pending' ? 0 : (((OCCUPANCY.find((o) => o.label === occSel) || {}).fee) || 0)
+        const busF = members.filter((mm) => mm.bus).length * BUS_FEE
+        const seoF = seorakAll ? members.length * SEORAK_FEE : 0
+        const total = reg + roomFee + occFee + busF + seoF
+        return (
+          <div className="bg-[#f2f8ff] rounded-xl p-3 mb-2 border border-[#cfe0ff]">
+            <div className="text-[12px] font-bold text-[#1b64da] mb-1">💰 수정 후 예상 그룹 총액 <span className="font-normal text-[#5f6b7a]">· 저장 전 미리보기</span></div>
+            <div className="text-[11px] text-[#4e5968] leading-relaxed">등록비 {won(reg)}{roomFee ? ` · 객실 ${won(roomFee)}` : ''}{occFee ? ` · 그룹비 ${won(occFee)}` : ''}{busF ? ` · 버스 ${won(busF)}` : ''}{seoF ? ` · 설악 ${won(seoF)}` : ''}{occStatus === 'pending' ? ' · (그룹비 추후결정)' : ''}</div>
+            <div className="text-[18px] font-extrabold text-[#1b64da] mt-1">{won(total)}</div>
+          </div>
+        )
+      })()}
       <button onClick={saveGroup} disabled={busy === 'group'} className="w-full py-2.5 rounded-xl bg-[#191f28] hover:bg-black text-white font-bold text-[13px] mb-1">
         {busy === 'group' ? '저장 중…' : '객실/인원/설악산뷰 저장'}
       </button>
@@ -2206,13 +2221,14 @@ function ReadChip({ p }) {
 }
 
 // 드롭 가능한 방 박스
-function RoomDrop({ id, title, sub, count, cap, danger, children, onDelete }) {
+function RoomDrop({ id, title, sub, count, cap, danger, children, onDelete, extra }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
     <div ref={setNodeRef} className={`rounded-2xl border p-3 mb-2 transition-colors ${isOver ? 'border-2 border-[#3182f6] bg-[#eaf3ff]' : danger ? 'border-[#f04452] bg-[#fff5f5]' : 'border-[#e5e8eb] bg-white'}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-bold text-[#191f28]">{title}{sub && <span className="text-[11px] text-[#5f6b7a] font-normal ml-1">{sub}</span>}</span>
-        <span className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <span className="text-[13px] font-bold text-[#191f28] min-w-0 truncate">{title}{sub && <span className="text-[11px] text-[#5f6b7a] font-normal ml-1">{sub}</span>}</span>
+        <span className="flex items-center gap-2 shrink-0">
+          {extra}
           {cap != null && <span className={`text-[12px] font-bold ${danger ? 'text-[#f04452]' : 'text-[#5f6b7a]'}`}>{count}/{cap}명</span>}
           {onDelete && <button onClick={onDelete} title="방 삭제 (인원은 미배정으로)" className="text-[#b0b8c1] hover:text-[#f04452] text-[13px] leading-none">✕</button>}
         </span>
@@ -2641,6 +2657,14 @@ function AdminApp() {
   const removeRoom = (lab) => {
     setExtraRooms((r) => r.filter((x) => x !== lab))
     setAssignDraft((d) => { const nd = { ...d }; m.pool.forEach((p) => { const cur = d[p.row] !== undefined ? d[p.row] : (p.assigned || ''); if (cur === lab) nd[p.row] = '' }); return nd })
+  }
+  // #32 배정된 방의 객실 종류 변경: 라벨의 (타입) 토큰을 교체 → 그 방 인원 전원의 배정방을 새 라벨로 (저장 시 반영)
+  const setRoomType = (lab, short) => {
+    const base = lab.replace(/\s*\((소노캄|스위트|패밀리)\)\s*$/, '')
+    const newLab = `${base} (${short})`
+    if (newLab === lab) return
+    setExtraRooms((r) => r.map((x) => (x === lab ? newLab : x)))
+    setAssignDraft((d) => { const nd = { ...d }; m.pool.forEach((p) => { const cur = d[p.row] !== undefined ? d[p.row] : (p.assigned || ''); if (cur === lab) nd[p.row] = newLab }); return nd })
   }
 
   const saveAssign = () => {
@@ -3420,9 +3444,16 @@ function AdminApp() {
                   const cap = ROOM_CAP[type]
                   // 씨앗 방: 부분그룹(다른 성도와 함께 배정 요청)이 든 방 → '추가 배정 필요' 표시 + 남은 자리
                   const seed = mem.some((p) => /나머지는 교회에서 배정|부분적으로/.test(p.occLabel || ''))
-                  const sub = roomTypeShort(type) + (seed ? ` · 🟡 부분·추가 ${Math.max(0, cap - mem.length)}자리` : '')
+                  const sub = seed ? `🟡 부분·추가 ${Math.max(0, cap - mem.length)}자리` : ''
+                  const typeSel = (
+                    <select value={roomTypeShort(type)} onChange={(e) => setRoomType(lab, e.target.value)} onClick={(e) => e.stopPropagation()} className="text-[11px] font-bold text-[#1b64da] bg-[#f2f8ff] border border-[#cfe0ff] rounded-lg px-1.5 py-1">
+                      <option value="패밀리">패밀리</option>
+                      <option value="스위트">스위트</option>
+                      <option value="소노캄">소노캄</option>
+                    </select>
+                  )
                   return (
-                    <RoomDrop key={lab} id={lab} title={lab} sub={sub} count={mem.length} cap={cap} danger={mem.length > cap} onDelete={() => removeRoom(lab)}>
+                    <RoomDrop key={lab} id={lab} title={lab} sub={sub} extra={typeSel} count={mem.length} cap={cap} danger={mem.length > cap} onDelete={() => removeRoom(lab)}>
                       {mem.map((p) => <PersonChip key={p.row} p={p} warn={!seed && reqRoomType(p.roomLabel) !== type} />)}
                     </RoomDrop>
                   )

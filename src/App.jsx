@@ -26,7 +26,9 @@ const ROOMS = [
 // 선택한 객실 평면도 (방 선택 아래 표시 · 탭하면 확대)
 function FloorPlan({ room }) {
   const [zoom, setZoom] = useState(false)
+  const [big, setBig] = useState(false)
   if (!room || !room.plan) return null
+  const close = () => { setZoom(false); setBig(false) }
   return (
     <div className="mt-3">
       <div className="text-[12px] font-bold text-[#1b64da] mb-1.5">📐 {room.name} 평면도 <span className="font-normal text-[#3182f6]">· 탭하면 확대</span></div>
@@ -34,10 +36,14 @@ function FloorPlan({ room }) {
         <img src={room.plan} alt={`${room.name} 평면도`} loading="lazy" className="w-full rounded-xl border border-[#cfe0ff] bg-white" />
       </button>
       {zoom && (
-        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-3 animate-fade-in" onClick={() => setZoom(false)}>
-          <img src={room.plan} alt={`${room.name} 평면도`} className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
-          <button onClick={() => setZoom(false)} className="absolute top-3 right-4 text-white text-[30px] leading-none font-light">✕</button>
-          <div className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-[13px] font-bold">{room.name} 평면도 · 빈 곳을 누르면 닫힙니다</div>
+        <div className="fixed inset-0 z-[70] bg-black/85 overflow-auto animate-fade-in" onClick={close}>
+          <div className="min-h-full flex items-start justify-center p-3 py-12">
+            <img src={room.plan} alt={`${room.name} 평면도`}
+              onClick={(e) => { e.stopPropagation(); setBig((b) => !b) }}
+              className={`rounded-lg bg-white cursor-zoom-in ${big ? 'max-w-none w-[200%] cursor-zoom-out' : 'w-full max-w-[920px]'}`} />
+          </div>
+          <button onClick={close} className="fixed top-3 right-4 text-white text-[30px] leading-none font-light">✕</button>
+          <div className="fixed bottom-4 left-0 right-0 text-center text-white/80 text-[13px] font-bold pointer-events-none">{room.name} 평면도 · 이미지 탭하면 {big ? '축소' : '더 확대'} · 빈 곳 탭하면 닫힘</div>
         </div>
       )}
     </div>

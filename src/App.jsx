@@ -1927,19 +1927,13 @@ function LookupMode() {
   )
 }
 
-// 조회·수정 진입 시: 그룹 신청에 확인 필요한 점(객실 불일치/부분그룹/미제출)이 있으면 정리해 안내
-const _ckNorm = (s) => (s || '').replace(/\s/g, '').replace(/[A-Za-z0-9]+$/, '')
-const _ckJosa = (s) => (s || '').replace(/(와|과|은|는|이|가|도|만|의|들|님|랑|하고)$/, '')
+// 조회·수정 진입 시: 그룹 신청에 확인 필요한 점(객실 불일치/부분그룹)이 있으면 정리해 안내
 function GroupCheckBanner({ results }) {
   if (!results || results.length === 0) return null
   const roomTypes = [...new Set(results.map((r) => reqRoomType(r.roomLabel)))]
   const roomMismatch = results.length >= 2 && roomTypes.length > 1
   const partial = results.some((r) => /부분적으로|나머지는 교회에서 배정/.test(r.occLabel || ''))
-  const submitted = new Set(results.map((r) => _ckNorm(r.name)))
-  const listNames = []
-  results.forEach((r) => nameTokens(r.list).forEach((n) => { const t = _ckJosa(n); if (t.length >= 2 && !listNames.includes(t)) listNames.push(t) }))
-  const missing = listNames.filter((n) => !submitted.has(_ckNorm(n)))
-  if (!roomMismatch && !partial && !missing.length) return null
+  if (!roomMismatch && !partial) return null
   return (
     <div className="bg-[#fffbeb] border border-[#fde68a] rounded-2xl p-4 mb-3">
       <div className="text-[14px] font-bold text-[#b45309] mb-2">⚠ 확인이 필요한 신청이에요</div>
@@ -1950,7 +1944,6 @@ function GroupCheckBanner({ results }) {
           </div>
         )}
         {partial && <div>· <b>"다른 성도와 함께 배정" 요청(부분 그룹)</b>이 있어요. 추가 인원·추가비용은 최종 방배정 후 결정됩니다.</div>}
-        {missing.length > 0 && <div>· <b>명단엔 있는데 아직 신청 안 한 분</b>: {missing.join(', ')}</div>}
       </div>
       <div className="text-[13px] text-[#1b64da] font-bold mt-3 leading-relaxed border-t border-[#fde68a] pt-2.5">👉 대표자·구성원이 상의해서 <b>객실·인원을 하나로 통일</b>한 뒤, <b>대표자 한 분이</b> 최종 내용으로 수정해 주세요. 헷갈리시면 안내데스크로 문의 부탁드려요.</div>
     </div>
@@ -2383,6 +2376,46 @@ const CURATED_SORT = {
     '13. 오기 정정: 조영렬 캠퍼스(부산↔분당), 김혜진 연락처(=방호근), 문상철 연락처 자리수, 함보라 연락처(특수문자).',
   ],
 }
+// 미선 자매가 정리한 [체크 필요] 표 — 사람 판단 결과(표시이름·문장명단·그룹판정 반영). 자동 파싱보다 정확.
+const CURATED_CHECK = {
+  missing: [
+    { rep: '김진명', names: ['최경진', '김이안'] },
+    { rep: '이혜란', names: ['허준석', '심윤지', '허모세', '허갈렙', '허준영', '안소영', '허온유'] },
+    { rep: '안성일', names: ['양영애', '안예원', '안희원'] },
+    { rep: '박현철', names: ['박은후', '남경주', '박종근', '박일렴'] },
+    { rep: '김종명', names: ['김성은', '김찬영'] },
+    { rep: '김미선B', names: ['박영수', '박민경'] },
+    { rep: '김은학', names: ['고은비', '신채희', '김현지'] },
+    { rep: '박윤정', names: ['이수향', '오주연', '김보영', '박지영', '김순자'] },
+    { rep: '김연지', names: ['김연지', '전혜리'] },
+    { rep: '유건희', names: ['천은빈'] },
+    { rep: '석현수', names: ['박준영', '전동현', '전성민', '김찬'] },
+    { rep: '(대표 미정)', names: ['이동신', '김소은', '박윤숙', '안혜천'] },
+    { rep: '김태희', names: ['김현경', '윤현수', '임진수', '리아'] },
+    { rep: '김민선', names: ['김민선', '김예은', '김혜민', '이다예', '이예원'] },
+  ],
+  roomMismatch: [
+    { rep: '김연지', mem: [['이한나A', '소노캄'], ['신원영', '소노캄'], ['차윤선', '소노캄'], ['차윤주', '소노캄'], ['김윤하', '패밀리']] },
+    { rep: '석현수', mem: [['성호민', '스위트'], ['석현수', '소노캄'], ['이주형', '소노캄']] },
+    { rep: '박현철', mem: [['박현철', '소노캄'], ['박양정', '패밀리']] },
+    { rep: '함보라', mem: [['선정희', '스위트'], ['함보라', '소노캄'], ['박혜영', '소노캄']] },
+    { rep: '김남현', mem: [['김남현', '스위트'], ['문상철', '패밀리'], ['길태형', '패밀리']] },
+  ],
+  partial: [
+    { name: '이선희', req: '이선희·안현진 + 외 2명 교회배정 (소노캄)' },
+    { name: '조형원', req: '조형원·최윤선, 다른 성도와 4명 방 (스위트)' },
+    { name: '강창모', req: '강창모·강현우, 다른 성도와 패밀리' },
+    { name: '박은미', req: '박은미·이사랑A, 7~8명(또는 6인) 방' },
+    { name: '김남현', req: '김남현·길태형·문상철, 6명 방' },
+  ],
+  applyCheck: [
+    { name: '문옥진', issue: '그룹 없는데 6인 숙박 신청 → 최종 정리돼야 총액 합산 맞음' },
+    { name: '강창모·강현우', issue: '요청은 부분인데 신청은 "교회 배정"(부분그룹 미선택)' },
+    { name: '정나리련 / 김태희', issue: '같은 그룹인데 신청 다름 — 정나리련 6인 / 김태희 부분(7~8 희망)' },
+    { name: '지유림 / 차영민', issue: '같은 그룹 신청 다름 + 설악산뷰 불일치 + 차영민 중복신청 의심' },
+    { name: '구버전·중복', issue: '김상아·이종만·이경미·김미선B·김말숙 등 구버전/중복 → 최신만 집계' },
+  ],
+}
 function AdminApp() {
   const [pin, setPin] = useState('')
   const [auth, setAuth] = useState(false)
@@ -2445,8 +2478,13 @@ function AdminApp() {
   const scanIssues = async () => {
     setIssueBusy(true)
     try {
-      // 정리안 '의사결정'(동명이인·대표 미제출·구버전·오기·비용분리 등)도 이슈로 함께 등록
-      const seed = (CURATED_SORT.decisions || []).map((d, i) => ({ key: '의사결정|' + (((d.match(/^(\d+)/) || [])[1]) || (i + 1)), type: '의사결정', target: '', content: d.replace(/^\d+\.\s*/, '') }))
+      // 미선 정리표(체크필요) 기반 이슈 등록 — 미제출/객실불일치/부분그룹/신청체크
+      const seed = [
+        ...CURATED_CHECK.missing.map((x) => ({ key: '미제출|' + x.rep, type: '미제출', target: x.rep + ' 그룹', content: '미신청: ' + x.names.join(', ') })),
+        ...CURATED_CHECK.roomMismatch.map((x) => ({ key: '객실|' + x.rep, type: '객실불일치', target: x.rep + ' 그룹', content: x.mem.map((m) => m[0] + ':' + m[1]).join(' / ') })),
+        ...CURATED_CHECK.partial.map((x) => ({ key: '부분|' + x.name, type: '부분그룹', target: x.name, content: x.req })),
+        ...CURATED_CHECK.applyCheck.map((x) => ({ key: '신청체크|' + x.name, type: '신청체크', target: x.name, content: x.issue })),
+      ]
       const j = await post({ action: 'issueScan', pin, seed })
       if (j.ok) setIssues(j.issues || [])
     } finally { setIssueBusy(false) }
@@ -3153,21 +3191,6 @@ function AdminApp() {
         })()}
 
         {tab === '체크필요' && (() => {
-          const live = rows.filter((r) => r.route !== '중복')
-          const byG = {}; live.forEach((r) => { (byG[r.gid] = byG[r.gid] || []).push(r) })
-          const nm = (s) => (s || '').replace(/\s/g, '').replace(/[A-Za-z0-9]+$/, '')
-          const js = (s) => (s || '').replace(/(와|과|은|는|이|가|도|만|의|들|님|랑|하고)$/, '')
-          const missG = [], roomMis = []
-          Object.keys(byG).forEach((gid) => {
-            const g = byG[gid]; const rep = (g.find((r) => (r.gtotal || 0) > 0) || g[0]).rep || g[0].name
-            const sub = new Set(g.map((r) => nm(r.name)))
-            const ln = []; g.forEach((r) => nameTokens(r.list).forEach((n) => { const t = js(n); if (t.length >= 2 && !ln.includes(t)) ln.push(t) }))
-            const miss = ln.filter((n) => !sub.has(nm(n)))
-            if (miss.length) missG.push({ rep, miss })
-            const types = [...new Set(g.map((r) => reqRoomType(r.roomLabel)))]
-            if (g.length >= 2 && types.length > 1) roomMis.push({ rep, mem: g.map((r) => ({ name: r.name, room: roomTypeShort(reqRoomType(r.roomLabel)) })) })
-          })
-          const partials = live.filter((r) => /부분적으로|나머지는 교회에서 배정/.test(r.occLabel || '') || /배정해|방으로 배정|상관없|외 \d명|명은/.test(r.list || ''))
           const statusTone = { '미해결': 'bg-[#fde7ea] text-[#dc2626]', '확인중': 'bg-[#fef3e2] text-[#b45309]', '해결': 'bg-[#e7f5ec] text-[#1d7a4d]' }
           return (
             <div>
@@ -3208,28 +3231,35 @@ function AdminApp() {
                       </>
                     })()}
               </div>
-              <Collapsible title="① 신청서 미제출 그룹 멤버" count={`${missG.length}그룹`} defaultOpen>
-                {missG.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : missG.map((x, i) => (
+              <Collapsible title="① 신청서 미제출 그룹 멤버" count={`${CURATED_CHECK.missing.length}그룹`} defaultOpen>
+                {CURATED_CHECK.missing.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0 flex items-start gap-2">
-                    <span className="text-[13px] font-bold text-[#191f28] shrink-0">{x.rep}</span>
-                    <span className="text-[12px] text-[#f04452]">미신청: {x.miss.join(', ')}</span>
+                    <span className="text-[13px] font-bold text-[#191f28] shrink-0 w-[72px]">{x.rep}</span>
+                    <span className="text-[12px] text-[#f04452]">미신청: {x.names.join(', ')}</span>
                   </div>
                 ))}
               </Collapsible>
-              <Collapsible title="② 같은 그룹 · 객실 신청 불일치" count={`${roomMis.length}그룹`} defaultOpen>
-                {roomMis.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : roomMis.map((x, i) => (
+              <Collapsible title="② 같은 그룹 · 객실 신청 불일치" count={`${CURATED_CHECK.roomMismatch.length}그룹`} defaultOpen>
+                {CURATED_CHECK.roomMismatch.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <div className="text-[13px] font-bold text-[#191f28] mb-1">{x.rep} 그룹</div>
-                    <div className="flex flex-wrap gap-1">{x.mem.map((m, j) => <span key={j} className="text-[11px] bg-[#fff1f2] text-[#b91c1c] border border-[#fecdd3] rounded px-1.5 py-0.5">{m.name} · {m.room}</span>)}</div>
+                    <div className="flex flex-wrap gap-1">{x.mem.map((m, j) => <span key={j} className="text-[11px] bg-[#fff1f2] text-[#b91c1c] border border-[#fecdd3] rounded px-1.5 py-0.5">{m[0]} · {m[1]}</span>)}</div>
                   </div>
                 ))}
               </Collapsible>
-              <Collapsible title="③ 부분 그룹 (다른 성도와 함께 배정 요청)" count={`${partials.length}명`}>
-                {partials.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : partials.map((r, i) => (
+              <Collapsible title="③ 부분 그룹 (다른 성도와 함께 배정 요청)" count={`${CURATED_CHECK.partial.length}건`}>
+                {CURATED_CHECK.partial.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
-                    <span className="text-[13px] font-bold text-[#191f28]">{r.name}</span>
-                    <span className="text-[11px] text-[#1b64da] ml-1">{roomTypeShort(reqRoomType(r.roomLabel))}</span>
-                    {r.list && <div className="text-[12px] text-[#5f6b7a] mt-0.5 leading-snug">📝 {r.list}</div>}
+                    <span className="text-[13px] font-bold text-[#191f28]">{x.name}</span>
+                    <div className="text-[12px] text-[#5f6b7a] mt-0.5 leading-snug">📝 {x.req}</div>
+                  </div>
+                ))}
+              </Collapsible>
+              <Collapsible title="④ 신청 체크 (오류·충돌)" count={`${CURATED_CHECK.applyCheck.length}건`} defaultOpen>
+                {CURATED_CHECK.applyCheck.map((x, i) => (
+                  <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
+                    <span className="text-[13px] font-bold text-[#191f28]">{x.name}</span>
+                    <div className="text-[12px] text-[#b45309] mt-0.5 leading-snug">⚠ {x.issue}</div>
                   </div>
                 ))}
               </Collapsible>

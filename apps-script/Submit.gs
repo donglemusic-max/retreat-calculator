@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv20-aisort'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv21-issues'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -230,6 +230,57 @@ function _aiSortGet_() {
   if (!s) return _json_({ ok: true, result: null });
   try { var o = JSON.parse(s); return _json_({ ok: true, at: o.at, result: o.result }); } catch (e) { return _json_({ ok: true, result: null }); }
 }
+// ── 이슈관리(체크필요 충돌 추적) — 별도 '이슈관리' 탭에 기록, 관리자·시트 양쪽에서 보고 편집 ──
+var ISSUE_SHEET = '이슈관리';
+function _roomShort_(l) { l = String(l || ''); return l.indexOf('소노캄') >= 0 ? '소노캄' : (l.indexOf('소노벨 스위트') >= 0 ? '스위트' : '패밀리'); }
+function _issueSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(); var sh = ss.getSheetByName(ISSUE_SHEET);
+  if (!sh) { sh = ss.insertSheet(ISSUE_SHEET); sh.getRange(1, 1, 1, 8).setValues([['키', '유형', '대상', '내용', '상태', '처리메모', '현재감지', '갱신일']]); sh.setFrozenRows(1); sh.setColumnWidths(1, 8, 130); }
+  return sh;
+}
+function _issueRows_(sh) {
+  var n = sh.getLastRow(); if (n < 2) return { rows: [], byKey: {} };
+  var v = sh.getRange(2, 1, n - 1, 8).getValues(); var rows = [], byKey = {};
+  v.forEach(function (r, i) { var o = { rowN: i + 2, key: String(r[0]), type: r[1], target: r[2], content: r[3], status: r[4] || '미해결', memo: r[5] || '', live: !!r[6], at: r[7] }; if (o.key) { rows.push(o); byKey[o.key] = o; } });
+  return { rows: rows, byKey: byKey };
+}
+// 현재 데이터에서 체크필요 충돌 산출
+function _scanIssues_(sheet, col, width) {
+  var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
+  var nm = function (s) { return String(s || '').replace(/\s/g, '').replace(/[A-Za-z0-9]+$/, ''); };
+  var js = function (s) { return String(s || '').replace(/(와|과|은|는|이|가|도|만|의|들|님|랑|하고)$/, ''); };
+  var byG = {}, out = [];
+  for (var r = 1; r < n; r++) { var row = vals[r]; if (!_gv_(row, col.name)) continue; if (_gv_(row, col.route) === '중복') continue; if (col.ver >= 0 && _isUncounted_(_gv_(row, col.ver))) continue; var g = _gv_(row, col.gid); (byG[g] = byG[g] || []).push(row); }
+  Object.keys(byG).forEach(function (gid) {
+    var g = byG[gid], rep = ''; for (var i = 0; i < g.length && !rep; i++) { var mm = _gv_(g[i], col.grep); if (mm) rep = mm; } if (!rep) rep = _gv_(g[0], col.name);
+    var sub = {}; g.forEach(function (x) { sub[nm(_gv_(x, col.name))] = 1; });
+    var ln = []; g.forEach(function (x) { _nameTokens_(_gv_(x, col.list)).forEach(function (t) { t = js(t); if (t.length >= 2 && ln.indexOf(t) < 0) ln.push(t); }); });
+    var miss = ln.filter(function (t) { return !sub[nm(t)]; });
+    if (miss.length) out.push({ key: '미제출|' + gid, type: '미제출', target: rep + ' 그룹', content: '미신청: ' + miss.join(', ') });
+    if (g.length >= 2) { var ty = {}; g.forEach(function (x) { ty[_roomShort_(_gv_(x, col.room))] = 1; }); if (Object.keys(ty).length > 1) out.push({ key: '객실|' + gid, type: '객실불일치', target: rep + ' 그룹', content: g.map(function (x) { return _gv_(x, col.name) + ':' + _roomShort_(_gv_(x, col.room)); }).join(' / ') }); }
+  });
+  for (var r2 = 1; r2 < n; r2++) { var row2 = vals[r2]; if (!_gv_(row2, col.name)) continue; if (_gv_(row2, col.route) === '중복' || (col.ver >= 0 && _isUncounted_(_gv_(row2, col.ver)))) continue; var occ = _gv_(row2, col.occ), list = _gv_(row2, col.list); if (/부분적으로|나머지는 교회에서 배정/.test(occ) || /배정해|방으로 배정|상관없|외 \d명|명은/.test(list)) out.push({ key: '부분|' + _gv_(row2, col.gid) + '|' + _gv_(row2, col.name), type: '부분그룹', target: _gv_(row2, col.name), content: list || occ }); }
+  return out;
+}
+function _issueScan_(sheet, col, width) {
+  var sh = _issueSheet_(), ex = _issueRows_(sh), cur = _scanIssues_(sheet, col, width);
+  var now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm'), curKeys = {};
+  cur.forEach(function (c) {
+    curKeys[c.key] = 1; var e = ex.byKey[c.key];
+    if (e) { sh.getRange(e.rowN, 4).setValue(c.content); sh.getRange(e.rowN, 7).setValue('Y'); sh.getRange(e.rowN, 8).setValue(now); }
+    else sh.appendRow([c.key, c.type, c.target, c.content, '미해결', '', 'Y', now]);
+  });
+  ex.rows.forEach(function (e) { if (!curKeys[e.key] && e.live) { sh.getRange(e.rowN, 7).setValue(''); sh.getRange(e.rowN, 8).setValue(now); } });
+  return _issueGet_();
+}
+function _issueGet_() { return _json_({ ok: true, issues: _issueRows_(_issueSheet_()).rows }); }
+function _issueSet_(body) {
+  var sh = _issueSheet_(), e = _issueRows_(sh).byKey[String(body.key || '')]; if (!e) return _json_({ ok: false, error: '이슈를 찾을 수 없습니다.' });
+  if (body.status != null) sh.getRange(e.rowN, 5).setValue(body.status);
+  if (body.memo != null) sh.getRange(e.rowN, 6).setValue(body.memo);
+  sh.getRange(e.rowN, 8).setValue(Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM-dd HH:mm'));
+  return _json_({ ok: true });
+}
 // 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
 // 명단 텍스트에서 한글 이름 토큰 추출 (불용어 제외)
 function _nameTokens_(t) {
@@ -249,12 +300,15 @@ function doPost(e) {
     var H = sheet.getRange(1, 1, 1, width).getValues()[0];
     var action = body.action || 'submit';
     // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신 (PIN 필요)
-    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet' || action === 'aiSort' || action === 'aiSortGet') {
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet' || action === 'aiSort' || action === 'aiSortGet' || action === 'issueScan' || action === 'issueGet' || action === 'issueSet') {
       if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
       if (action === 'mailTplGet') return _mailTplGet_();
       if (action === 'mailTplSet') return _mailTplSet_(body);
       if (action === 'aiSort') return _aiSort_(body);
       if (action === 'aiSortGet') return _aiSortGet_();
+      if (action === 'issueScan') return _issueScan_(sheet, acol, width);
+      if (action === 'issueGet') return _issueGet_();
+      if (action === 'issueSet') return _issueSet_(body);
       H = _ensureAdminCols_(sheet, H);
       width = H.length;
       var acol = _colMap_(H);

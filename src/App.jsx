@@ -2422,6 +2422,12 @@ function AdminApp() {
       else setAiMsg('오류: ' + (j.error || ''))
     } catch (e) { setAiMsg('오류: ' + String(e)) } finally { setAiBusy(false) }
   }
+  // 이슈관리(체크필요 충돌 추적) — '이슈관리' 시트와 동기화
+  const [issues, setIssues] = useState(null)
+  const [issueBusy, setIssueBusy] = useState(false)
+  const loadIssues = async () => { const j = await post({ action: 'issueGet', pin }); if (j.ok) setIssues(j.issues || []) }
+  const scanIssues = async () => { setIssueBusy(true); try { const j = await post({ action: 'issueScan', pin }); if (j.ok) setIssues(j.issues || []) } finally { setIssueBusy(false) } }
+  const setIssue = async (key, patch) => { setIssues((arr) => (arr || []).map((x) => x.key === key ? { ...x, ...patch } : x)); await post({ action: 'issueSet', pin, key, ...patch }) }
   const [undoStack, setUndoStack] = useState([]) // 실행 취소: 방/입금 컬럼 작업의 직전 값 스냅샷
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -2773,7 +2779,7 @@ function AdminApp() {
   // #11 워크플로우 단계 번호(① 그룹정리 → ② 같은방 → ③ 방배정 → ④ 입금) + 처리할 건수 배지
   const TAB_STEP = { 그룹정리: 1, 요청조합: 2, 방배정: 3, 리마인드: 4 }
   const tabCount = (t) => t === '리마인드' ? m.unpaid.length : t === '방배정' ? m.unassigned.length : t === '그룹정리' ? m.checkGroups.length : 0
-  const goTab = (t) => { setTab(t); setMergeSel({}); if (t === '메일문구' && !mailTpl) loadMailTpl() } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
+  const goTab = (t) => { setTab(t); setMergeSel({}); if (t === '메일문구' && !mailTpl) loadMailTpl(); if (t === '체크필요' && issues === null) loadIssues() } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
 
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12">
@@ -3130,13 +3136,46 @@ function AdminApp() {
             if (g.length >= 2 && types.length > 1) roomMis.push({ rep, mem: g.map((r) => ({ name: r.name, room: roomTypeShort(reqRoomType(r.roomLabel)) })) })
           })
           const partials = live.filter((r) => /부분적으로|나머지는 교회에서 배정/.test(r.occLabel || '') || /배정해|방으로 배정|상관없|외 \d명|명은/.test(r.list || ''))
+          const statusTone = { '미해결': 'bg-[#fde7ea] text-[#dc2626]', '확인중': 'bg-[#fef3e2] text-[#b45309]', '해결': 'bg-[#e7f5ec] text-[#1d7a4d]' }
           return (
             <div>
               <HelpToggle>{`그룹 신청에서 사람이 직접 확인·정리해야 하는 항목을 모았습니다.
 • 미제출 멤버 = 명단엔 있으나 본인 신청서가 없는 사람 (대표자에게 연락).
 • 객실 불일치 = 같은 그룹인데 구성원이 서로 다른 객실을 골라 제출함 (대표가 하나로 통일 필요).
 • 부분 그룹 = "다른 성도와 함께 배정" 요청 (방배정 탭에서 채워 넣기).
-※ 해당 성도가 조회·수정에 들어오면 같은 안내가 노란 배너로 표시됩니다.`}</HelpToggle>
+※ 해당 성도가 조회·수정에 들어오면 같은 안내가 노란 배너로 표시됩니다.
+※ 아래 '이슈관리'는 구글시트 '이슈관리' 탭과 연동 — 상태/메모는 시트에서도 편집되고, [시트 동기화]를 누르면 현재 데이터로 갱신됩니다.`}</HelpToggle>
+              <div className="bg-white border border-[#f2f4f6] rounded-2xl p-4 mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[13px] font-bold text-[#191f28]">📋 이슈관리 <span className="text-[11px] font-normal text-[#5f6b7a]">(시트 ‘이슈관리’ 탭과 연동)</span></span>
+                  <button onClick={scanIssues} disabled={issueBusy} className={`text-[11px] font-bold px-3 py-1.5 rounded-lg ${issueBusy ? 'bg-[#e5e8eb] text-[#b0b8c1]' : 'bg-[#1b64da] text-white'}`}>{issueBusy ? '동기화 중…' : '🔄 시트 동기화(스캔)'}</button>
+                </div>
+                {issues === null ? <p className="text-[12px] text-[#5f6b7a]">불러오는 중…</p>
+                  : issues.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">기록된 이슈가 없습니다. [시트 동기화]를 눌러 현재 충돌을 모아주세요.</p>
+                    : (() => {
+                      const open = issues.filter((x) => x.status !== '해결')
+                      return <>
+                        <div className="text-[11px] text-[#5f6b7a] mb-2">미해결·확인중 {open.length} · 해결 {issues.length - open.length} · 전체 {issues.length}</div>
+                        {issues.map((x) => (
+                          <div key={x.key} className={`border rounded-xl p-2.5 mb-2 ${x.status === '해결' ? 'border-[#d7e9dd] bg-[#f5fbf7]' : 'border-[#f2f4f6]'}`}>
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#eef0f3] text-[#4e5968]">{x.type}</span>
+                              <span className="text-[13px] font-bold text-[#191f28]">{x.target}</span>
+                              {!x.live && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#e7f5ec] text-[#1d7a4d]">✓ 현재 미감지(해결 추정)</span>}
+                            </div>
+                            <div className="text-[12px] text-[#4e5968] mb-1.5 leading-snug">{x.content}</div>
+                            <div className="flex items-center gap-1.5">
+                              {['미해결', '확인중', '해결'].map((s) => (
+                                <button key={s} onClick={() => setIssue(x.key, { status: s })} className={`text-[11px] font-bold px-2 py-1 rounded-lg ${x.status === s ? statusTone[s] : 'bg-[#f2f4f6] text-[#8a8f98]'}`}>{s}</button>
+                              ))}
+                              <input defaultValue={x.memo} onBlur={(e) => { if (e.target.value !== x.memo) setIssue(x.key, { memo: e.target.value }) }} placeholder="처리메모" className="flex-1 min-w-0 text-[12px] bg-[#f9fafb] border border-[#e5e8eb] rounded-lg px-2 py-1" />
+                            </div>
+                            {x.at && <div className="text-[10px] text-[#b0b8c1] mt-1">갱신 {x.at}</div>}
+                          </div>
+                        ))}
+                      </>
+                    })()}
+              </div>
               <Collapsible title="① 신청서 미제출 그룹 멤버" count={`${missG.length}그룹`} defaultOpen>
                 {missG.length === 0 ? <p className="text-[12px] text-[#5f6b7a]">없음</p> : missG.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0 flex items-start gap-2">

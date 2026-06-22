@@ -2849,6 +2849,14 @@ function AdminApp() {
   // #11 워크플로우 단계 번호(① 그룹정리 → ② 같은방 → ③ 방배정 → ④ 입금) + 처리할 건수 배지
   const TAB_STEP = { 그룹정리: 1, 요청조합: 2, 방배정: 3, 리마인드: 4 }
   const tabCount = (t) => t === '리마인드' ? m.unpaid.length : t === '방배정' ? m.unassigned.length : t === '그룹정리' ? m.checkGroups.length : 0
+  // 4개 영역(상위) + 하위 탭 구성
+  const AREAS = [
+    { key: '현황', tabs: ['요약', '정리안', '체크필요'] },
+    { key: '정리·배정', tabs: ['그룹정리', '요청조합', '방배정'] },
+    { key: '소통', tabs: ['리마인드', '문의', '메일문구'] },
+    { key: '버스', tabs: ['버스명단'] },
+  ]
+  const curArea = AREAS.find((a) => a.tabs.includes(tab)) || AREAS[0]
   const goTab = (t) => { setTab(t); setMergeSel({}); if (t === '메일문구' && !mailTpl) loadMailTpl(); if (t === '체크필요' && issues === null) loadIssues() } // 탭 이동 시 합치기 선택 초기화(탭 간 오선택 방지)
 
   return (
@@ -2931,18 +2939,34 @@ function AdminApp() {
           <p className="text-[12px] text-[#5f6b7a] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
         </header>
 
-        <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4 overflow-x-auto sticky top-0 z-20 shadow-sm">
-          {TAB_ORDER.map((t) => {
-            const cnt = tabCount(t)
-            const step = TAB_STEP[t]
-            return (
-              <button key={t} onClick={() => goTab(t)} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] flex items-center justify-center gap-1 ${tab === t ? 'bg-white text-[#3182f6] shadow' : 'text-[#5f6b7a]'}`}>
-                {step && <span className={`w-[15px] h-[15px] rounded-full text-[10px] font-extrabold flex items-center justify-center ${tab === t ? 'bg-[#3182f6] text-white' : 'bg-[#cbd2da] text-white'}`}>{step}</span>}
-                {TAB_LABEL[t]}
-                {cnt > 0 && <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${tab === t ? 'bg-[#fde7ea] text-[#dc2626]' : 'bg-[#dc2626] text-white'}`}>{cnt}</span>}
-              </button>
-            )
-          })}
+        <div className="sticky top-0 z-20 mb-4">
+          {/* 상위: 4개 영역 */}
+          <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] shadow-sm">
+            {AREAS.map((a) => {
+              const cnt = a.tabs.reduce((s, t) => s + tabCount(t), 0)
+              const active = curArea.key === a.key
+              return (
+                <button key={a.key} onClick={() => goTab(a.tabs[0])} className={`flex-1 whitespace-nowrap py-2.5 px-3 text-[13px] font-bold rounded-[10px] flex items-center justify-center gap-1 ${active ? 'bg-white text-[#3182f6] shadow' : 'text-[#5f6b7a]'}`}>
+                  {a.key}
+                  {cnt > 0 && <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${active ? 'bg-[#fde7ea] text-[#dc2626]' : 'bg-[#dc2626] text-white'}`}>{cnt}</span>}
+                </button>
+              )
+            })}
+          </div>
+          {/* 하위: 영역 내 탭 (2개 이상일 때만) */}
+          {curArea.tabs.length > 1 && (
+            <div className="flex gap-1.5 mt-2 px-0.5 overflow-x-auto pb-0.5">
+              {curArea.tabs.map((t) => {
+                const cnt = tabCount(t)
+                return (
+                  <button key={t} onClick={() => goTab(t)} className={`whitespace-nowrap py-1.5 px-3 text-[12px] font-bold rounded-full flex items-center gap-1 border ${tab === t ? 'bg-[#3182f6] text-white border-[#3182f6]' : 'bg-white text-[#5f6b7a] border-[#e5e8eb]'}`}>
+                    {TAB_LABEL[t]}
+                    {cnt > 0 && <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${tab === t ? 'bg-white/25 text-white' : 'bg-[#dc2626] text-white'}`}>{cnt}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <StatusLegend />

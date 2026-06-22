@@ -3216,6 +3216,32 @@ function AdminApp() {
 
         {tab === '체크필요' && (() => {
           const statusTone = { '미해결': 'bg-[#fde7ea] text-[#dc2626]', '확인중': 'bg-[#fef3e2] text-[#b45309]', '해결': 'bg-[#e7f5ec] text-[#1d7a4d]' }
+          // ▼ 실시간 자동 검출 (현재 데이터 기준 — 신규 신청도 자동 포함)
+          const cNorm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
+          const liveR = rows.filter((r) => r.route !== '중복')
+          const dupR = rows.filter((r) => r.route === '중복')
+          const subN = new Set(liveR.map((r) => cNorm(r.name)))
+          const subBase = new Set(subN); liveR.forEach((r) => { const b = cNorm(r.name).replace(/[A-Za-z0-9]+$/, ''); if (b.length >= 2) subBase.add(b) })
+          const knownNm = (k) => subN.has(k) || subBase.has(k.replace(/[A-Za-z0-9]+$/, ''))
+          const byGidC = {}; liveR.forEach((r) => { (byGidC[r.gid] = byGidC[r.gid] || []).push(r) })
+          const cMissing = [], cRoom = [], cErr = []
+          const pushErr = (name, issue) => { if (!cErr.some((e) => e.name === name && e.issue === issue)) cErr.push({ name, issue }) }
+          Object.values(byGidC).forEach((mem) => {
+            const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
+            const roster = mem.map((r) => r.list).find(Boolean) || ''
+            const miss = [...new Set(nameTokens(roster).map(cNorm))].filter((k) => !knownNm(k))
+            if (miss.length) cMissing.push({ rep, names: miss })
+            if (new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1) cRoom.push({ rep, mem: mem.map((r) => [r.name, roomTypeShort(reqRoomType(r.roomLabel))]) })
+            const occKinds = [...new Set(mem.map((r) => /인이 투숙/.test(r.occLabel || '') ? '그룹' : /부분/.test(r.occLabel || '') ? '부분' : '개인'))]
+            if (occKinds.length > 1) pushErr(rep + ' 그룹', `구성원 신청유형이 섞임 (${occKinds.join('/')}) — 통일 필요`)
+            if (mem.length > 1 && new Set(mem.map((r) => !!r.seorak)).size > 1) pushErr(rep + ' 그룹', '설악산뷰 신청이 구성원마다 다름')
+            if (mem.some((r) => /인이 투숙/.test(r.occLabel || '')) && !mem.some((r) => (r.list || '').trim())) pushErr(rep + (mem.length > 1 ? ' 그룹' : ''), '그룹(N인 투숙) 신청인데 명단이 비어 있음')
+          })
+          const pByGid = {}; liveR.filter((r) => /부분/.test(r.occLabel || '')).forEach((r) => { (pByGid[r.gid] = pByGid[r.gid] || []).push(r) })
+          const cPartial = Object.values(pByGid).map((mem) => ({ name: mem.map((r) => r.name).join('·'), req: (mem.map((r) => r.list || r.inquiry).find(Boolean) || '') }))
+          liveR.forEach((r) => {
+            if (isChurchAssigned(r.occLabel) && !/부분/.test(r.occLabel || '') && /다른\s*성도|배정\s*요청|함께\s*배정|함께\s*4명|2명은|3명은/.test((r.list || '') + ' ' + (r.inquiry || ''))) pushErr(r.name, '요청은 "다른 성도와 함께"인데 신청은 교회배정(부분그룹 미선택)')
+          })
           return (
             <div>
               <HelpToggle>{`그룹 신청에서 사람이 직접 확인·정리해야 하는 항목을 모았습니다.
@@ -3255,37 +3281,43 @@ function AdminApp() {
                       </>
                     })()}
               </div>
-              <Collapsible title="① 신청서 미제출 그룹 멤버" count={`${CURATED_CHECK.missing.length}그룹`} defaultOpen>
-                {CURATED_CHECK.missing.map((x, i) => (
+              <div className="text-[11px] text-[#1b64da] bg-[#eef5ff] border border-[#d0e2ff] rounded-lg px-3 py-1.5 mb-2">⚡ 아래 ①~⑤는 <b>현재 데이터 실시간 자동 검출</b> — 새 신청이 들어오면 자동으로 포함됩니다(새로고침).</div>
+              <Collapsible title="① 신청서 미제출 그룹 멤버" count={`${cMissing.length}그룹`} defaultOpen>
+                {cMissing.length ? cMissing.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0 flex items-start gap-2">
                     <span className="text-[13px] font-bold text-[#191f28] shrink-0 w-[72px]">{x.rep}</span>
                     <span className="text-[12px] text-[#f04452]">미신청: {x.names.join(', ')}</span>
                   </div>
-                ))}
+                )) : <p className="text-[12px] text-[#5f6b7a]">없음</p>}
               </Collapsible>
-              <Collapsible title="② 같은 그룹 · 객실 신청 불일치" count={`${CURATED_CHECK.roomMismatch.length}그룹`} defaultOpen>
-                {CURATED_CHECK.roomMismatch.map((x, i) => (
+              <Collapsible title="② 같은 그룹 · 객실 신청 불일치" count={`${cRoom.length}그룹`} defaultOpen>
+                {cRoom.length ? cRoom.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <div className="text-[13px] font-bold text-[#191f28] mb-1">{x.rep} 그룹</div>
                     <div className="flex flex-wrap gap-1">{x.mem.map((m, j) => <span key={j} className="text-[11px] bg-[#fff1f2] text-[#b91c1c] border border-[#fecdd3] rounded px-1.5 py-0.5">{m[0]} · {m[1]}</span>)}</div>
                   </div>
-                ))}
+                )) : <p className="text-[12px] text-[#5f6b7a]">없음</p>}
               </Collapsible>
-              <Collapsible title="③ 부분 그룹 (다른 성도와 함께 배정 요청)" count={`${CURATED_CHECK.partial.length}건`}>
-                {CURATED_CHECK.partial.map((x, i) => (
+              <Collapsible title="③ 부분 그룹 (다른 성도와 함께 배정 요청)" count={`${cPartial.length}건`}>
+                {cPartial.length ? cPartial.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <span className="text-[13px] font-bold text-[#191f28]">{x.name}</span>
                     <div className="text-[12px] text-[#5f6b7a] mt-0.5 leading-snug">📝 {x.req}</div>
                   </div>
-                ))}
+                )) : <p className="text-[12px] text-[#5f6b7a]">없음</p>}
               </Collapsible>
-              <Collapsible title="④ 신청 체크 (오류·충돌)" count={`${CURATED_CHECK.applyCheck.length}건`} defaultOpen>
-                {CURATED_CHECK.applyCheck.map((x, i) => (
+              <Collapsible title="④ 신청 체크 (오류·충돌)" count={`${cErr.length}건`} defaultOpen>
+                {cErr.length ? cErr.map((x, i) => (
                   <div key={i} className="py-2 border-b border-[#f7f8fa] last:border-0">
                     <span className="text-[13px] font-bold text-[#191f28]">{x.name}</span>
                     <div className="text-[12px] text-[#b45309] mt-0.5 leading-snug">⚠ {x.issue}</div>
                   </div>
-                ))}
+                )) : <p className="text-[12px] text-[#5f6b7a]">없음</p>}
+              </Collapsible>
+              <Collapsible title="⑤ 중복 신청 (집계 제외)" count={`${dupR.length}건`}>
+                {dupR.length ? dupR.map((r) => (
+                  <div key={r.row} className="text-[12px] text-[#4e5968] py-0.5">{r.name} <span className="text-[11px] text-[#8b95a1]">— {r.note || '중복 재제출'}</span></div>
+                )) : <p className="text-[12px] text-[#5f6b7a]">없음</p>}
               </Collapsible>
             </div>
           )

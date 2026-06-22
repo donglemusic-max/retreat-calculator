@@ -3228,15 +3228,15 @@ function AdminApp() {
           const resolveNm = (k) => { if (knownNm(k)) return k; const s = k.replace(josaRe, ''); return (s.length >= 2 && knownNm(s)) ? s : k }
           const cMissing = [], cRoom = [], cErr = []
           const pushErr = (name, issue) => { if (!cErr.some((e) => e.name === name && e.issue === issue)) cErr.push({ name, issue }) }
+          const baseOf = (n) => cNorm(n).replace(/[A-Za-z0-9]+$/, '')
           Object.values(byGidC).forEach((mem) => {
             const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
-            const isPartialG = mem.some((r) => /부분/.test(r.occLabel || ''))
-            const roster = mem.map((r) => r.list).find(Boolean) || ''
-            // 부분그룹은 ③에서 다룸(명단=미제출 명단 아님). 대표 본인·조사붙은 토큰 제외
-            if (!isPartialG) {
-              const miss = [...new Set(nameTokens(roster).map((t) => resolveNm(cNorm(t))))].filter((k) => k.length >= 2 && !knownNm(k) && k !== cNorm(rep))
-              if (miss.length) cMissing.push({ rep, names: miss })
-            }
+            // 명단 = 구성원 전원 명단의 합집합(멤버마다 다르게 적은 경우 누락 방지) · 조사/접미사 보정
+            const rosterToks = [...new Set(nameTokens(mem.map((r) => r.list).filter(Boolean).join('  ')).map((t) => resolveNm(cNorm(t))))]
+            const rosterSet = new Set(rosterToks)
+            const orphan = mem.some((r) => !rosterSet.has(cNorm(r.name)) && !rosterSet.has(baseOf(r.name))) // 별칭 제출(명단엔 없는 제출자) → 대표는 이미 그 별칭으로 제출한 것
+            const miss = rosterToks.filter((k) => k.length >= 2 && !knownNm(k) && !(orphan && k === cNorm(rep)))
+            if (miss.length) cMissing.push({ rep, names: miss })
             if (new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1) cRoom.push({ rep, mem: mem.map((r) => [r.name, roomTypeShort(reqRoomType(r.roomLabel))]) })
             // 신청유형 섞임: '개인'(객실칸 비움=예약그룹 잔여)은 무시, 그룹↔부분 충돌만 오류
             const kinds = [...new Set(mem.map((r) => /인이 투숙/.test(r.occLabel || '') ? '그룹' : /부분/.test(r.occLabel || '') ? '부분' : '개인').filter((k) => k !== '개인'))]

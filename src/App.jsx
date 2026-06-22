@@ -2472,18 +2472,52 @@ function AdminApp() {
     } catch (e) { setAiMsg('오류: ' + String(e)) } finally { setAiBusy(false) }
   }
   // 이슈관리(체크필요 충돌 추적) — '이슈관리' 시트와 동기화
+  // 체크필요 라이브 검출 (화면 ①~⑤ + 이슈관리 동기화가 공유)
+  const checks = useMemo(() => {
+    const cNorm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
+    const liveR = rows.filter((r) => r.route !== '중복')
+    const dups = rows.filter((r) => r.route === '중복')
+    const subN = new Set(liveR.map((r) => cNorm(r.name)))
+    const subBase = new Set(subN); liveR.forEach((r) => { const b = cNorm(r.name).replace(/[A-Za-z0-9]+$/, ''); if (b.length >= 2) subBase.add(b) })
+    const knownNm = (k) => subN.has(k) || subBase.has(k.replace(/[A-Za-z0-9]+$/, ''))
+    const byGidC = {}; liveR.forEach((r) => { (byGidC[r.gid] = byGidC[r.gid] || []).push(r) })
+    const josaRe = /(와|과|은|는|이|가|을|를|도|만|의|님|들|랑|이랑|에게|한테|에서|하고)$/
+    const resolveNm = (k) => { if (knownNm(k)) return k; const s = k.replace(josaRe, ''); return (s.length >= 2 && knownNm(s)) ? s : k }
+    const baseOf = (n) => cNorm(n).replace(/[A-Za-z0-9]+$/, '')
+    const missing = [], roomMismatch = [], applyCheck = []
+    const pushErr = (name, issue) => { if (!applyCheck.some((e) => e.name === name && e.issue === issue)) applyCheck.push({ name, issue }) }
+    Object.values(byGidC).forEach((mem) => {
+      const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
+      const rosterToks = [...new Set(nameTokens(mem.map((r) => r.list).filter(Boolean).join('  ')).map((t) => resolveNm(cNorm(t))))]
+      const rosterSet = new Set(rosterToks)
+      const orphan = mem.some((r) => !rosterSet.has(cNorm(r.name)) && !rosterSet.has(baseOf(r.name)))
+      const miss = rosterToks.filter((k) => k.length >= 2 && !knownNm(k) && !(orphan && k === cNorm(rep)))
+      if (miss.length) missing.push({ rep, names: miss })
+      if (new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1) roomMismatch.push({ rep, mem: mem.map((r) => [r.name, roomTypeShort(reqRoomType(r.roomLabel))]) })
+      const kinds = [...new Set(mem.map((r) => /인이 투숙/.test(r.occLabel || '') ? '그룹' : /부분/.test(r.occLabel || '') ? '부분' : '개인').filter((k) => k !== '개인'))]
+      if (kinds.length > 1) pushErr(rep + ' 그룹', `같은 그룹인데 '그룹'과 '부분' 신청이 섞임 — 통일 필요`)
+      if (mem.length > 1 && new Set(mem.map((r) => !!r.seorak)).size > 1) pushErr(rep + ' 그룹', '설악산뷰 신청이 구성원마다 다름')
+      if (mem.some((r) => /인이 투숙/.test(r.occLabel || '')) && !mem.some((r) => (r.list || '').trim())) pushErr(rep + (mem.length > 1 ? ' 그룹' : ''), '그룹(N인 투숙) 신청인데 명단이 비어 있음')
+    })
+    const pByGid = {}; liveR.filter((r) => /부분/.test(r.occLabel || '')).forEach((r) => { (pByGid[r.gid] = pByGid[r.gid] || []).push(r) })
+    const partial = Object.values(pByGid).map((mem) => ({ name: mem.map((r) => r.name).join('·'), req: (mem.map((r) => r.list || r.inquiry).find(Boolean) || '') }))
+    liveR.forEach((r) => {
+      if (isChurchAssigned(r.occLabel) && !/부분/.test(r.occLabel || '') && /다른\s*성도|배정\s*요청|함께\s*배정|함께\s*4명|2명은|3명은/.test((r.list || '') + ' ' + (r.inquiry || ''))) pushErr(r.name, '요청은 "다른 성도와 함께"인데 신청은 교회배정(부분그룹 미선택)')
+    })
+    return { missing, roomMismatch, partial, applyCheck, dups }
+  }, [rows])
   const [issues, setIssues] = useState(null)
   const [issueBusy, setIssueBusy] = useState(false)
   const loadIssues = async () => { const j = await post({ action: 'issueGet', pin }); if (j.ok) setIssues(j.issues || []) }
   const scanIssues = async () => {
     setIssueBusy(true)
     try {
-      // 미선 정리표(체크필요) 기반 이슈 등록 — 미제출/객실불일치/부분그룹/신청체크
+      // 라이브 검출(현재 데이터) 기반 이슈 등록 — 미제출/객실불일치/부분그룹/신청체크
       const seed = [
-        ...CURATED_CHECK.missing.map((x) => ({ key: '미제출|' + x.rep, type: '미제출', target: x.rep + ' 그룹', content: '미신청: ' + x.names.join(', ') })),
-        ...CURATED_CHECK.roomMismatch.map((x) => ({ key: '객실|' + x.rep, type: '객실불일치', target: x.rep + ' 그룹', content: x.mem.map((m) => m[0] + ':' + m[1]).join(' / ') })),
-        ...CURATED_CHECK.partial.map((x) => ({ key: '부분|' + x.name, type: '부분그룹', target: x.name, content: x.req })),
-        ...CURATED_CHECK.applyCheck.map((x) => ({ key: '신청체크|' + x.name, type: '신청체크', target: x.name, content: x.issue })),
+        ...checks.missing.map((x) => ({ key: '미제출|' + x.rep, type: '미제출', target: x.rep + ' 그룹', content: '미신청: ' + x.names.join(', ') })),
+        ...checks.roomMismatch.map((x) => ({ key: '객실|' + x.rep, type: '객실불일치', target: x.rep + ' 그룹', content: x.mem.map((m) => m[0] + ':' + m[1]).join(' / ') })),
+        ...checks.partial.map((x) => ({ key: '부분|' + x.name, type: '부분그룹', target: x.name, content: x.req })),
+        ...checks.applyCheck.map((x) => ({ key: '신청체크|' + x.name, type: '신청체크', target: x.name, content: x.issue })),
       ]
       const j = await post({ action: 'issueScan', pin, seed })
       if (j.ok) setIssues(j.issues || [])
@@ -3216,39 +3250,7 @@ function AdminApp() {
 
         {tab === '체크필요' && (() => {
           const statusTone = { '미해결': 'bg-[#fde7ea] text-[#dc2626]', '확인중': 'bg-[#fef3e2] text-[#b45309]', '해결': 'bg-[#e7f5ec] text-[#1d7a4d]' }
-          // ▼ 실시간 자동 검출 (현재 데이터 기준 — 신규 신청도 자동 포함)
-          const cNorm = (x) => String(x || '').replace(/\s+/g, '').replace(/^가족\//, '')
-          const liveR = rows.filter((r) => r.route !== '중복')
-          const dupR = rows.filter((r) => r.route === '중복')
-          const subN = new Set(liveR.map((r) => cNorm(r.name)))
-          const subBase = new Set(subN); liveR.forEach((r) => { const b = cNorm(r.name).replace(/[A-Za-z0-9]+$/, ''); if (b.length >= 2) subBase.add(b) })
-          const knownNm = (k) => subN.has(k) || subBase.has(k.replace(/[A-Za-z0-9]+$/, ''))
-          const byGidC = {}; liveR.forEach((r) => { (byGidC[r.gid] = byGidC[r.gid] || []).push(r) })
-          const josaRe = /(와|과|은|는|이|가|을|를|도|만|의|님|들|랑|이랑|에게|한테|에서|하고)$/
-          const resolveNm = (k) => { if (knownNm(k)) return k; const s = k.replace(josaRe, ''); return (s.length >= 2 && knownNm(s)) ? s : k }
-          const cMissing = [], cRoom = [], cErr = []
-          const pushErr = (name, issue) => { if (!cErr.some((e) => e.name === name && e.issue === issue)) cErr.push({ name, issue }) }
-          const baseOf = (n) => cNorm(n).replace(/[A-Za-z0-9]+$/, '')
-          Object.values(byGidC).forEach((mem) => {
-            const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
-            // 명단 = 구성원 전원 명단의 합집합(멤버마다 다르게 적은 경우 누락 방지) · 조사/접미사 보정
-            const rosterToks = [...new Set(nameTokens(mem.map((r) => r.list).filter(Boolean).join('  ')).map((t) => resolveNm(cNorm(t))))]
-            const rosterSet = new Set(rosterToks)
-            const orphan = mem.some((r) => !rosterSet.has(cNorm(r.name)) && !rosterSet.has(baseOf(r.name))) // 별칭 제출(명단엔 없는 제출자) → 대표는 이미 그 별칭으로 제출한 것
-            const miss = rosterToks.filter((k) => k.length >= 2 && !knownNm(k) && !(orphan && k === cNorm(rep)))
-            if (miss.length) cMissing.push({ rep, names: miss })
-            if (new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1) cRoom.push({ rep, mem: mem.map((r) => [r.name, roomTypeShort(reqRoomType(r.roomLabel))]) })
-            // 신청유형 섞임: '개인'(객실칸 비움=예약그룹 잔여)은 무시, 그룹↔부분 충돌만 오류
-            const kinds = [...new Set(mem.map((r) => /인이 투숙/.test(r.occLabel || '') ? '그룹' : /부분/.test(r.occLabel || '') ? '부분' : '개인').filter((k) => k !== '개인'))]
-            if (kinds.length > 1) pushErr(rep + ' 그룹', `같은 그룹인데 '그룹'과 '부분' 신청이 섞임 — 통일 필요`)
-            if (mem.length > 1 && new Set(mem.map((r) => !!r.seorak)).size > 1) pushErr(rep + ' 그룹', '설악산뷰 신청이 구성원마다 다름')
-            if (mem.some((r) => /인이 투숙/.test(r.occLabel || '')) && !mem.some((r) => (r.list || '').trim())) pushErr(rep + (mem.length > 1 ? ' 그룹' : ''), '그룹(N인 투숙) 신청인데 명단이 비어 있음')
-          })
-          const pByGid = {}; liveR.filter((r) => /부분/.test(r.occLabel || '')).forEach((r) => { (pByGid[r.gid] = pByGid[r.gid] || []).push(r) })
-          const cPartial = Object.values(pByGid).map((mem) => ({ name: mem.map((r) => r.name).join('·'), req: (mem.map((r) => r.list || r.inquiry).find(Boolean) || '') }))
-          liveR.forEach((r) => {
-            if (isChurchAssigned(r.occLabel) && !/부분/.test(r.occLabel || '') && /다른\s*성도|배정\s*요청|함께\s*배정|함께\s*4명|2명은|3명은/.test((r.list || '') + ' ' + (r.inquiry || ''))) pushErr(r.name, '요청은 "다른 성도와 함께"인데 신청은 교회배정(부분그룹 미선택)')
-          })
+          const { missing: cMissing, roomMismatch: cRoom, partial: cPartial, applyCheck: cErr, dups: dupR } = checks
           return (
             <div>
               <HelpToggle>{`그룹 신청에서 사람이 직접 확인·정리해야 하는 항목을 모았습니다.

@@ -1402,8 +1402,11 @@ function SubmitSection({ payload, valid, missing }) {
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [result, setResult] = useState(null)
   const [err, setErr] = useState('')
+  const lockRef = useRef(false) // 더블클릭/연타 중복 제출 하드 가드
 
   const submit = async () => {
+    if (lockRef.current) return // 이미 전송 중이면 무시 (re-render 전 연타 방지)
+    lockRef.current = true
     setStatus('loading'); setErr('')
     try {
       const res = await fetch(SUBMIT_URL, {
@@ -1412,9 +1415,9 @@ function SubmitSection({ payload, valid, missing }) {
         body: JSON.stringify(payload),
       })
       const j = await res.json()
-      if (j.ok) { setResult(j); setStatus('done') }
-      else { setErr(j.error || '제출 실패'); setStatus('error') }
-    } catch (e) { setErr(String(e)); setStatus('error') }
+      if (j.ok) { setResult(j); setStatus('done') } // 성공 시 완료화면으로 전환(재제출 불가) → 락 유지
+      else { setErr(j.error || '제출 실패'); setStatus('error'); lockRef.current = false }
+    } catch (e) { setErr(String(e)); setStatus('error'); lockRef.current = false }
   }
 
   if (!SUBMIT_URL) {

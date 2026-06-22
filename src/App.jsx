@@ -2174,7 +2174,7 @@ const roomTypeOfMembers = (members) => {
 }
 
 // 자유텍스트(명단/문의)에서 '사람 이름' 토큰만 추출 — 문장/조사/객실용어/동사어미 제외
-const NAME_STOP = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|방도|방은|방만|님이|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|좋을|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|인원|인실|대표|정도|혹시|설악|뷰는|이렇게|그렇게|저렇게|어떻게|그래서|그러면|그리고|하지만|그런데|그냥|다시|같이|여러|아주|조금|많이|서로|이번|모여|모이|채워|제가|저는|저희|우리|확인|참여|참석|예정|관련|문의|답변|수정|변경|취소|괜찮|그게|명은|명이|명만|명과|명도|명들|여명|몇명|채워|모이|모여/
+const NAME_STOP = /투숙|신청|상관|배정|교회|추가|비용|없|캠퍼스|함께|함깨|성도|다른|또는|혹은|그룹|가족|부분|명방|방으로|방을|방도|방은|방만|님이|형제|자매|가능|모두|각각|각가|먼저|보냅|원합|소노|패밀|스위|원룸|온돌|침대|침실|좋겠|좋을|주시|부탁|드림|드려|되겠|혼자|요청|선택|이용|출퇴근|식사|객실|추천|배치|희망|인원|인실|대표|정도|혹시|설악|뷰는|이렇게|그렇게|저렇게|어떻게|그래서|그러면|그리고|하지만|그런데|그냥|다시|같이|여러|아주|조금|많이|서로|이번|모여|모이|채워|제가|저는|저희|우리|확인|참여|참석|예정|관련|문의|답변|수정|변경|취소|괜찮|그게|명은|명이|명만|명과|명도|명들|여명|몇명|채워|모이|모여|나머지|테스트|상관없|적어|적힌/
 const NAME_END = /(구요|구여|네요|어요|아요|에요|예요|세요|지면|으면|해서|하고|이고|되고|라서|래서|면서|는데|니다|니까|을까|겠어|겠습|드려|드림|어서|아서|시면|시는|시고|군요|거든|잖아|는걸|에서|에게|한테|부터|까지|마다|조차|구나|드릴|합니|입니|텐데|는지|을지|어용|아용)$/
 const nameTokens = (t) => (t || '').split(/[^가-힣A-Za-z]+/).filter((x) => /^[가-힣]{2,4}$/.test(x) && !NAME_STOP.test(x) && !NAME_END.test(x))
 // 금액 계산 헬퍼 (관리자 클라이언트 재계산용)
@@ -3224,16 +3224,23 @@ function AdminApp() {
           const subBase = new Set(subN); liveR.forEach((r) => { const b = cNorm(r.name).replace(/[A-Za-z0-9]+$/, ''); if (b.length >= 2) subBase.add(b) })
           const knownNm = (k) => subN.has(k) || subBase.has(k.replace(/[A-Za-z0-9]+$/, ''))
           const byGidC = {}; liveR.forEach((r) => { (byGidC[r.gid] = byGidC[r.gid] || []).push(r) })
+          const josaRe = /(와|과|은|는|이|가|을|를|도|만|의|님|들|랑|이랑|에게|한테|에서|하고)$/
+          const resolveNm = (k) => { if (knownNm(k)) return k; const s = k.replace(josaRe, ''); return (s.length >= 2 && knownNm(s)) ? s : k }
           const cMissing = [], cRoom = [], cErr = []
           const pushErr = (name, issue) => { if (!cErr.some((e) => e.name === name && e.issue === issue)) cErr.push({ name, issue }) }
           Object.values(byGidC).forEach((mem) => {
             const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
+            const isPartialG = mem.some((r) => /부분/.test(r.occLabel || ''))
             const roster = mem.map((r) => r.list).find(Boolean) || ''
-            const miss = [...new Set(nameTokens(roster).map(cNorm))].filter((k) => !knownNm(k))
-            if (miss.length) cMissing.push({ rep, names: miss })
+            // 부분그룹은 ③에서 다룸(명단=미제출 명단 아님). 대표 본인·조사붙은 토큰 제외
+            if (!isPartialG) {
+              const miss = [...new Set(nameTokens(roster).map((t) => resolveNm(cNorm(t))))].filter((k) => k.length >= 2 && !knownNm(k) && k !== cNorm(rep))
+              if (miss.length) cMissing.push({ rep, names: miss })
+            }
             if (new Set(mem.map((r) => reqRoomType(r.roomLabel))).size > 1) cRoom.push({ rep, mem: mem.map((r) => [r.name, roomTypeShort(reqRoomType(r.roomLabel))]) })
-            const occKinds = [...new Set(mem.map((r) => /인이 투숙/.test(r.occLabel || '') ? '그룹' : /부분/.test(r.occLabel || '') ? '부분' : '개인'))]
-            if (occKinds.length > 1) pushErr(rep + ' 그룹', `구성원 신청유형이 섞임 (${occKinds.join('/')}) — 통일 필요`)
+            // 신청유형 섞임: '개인'(객실칸 비움=예약그룹 잔여)은 무시, 그룹↔부분 충돌만 오류
+            const kinds = [...new Set(mem.map((r) => /인이 투숙/.test(r.occLabel || '') ? '그룹' : /부분/.test(r.occLabel || '') ? '부분' : '개인').filter((k) => k !== '개인'))]
+            if (kinds.length > 1) pushErr(rep + ' 그룹', `같은 그룹인데 '그룹'과 '부분' 신청이 섞임 — 통일 필요`)
             if (mem.length > 1 && new Set(mem.map((r) => !!r.seorak)).size > 1) pushErr(rep + ' 그룹', '설악산뷰 신청이 구성원마다 다름')
             if (mem.some((r) => /인이 투숙/.test(r.occLabel || '')) && !mem.some((r) => (r.list || '').trim())) pushErr(rep + (mem.length > 1 ? ' 그룹' : ''), '그룹(N인 투숙) 신청인데 명단이 비어 있음')
           })

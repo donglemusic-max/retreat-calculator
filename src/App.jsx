@@ -2894,7 +2894,7 @@ function AdminApp() {
   )
 
   const TAB_ORDER = ['요약', '정리안', '체크필요', '그룹정리', '요청조합', '방배정', '리마인드', '문의', '버스명단', '메일문구']
-  const TAB_LABEL = { 요약: '요약', 정리안: '정리안', 체크필요: '⚠️ 체크필요', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스', 메일문구: '✉️ 메일문구' }
+  const TAB_LABEL = { 요약: '요약', 정리안: '📸 정리안(고정)', 체크필요: '⚠️ 체크필요', 그룹정리: '그룹정리', 요청조합: '같은 방 요청', 방배정: '방배정', 리마인드: '입금·확인', 문의: '문의', 버스명단: '버스', 메일문구: '✉️ 메일문구' }
   // #11 워크플로우 단계 번호(① 그룹정리 → ② 같은방 → ③ 방배정 → ④ 입금) + 처리할 건수 배지
   const TAB_STEP = { 그룹정리: 1, 요청조합: 2, 방배정: 3, 리마인드: 4 }
   const tabCount = (t) => t === '리마인드' ? m.unpaid.length : t === '방배정' ? m.unassigned.length : t === '그룹정리' ? m.checkGroups.length : 0
@@ -3178,6 +3178,13 @@ function AdminApp() {
           const gPeople = (g) => g[2].split('·').filter(Boolean).length + (g[3] ? g[3].split('·').filter(Boolean).length : 0) // 명단+미제출 인원
           return (
             <div>
+              <div className="bg-[#fff4e5] border-2 border-[#ffc078] rounded-2xl px-4 py-3 mb-3">
+                <div className="text-[15px] font-extrabold text-[#b45309] flex items-center gap-1.5">📸 고정 스냅샷 · 실시간 아님</div>
+                <div className="text-[13px] text-[#92400e] font-semibold mt-1 leading-relaxed">
+                  이 화면은 <b>{isAi ? aiSort.at : CURATED_SORT.at} 시점</b>에 정리한 사진입니다. 이후 성도님이 바꾼 신청(객실·인원 등)은 <b>여기 반영 안 됨.</b><br />
+                  👉 <b>지금 최신 현황</b>은 <b>요약 · ⚠️체크필요 · 그룹정리</b> 탭에서 보세요. (조회·수정/구글시트 값과 일치)
+                </div>
+              </div>
               <HelpToggle>{`운영자가 전체 신청 데이터를 직접 분석해 정리한 화면입니다. (스냅샷 · 새 신청은 미반영 → 데이터 주시면 갱신, 또는 '🤖 AI 정리안 갱신')
 • 그룹 = 비용 함께 내는 묶음. 초록 '전원'=명단 전원 제출, 주황 'N/M'=일부 미제출.
 • 부분그룹 = "다른 성도와 같은 방" 요청(추가 배정 예정).

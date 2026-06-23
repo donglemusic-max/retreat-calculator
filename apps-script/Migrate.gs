@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v17-keepadmin'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v18-rostermerge'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -225,11 +225,19 @@ function enrichSheet() {
   Object.keys(byForce).forEach(function (k) { var a = byForce[k]; for (var i = 1; i < a.length; i++) union(a[0], a[i]); });
   // 동일 명단 묶음 자동 병합: 명단 이름 집합이 "완전히 동일"하면 한 그룹으로 (같은 그룹원들이 같은 명단을 적은 경우).
   //   이름 하나만 겹치는 건 병합 안 함 → 무관한 사람 과병합 방지. 2명 이상 명단일 때만.
+  //   ★ 제출자 본인 이름이 그 명단에 들어있는 행만 병합 후보 — 별칭/대리 제출(예: '첼로09'가 박윤정 그룹 명단 제출)이
+  //     이메일·대표 다른 별개 그룹(예: 이수향 팀)에 잘못 붙는 것 방지. 이런 경우는 '이중 그룹'으로 남겨 사람이 정리.
   var byRoster = {};
+  var _bare_ = function (s) { return String(s || '').replace(/\s+/g, '').replace(/[A-Za-z0-9]+$/, ''); };
   rowsIdx.forEach(function (r) {
     if (splitSet[r]) return;
     var tk = _listNames_(get(r, 'list'));
-    if (tk.length >= 2) { var key = tk.slice().sort().join(','); (byRoster[key] = byRoster[key] || []).push(r); }
+    if (tk.length < 2) return;
+    var self = String(get(r, 'name') || '').replace(/\s+/g, '');
+    var selfBare = _bare_(self);
+    var inRoster = tk.some(function (t) { var b = String(t).replace(/\s+/g, ''); return b === self || _bare_(b) === selfBare; });
+    if (!inRoster) return; // 본인이 명단에 없으면(별칭·대리 제출) 동일명단 병합 제외
+    var key = tk.slice().sort().join(','); (byRoster[key] = byRoster[key] || []).push(r);
   });
   Object.keys(byRoster).forEach(function (k) { var a = byRoster[k]; for (var i = 1; i < a.length; i++) union(a[0], a[i]); });
   var clusters = {};

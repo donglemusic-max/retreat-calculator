@@ -34,7 +34,7 @@
 - 실사용 제출/조회/관리 엔드포인트(App.jsx `SUBMIT_URL` 기본값):
   `https://script.google.com/macros/s/AKfycbxSeDKQOKld3t4L6mAxS5beVV9XhWyQvHDr0PGo-ohx34CK1E1obvSC6Sz8XzDcCOgDUg/exec`
 - **버전 확인**: 웹앱 URL을 브라우저로 GET → `{"version":"svN-..."}`. enrich는 토스트에 `[vN-...]`.
-  - 현재 코드: enrich **v17-keepadmin**, submit **sv26-dupfix2**. (2026-06-22 기준 배포 완료 — /exec 확인됨)
+  - 현재 코드: enrich **v18-rostermerge**, submit **sv26-dupfix2**. (2026-06-22 기준 배포 완료 — /exec 확인됨)
 - ⚠️ Submit.gs/Migrate.gs 바꾸면 사용자가 **재배포(기존 배포 버전 올리기, URL 유지) / enrich 재실행** 해야 함. 버전 마커로 반영 여부 확인.
 - ADMIN_PIN: Submit.gs 상단(기본 '2026', 운영시 변경 권장). 관리자 페이지 `사이트/#admin`.
 
@@ -48,7 +48,7 @@
 - **미제출 보존**: 명단>제출이면 확인필요. 관리자 요약에 "명단 기준 예상/미제출 추정"(미제출 이름 전체 1회씩, 부정확→추정).
 
 ## 5. Apps Script 함수 맵
-### Migrate.gs (enrich, v17-keepadmin)
+### Migrate.gs (enrich, v18-rostermerge)
 - `enrichSheet()` — 응답탭 자동탐색 → 오버라이드 적용(메모리) → union-find 그룹 → dedup → 비용/신청유형/침구/확인필요 앱컬럼 기록 → F열 전화정규화. 토스트 `[v14-partial-del] N그룹/총액`.
   - **강제그룹**(force, grpRow 없음): 그룹 취급, 객실 그룹가=대표자 객실, 그룹비=인원수(`groupFeeByCount_`).
   - **OCC_PARTIAL 마커**(occ에 '나머지는 교회에서 배정'): 부분그룹 → 객실 그룹가 1회·투숙비 0(추후결정)·신청유형'부분'.

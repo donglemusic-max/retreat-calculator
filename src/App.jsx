@@ -2507,6 +2507,18 @@ function AdminApp() {
     liveR.forEach((r) => {
       if (isChurchAssigned(r.occLabel) && !/부분/.test(r.occLabel || '') && /다른\s*성도|배정\s*요청|함께\s*배정|함께\s*4명|2명은|3명은/.test((r.list || '') + ' ' + (r.inquiry || ''))) pushErr(r.name, '요청은 "다른 성도와 함께"인데 신청은 교회배정(부분그룹 미선택)')
     })
+    // 이중 그룹: 다른 gid인데 멤버 명단(제출+명단)이 크게 겹침 → 같은 가족/그룹 중복 신청 의심
+    const gidNames = Object.entries(byGidC).map(([gid, mem]) => {
+      const rep = (mem.find((r) => r.rep) || mem[0]).rep || mem[0].name
+      const set = new Set(mem.map((r) => cNorm(r.name)))
+      nameTokens(mem.map((r) => r.list).filter(Boolean).join('  ')).forEach((t) => set.add(cNorm(t)))
+      return { gid, rep, names: [...set].filter((n) => n.length >= 2) }
+    })
+    for (let i = 0; i < gidNames.length; i++) for (let j = i + 1; j < gidNames.length; j++) {
+      const A = gidNames[i], B = gidNames[j]
+      const shared = A.names.filter((n) => B.names.includes(n))
+      if (shared.length >= 3) pushErr(`${A.rep} ↔ ${B.rep}`, `다른 그룹인데 명단이 거의 같음 (공통 ${shared.length}명: ${shared.join('·')}) — 이중 신청 의심, 한쪽 정리 필요`)
+    }
     return { missing, roomMismatch, partial, applyCheck, dups }
   }, [rows])
   const [issues, setIssues] = useState(null)

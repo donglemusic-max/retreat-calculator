@@ -418,6 +418,34 @@ check('#35 씨앗방(seed)은 경고 안함', warnOf(ROOMS[2].label, '소노벨 
   check('캠퍼스 혼합 그룹 4명 유지(분리X)', lookup('조형만', 'mix@x.com').length === 4, `len=${lookup('조형만', 'mix@x.com').length}`)
 }
 
+// ════════════ 23) 이중 그룹 검출: 다른 gid·명단 3명+ 겹침 → 의심, 2명 이하 겹침 → 무시 ════════════
+{
+  const dupPairs = (groups) => {
+    const res = []
+    for (let i = 0; i < groups.length; i++) for (let j = i + 1; j < groups.length; j++) {
+      const sh = groups[i].names.filter((n) => groups[j].names.includes(n))
+      if (sh.length >= 3) res.push([groups[i].rep, groups[j].rep, sh.length])
+    }
+    return res
+  }
+  // 박윤정(G027)·이수향(A2606) 같은 6명 가족 → 검출돼야
+  const g1 = [
+    { rep: '박윤정', names: ['박윤정', '이수향', '오주연', '김보영', '박지영', '김순자'] },
+    { rep: '이수향', names: ['이수향', '오주연', '박윤정', '박지영', '김순자', '김보영'] },
+    { rep: '김민구', names: ['김민구', '이유란', '김예소', '김요한', '김다니엘', '김요엘'] }, // 무관
+  ]
+  const r1 = dupPairs(g1)
+  check('이중그룹: 박윤정↔이수향 검출', r1.length === 1 && r1[0][2] === 6, JSON.stringify(r1))
+  // 이혜란 그룹 vs 허준석 개인(명단 1명 겹침) → 무시
+  const g2 = [
+    { rep: '이혜란', names: ['이혜란', '허준석', '심윤지', '허모세', '허갈렙', '허준영', '안소영', '허온유'] },
+    { rep: '허준석', names: ['허준석'] },
+    { rep: '석현수', names: ['석현수', '성호민', '박준영', '이주형', '전동현', '전성민', '김찬'] },
+    { rep: '이주형', names: ['이주형'] },
+  ]
+  check('이중그룹: 1명 겹침은 무시(오탐 없음)', dupPairs(g2).length === 0, JSON.stringify(dupPairs(g2)))
+}
+
 // ── 결과 ──
 console.log(`\n시뮬레이션: PASS ${PASS} / FAIL ${FAIL}`)
 if (fails.length) { console.log('\n실패 케이스:'); fails.slice(0, 40).forEach((f) => console.log(' ✗ ' + f)); if (fails.length > 40) console.log(` …외 ${fails.length - 40}건`) }

@@ -1813,7 +1813,8 @@ function LookupDeposit({ results }) {
 
   const text = `[2026 전교인 리트릿 등록 입금 안내]\n입금 계좌: ${ACCOUNT}\n방식: ${mode === 'leader' && multi ? '대표자 일괄' : '항목별/각자'}\n\n▸ 입금자명   금액\n` +
     lines.map((l) => `▸ ${l.cat}  ${l.payer}   ${won(l.amt)}`).join('\n') +
-    `\n─────────────────\n총 합계: ${won(total)}\n\n* 원활한 등록 관리를 위하여, 위 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.`
+    (isPartial ? `\n▸ 방·그룹 추가비용   추후 결정(최종 인원 확정 후 공지)` : '') +
+    `\n─────────────────\n총 합계: ${won(total)}${isPartial ? ' + 방·그룹비(추후)' : ''}\n\n* 원활한 등록 관리를 위하여, 위 항목별로 구분하여 따로 입금해 주시기를 부탁드립니다.${isPartial ? '\n※ 부분 그룹은 방(객실) 그룹 추가비용이 최종 인원 확정 후 추후 결정되어 별도 공지됩니다.' : ''}`
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { alert('복사 실패 — 길게 눌러 복사해 주세요.') } }
 
   return (
@@ -1851,6 +1852,12 @@ function LookupDeposit({ results }) {
             <span className="text-[15px] font-bold text-[#191f28]">{won(l.amt)}</span>
           </div>
         ))}
+        {isPartial && (
+          <div className="flex items-center justify-between py-2.5 border-b border-[#f7f8fa]">
+            <span className="inline-block bg-[#fff7ed] text-[#b45309] text-[13px] font-bold px-2.5 py-1 rounded-lg">방·그룹 추가비용</span>
+            <span className="text-[13px] font-bold text-[#b45309]">추후 결정 · 공지 예정</span>
+          </div>
+        )}
         <div className="flex items-center justify-between pt-2">
           <span className="text-[14px] font-bold text-[#4e5968]">총 합계</span>
           <span className="text-[20px] font-extrabold text-[#191f28]">{won(total)}</span>

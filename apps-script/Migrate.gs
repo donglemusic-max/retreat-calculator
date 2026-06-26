@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v18-rostermerge'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것
+var ENRICH_VERSION = 'v19-partialroom'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것 (rostermerge + 부분그룹 개인객실비)
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -306,11 +306,11 @@ function enrichSheet() {
       bedding = Math.max(0, memberCount - roomBase_(roomSel));
       appType = '그룹';
     }
-    // 부분그룹(앱 #7/#8): 'OCC_PARTIAL' 마커 → 객실 그룹가 1회만, 투숙(그룹)비는 추후결정=0, 유형='부분'.
+    // 부분그룹(앱 #7/#8): 인원 미확정 → 객실 그룹가(6/24만) 적용 안 함. 개인 객실비(인당)만 받고,
+    // 객실 그룹비는 추후 인원 확정 후 결정·공지. (이흥배 목사님 피드백 2026-06-21: 부분그룹은 6만 없이 1만씩)
     var isPartialMarker = members.some(function (r) { return /나머지는 교회에서 배정/.test(get(r, 'occ')); });
     if (isPartialMarker && grpRow < 0 && !forced) {
-      isGrp = true; // 객실 그룹가 1회 적용 + 본인객실 0
-      commonFee = roomAdd_(get(repRow, 'room')); // 객실 그룹가만 (투숙비 0)
+      // isGrp=false 유지 → pRoom=개인 객실비, commonFee=0(추후결정). 유형만 '부분'.
       bedding = '';
       appType = '부분';
     }

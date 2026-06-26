@@ -799,11 +799,14 @@ function GroupMode() {
     const memberFee = (m) => DEPTS.find((d) => d.name === m.dept)?.fee || 0
     const baseSum = members.reduce((s, m) => s + memberFee(m), 0)
     const busCount = members.filter((m) => m.bus).length
-    const roomGroup = room.group
-    const occFee = partial ? 0 : effOcc.fee // 부분그룹: 투숙(그룹)비 추후결정 → 지금은 0
+    // 부분그룹: 객실 그룹비(6/24만)·투숙비 추후결정 → 지금은 개인 객실비(인당)만. (목사님 피드백)
+    const roomGroup = partial ? 0 : room.group
+    const occFee = partial ? 0 : effOcc.fee
+    const roomIndivEach = partial ? room.indiv : 0
+    const roomIndivTotal = roomIndivEach * count
     const busTotal = busCount * BUS_FEE
     const seorakTotal = seorak ? count * SEORAK_FEE : 0
-    const total = baseSum + roomGroup + occFee + busTotal + seorakTotal
+    const total = baseSum + roomGroup + roomIndivTotal + occFee + busTotal + seorakTotal
 
     const lines = []
     if (depositMode === 'split') {
@@ -813,7 +816,11 @@ function GroupMode() {
     } else {
       lines.push({ cat: '등록비', payer: who, amt: baseSum, note: `${count}명 합산` })
     }
-    if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: partial ? `${room.name} · 그룹 기준` : room.name })
+    if (roomGroup > 0) lines.push({ cat: '객실선택', payer: who, amt: roomGroup, note: room.name })
+    if (roomIndivEach > 0) {
+      if (depositMode === 'split') members.forEach((m, i) => lines.push({ cat: '객실선택', payer: m.name.trim() || `구성원${i + 1}`, amt: roomIndivEach, note: room.name }))
+      else lines.push({ cat: '객실선택', payer: who, amt: roomIndivTotal, note: `${room.name} · ${count}명 개인` })
+    }
     if (occFee > 0) lines.push({ cat: '그룹', payer: who, amt: occFee, note: `${effOcc.label} 투숙` })
     // 버스·설악: split 모드에서 '개인별'이면 각자 본인 이름으로, 아니면 대표자가 모아서
     const byEach = depositMode === 'split' && busSeorakBy === 'each'
@@ -1776,6 +1783,7 @@ function LookupDeposit({ results }) {
   const [mode, setMode] = useState('leader') // leader=대표자 일괄, each=등록비 각자
   const deptFeeOfLabel = (label) => DEPTS.find((d) => d.label === label)?.fee || 0
   const isGroup = results.some((r) => /인이 투숙/.test(r.occLabel || '') || r.appType === '그룹')
+  const isPartial = results.some((r) => r.appType === '부분' || /나머지는 교회에서 배정|부분 그룹/.test(r.occLabel || ''))
   const multi = results.length > 1
   const rep = results.find((r) => (r.common || 0) > 0 || (r.groupTotal || 0) > 0) || results[0]
   const repName = rep.rep || rep.name
@@ -1831,6 +1839,11 @@ function LookupDeposit({ results }) {
       <p className="text-[13px] text-[#5f6b7a] mb-3 leading-relaxed">
         아래 항목별로 <b>각각 따로</b> 입금해 주세요.
       </p>
+      {isPartial && (
+        <div className="bg-[#fffbeb] border border-[#fde68a] rounded-xl p-3 mb-3 text-[13px] text-[#92660a] leading-relaxed">
+          ※ <b>부분 그룹</b>은 현재 <b>개인 기준(1인 객실비)</b>으로 안내됩니다. 방(객실) <b>그룹 추가비용은 최종 방배정·인원 확정 후 추후 결정되어 별도 공지</b>될 예정입니다.
+        </div>
+      )}
       <div className="space-y-2 mb-4">
         {lines.map((l, i) => (
           <div key={i} className="flex items-center justify-between py-2.5 border-b border-[#f7f8fa] last:border-0">

@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv26-dupfix2'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv27-partialroom'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -359,10 +359,12 @@ function _submit_(body, sheet, col, width) {
   var occLabel = body.occLabel || '';
   var seorakOn = !!body.seorak;
   var isGrp = isGroupOcc_(occLabel);
-  var isPartial = /나머지는 교회에서 배정/.test(occLabel); // OCC_PARTIAL: 객실 그룹가 1회·투숙(그룹)비 0
+  var isPartial = /나머지는 교회에서 배정/.test(occLabel); // OCC_PARTIAL: 부분그룹
   var grp = isGrp || isPartial;
-  var commonFee = grp ? (roomAdd_(roomLabel) + (isGrp ? occAdd_(occLabel) : 0)) : 0;
-  var pRoom = function () { return grp ? 0 : roomIndiv_(roomLabel); };
+  // 부분그룹은 객실 그룹가(6/24만) 미적용 → 개인 객실비(인당)만. 그룹비는 추후 인원확정 후 결정.
+  var roomGroup = isGrp;
+  var commonFee = roomGroup ? (roomAdd_(roomLabel) + occAdd_(occLabel)) : 0;
+  var pRoom = function () { return roomGroup ? 0 : roomIndiv_(roomLabel); };
   var appType = isGrp ? '그룹' : (isPartial ? '부분' : '개인');
   var groupTotal = commonFee;
   members.forEach(function (m) {
@@ -589,7 +591,10 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   if (col.type >= 0) for (var ti = 0; ti < idxs.length; ti++) { var tv = _gv_(vals[idxs[ti]], col.type); if (tv === '그룹') typeGrp = true; else if (tv === '부분') typePartial = true; }
   var isPartialMarker = /나머지는 교회에서 배정/.test(occLabel) || (!isGrp && typePartial);
   var forcedGrp = !isGrp && !isPartialMarker && typeGrp;
-  var grp = isGrp || forcedGrp || isPartialMarker; // 객실 그룹가 적용 여부
+  var grp = isGrp || forcedGrp || isPartialMarker; // 유형/설악 등 그룹 취급(부분 포함)
+  // 객실 '그룹가'(대표 공동 6/24만) 적용은 정규그룹·강제그룹만. 부분그룹은 인원 미확정 → 개인 객실비(인당)만 받고
+  // 객실 그룹비는 추후 인원 확정 후 결정(공지). (이흥배 목사님 피드백: 부분그룹은 6만 없이 1만씩)
+  var roomGroup = isGrp || forcedGrp;
   // dedup by name + 구/삭제 집계 제외 (#16/#17)
   var ord = idxs.slice().sort(function (a, b) { return ((col.ver >= 0 && _gv_(vals[a], col.ver) === '구') ? 1 : 0) - ((col.ver >= 0 && _gv_(vals[b], col.ver) === '구') ? 1 : 0); });
   var seen = {}, counted = {}, names = [];
@@ -602,7 +607,7 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   var memberCount = names.length;
   // 그룹비: 정규그룹=투숙텍스트 / 강제그룹=인원수 / 부분=0(추후결정)
   var groupFee = isGrp ? occAdd_(occLabel) : (isPartialMarker ? 0 : groupFeeByCount_(memberCount));
-  var common = grp ? (roomAdd_(roomLabel) + groupFee) : 0;
+  var common = roomGroup ? (roomAdd_(roomLabel) + groupFee) : 0; // 부분그룹=0(추후결정)
   var rep = ''; for (var k = 0; k < idxs.length && !rep; k++) { var mm = _gv_(vals[idxs[k]], col.rep).match(/[가-힣]{2,4}[A-Za-z0-9]*/); if (mm) rep = mm[0]; } // 접미사/숫자 보존
   if (!rep) rep = names[0] || _gv_(vals[idxs[0]], col.name);
   var repRow = idxs.filter(function (r) { return counted[r] && _gv_(vals[r], col.name) === rep; })[0];
@@ -613,7 +618,7 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
   var total = common;
   idxs.forEach(function (r) {
     if (!counted[r]) return;
-    total += deptFee_(_gv_(vals[r], col.dept)) + (grp ? 0 : roomIndiv_(roomLabel))
+    total += deptFee_(_gv_(vals[r], col.dept)) + (roomGroup ? 0 : roomIndiv_(roomLabel))
       + (_gv_(vals[r], col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0)
       + (seoOf(r) ? SEORAK_FEE : 0);
   });
@@ -630,7 +635,7 @@ function _recalcGroupFull_(sheet, H, col, width, gid, override) {
     if (grp && col.type >= 0 && !dup) set(col.type, typeLabel);
     if (seorakAll !== null && !dup) set(col.seorak, seorakAll ? SEORAK_YES : ''); // #11 전원 동일
     set(col.ifee, dup ? 0 : deptFee_(_gv_(row, col.dept)));
-    set(col.iroom, dup ? 0 : (grp ? 0 : roomIndiv_(roomLabel)));
+    set(col.iroom, dup ? 0 : (roomGroup ? 0 : roomIndiv_(roomLabel)));
     set(col.mbus, dup ? 0 : (_gv_(row, col.bus).indexOf('버스') >= 0 ? BUS_FEE : 0));
     set(col.mseo, dup ? 0 : (seoOf(r) ? SEORAK_FEE : 0));
     set(col.common, r === repRow ? common : 0); set(col.gtotal, r === repRow ? total : 0);

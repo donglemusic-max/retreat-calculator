@@ -23,7 +23,7 @@ var DEPT_FEE = {
   '장년부': 278000, '청년부': 278000, '중고등부': 268000, '소년부': 258000,
   '초등부': 248000, '유년부': 228000, '유치부': 208000, '영유아부': 198000, '영아부': 178000,
 };
-var ENRICH_VERSION = 'v19-partialroom'; // 토스트에 표시 — 이게 보이면 최신 코드가 실행된 것 (rostermerge + 부분그룹 개인객실비)
+var ENRICH_VERSION = 'v20-namesafe'; // 토스트에 표시 (rostermerge + 부분그룹 개인객실비 + 동명이인 오병합 방지)
 var BUS_FEE = 38000;
 var SEORAK_FEE = 10000;
 
@@ -215,11 +215,20 @@ function enrichSheet() {
   });
   var unionBucket = function (map) { Object.keys(map).forEach(function (k) { var arr = map[k]; for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }); };
   unionBucket(byEmail); unionBucket(byPhone);
-  // 대표자(G) 명시 그룹: 같은 대표자값끼리 + 그 대표자 이름을 가진 본인 행과 묶기
+  // 대표자(G) 명시 그룹: 같은 대표자값끼리 + 그 대표자 이름을 가진 '본인 행' 붙이기.
+  // ★ 동명이인 오병합 방지: 이름만으로 붙이면 같은 이름 다른 사람(예: 유혜원그룹 문형미 ↔ 개인 kiuni 문형미)이
+  //   엉뚱한 그룹에 합쳐짐. 그래서 '같은 이메일/전화를 공유' 하거나 '본인이 대표자를 따로 선언 안 한(고아) 행'만 붙인다.
+  //   (대표자를 직접 선언한 행끼리는 위 byRep arr-union(221)으로 이미 묶이므로, 이 이름붙이기는 고아행 보강용)
   Object.keys(byRep).forEach(function (v) {
     var arr = byRep[v];
     for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]);
-    (byNm[v] || []).forEach(function (srow) { union(arr[0], srow); });
+    var contacts = {};
+    arr.forEach(function (r) { var e = get(r, 'email'); if (e) contacts['e:' + e] = 1; var p = phoneKey(get(r, 'contact')); if (p) contacts['p:' + p] = 1; });
+    (byNm[v] || []).forEach(function (srow) {
+      var se = get(srow, 'email'), sp = phoneKey(get(srow, 'contact'));
+      var srm = get(srow, 'rep').match(/[가-힣]{2,4}[A-Za-z0-9]*/); var srk = srm ? srm[0] : '';
+      if ((se && contacts['e:' + se]) || (sp && contacts['p:' + sp]) || !srk) union(arr[0], srow);
+    });
   });
   // 오버라이드 강제그룹: 같은 강제그룹 값을 가진 사람끼리 한 그룹으로 (명단만으로 엮인 그룹 수기 병합)
   Object.keys(byForce).forEach(function (k) { var a = byForce[k]; for (var i = 1; i < a.length; i++) union(a[0], a[i]); });

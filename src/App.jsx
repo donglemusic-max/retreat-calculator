@@ -3086,9 +3086,10 @@ function AdminApp() {
           </div>
           {gateMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{gateMsg}</p>}
 
-          {regOpen === false && (
+          {regOpen != null && (
             <div className="mt-3 pt-3 border-t border-[#f2f4f6]">
               <div className="text-[13px] font-bold text-[#191f28] mb-2">임시 등록 링크 발급 <span className="text-[11px] font-normal text-[#5f6b7a]">(제출 1회 · 발급 후 48시간 유효)</span></div>
+              {regOpen && <p className="text-[11px] text-[#5f6b7a] mb-2">지금은 등록이 열려 있어 누구나 등록 가능합니다. 이 링크는 <b>마감 후</b> 우회 입장용으로 미리 발급해 둘 수 있어요.</p>}
               <div className="flex gap-2">
                 <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="누구용인지 메모 (예: 김OO 성도)"
                   className="flex-1 px-3 py-2 rounded-xl border border-[#e5e8eb] text-[13px]" />

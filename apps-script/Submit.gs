@@ -294,6 +294,25 @@ function testTelegram() {
   Logger.log(out);
   return out; // 실행 후 '실행 로그'에서 확인
 }
+// 진단용: 에디터에서 ▶ 실행 → 봇에게 메시지 보낸 사람들의 chat id·이름을 로그에 표시.
+// (목사님이 봇에 메시지 보낸 뒤 실행하면, 목사님 chat id가 보임 → TG_CHAT에 콤마로 추가)
+function showTgChats() {
+  var token = PropertiesService.getScriptProperties().getProperty('TG_TOKEN');
+  if (!token) throw new Error('TG_TOKEN 속성이 비어있습니다.');
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates?offset=-20', { muteHttpExceptions: true });
+  var data = JSON.parse(res.getContentText());
+  if (!data.ok) { Logger.log('텔레그램 오류: ' + res.getContentText()); return res.getContentText(); }
+  var seen = {}, out = [];
+  (data.result || []).forEach(function (u) {
+    var m = u.message || u.edited_message; if (!m || !m.chat) return;
+    var c = m.chat;
+    if (seen[c.id]) return; seen[c.id] = true;
+    out.push('chat_id: ' + c.id + '  |  type: ' + c.type + '  |  이름: ' + ((c.first_name || '') + ' ' + (c.last_name || '') + (c.title || '')).trim() + '  |  "' + (m.text || '') + '"');
+  });
+  var txt = out.length ? out.join('\n') : '(받은 메시지 없음 — 목사님이 @TLC_Retreat_bot 에 메시지를 보냈는지 확인)';
+  Logger.log(txt);
+  return txt; // '실행 로그'에서 확인
+}
 function _notify_(msg) {
   try {
     var p = PropertiesService.getScriptProperties(), token = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');

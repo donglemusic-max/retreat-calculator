@@ -1883,7 +1883,7 @@ function LookupDeposit({ results }) {
   )
 }
 
-function LookupMode() {
+function LookupMode({ canEdit = true, onInquire }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState('idle') // idle | loading | loaded | error
@@ -1939,6 +1939,17 @@ function LookupMode() {
           </Card>
         ) : (
           <>
+            {!canEdit && (
+              <div className="bg-[#f9fafb] border border-[#e5e8eb] rounded-2xl p-4 mb-3">
+                <div className="text-[14px] font-bold text-[#191f28] mb-1">🔒 현재 조회만 가능합니다</div>
+                <p className="text-[13px] text-[#5f6b7a] leading-relaxed">
+                  등록·수정 기간이 마감되어 신청 <b>내용 확인</b>만 가능합니다. 정보 수정·구성원 추가/취소가 필요하시면 문의해 주세요.
+                </p>
+                {onInquire && (
+                  <button onClick={onInquire} className="mt-3 w-full py-2.5 rounded-xl bg-[#191f28] text-white font-bold text-[13px]">수정 문의하기</button>
+                )}
+              </div>
+            )}
             <GroupCheckBanner results={results} />
             {(results.length > 1 || /인이 투숙/.test(results[0].occLabel || '') || results[0].appType === '그룹') ? (
               <GroupEditor members={results} auth={{ verifyEmail: email.trim() }} onRefresh={lookup} title={`${(results.find((r) => r.isSelf) || results[0]).rep || name.trim()}님 그룹`} />
@@ -2585,6 +2596,7 @@ function AdminApp() {
   const [busy, setBusy] = useState(0)
   const track = async (fn) => { setBusy((b) => b + 1); try { return await fn() } finally { setBusy((b) => Math.max(0, b - 1)) } }
   const reload = () => track(async () => { const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || []) })
+  const opLock = useRef(false) // 확인모달 없는 직접 버튼의 연타(재진입) 방지
 
   // ── 접수 마감 토글 + 임시 1회성 링크 ──
   const [regOpen, setRegOpen] = useState(null) // null=로딩중
@@ -2873,12 +2885,14 @@ function AdminApp() {
   }
 
   const addPlaceholder = async () => {
+    if (opLock.current) return // 연타 시 중복 행 생성 방지
     if (!ph.name.trim()) { setPhMsg('이름을 입력하세요'); return }
-    setPhMsg('추가 중…')
-    const deptLabel = ph.dept ? DEPTS.find((d) => d.name === ph.dept)?.label : ''
-    const j = await post({ action: 'addPlaceholder', pin, name: ph.name.trim(), deptLabel })
-    if (j.ok) { setPh({ name: '', dept: '' }); setPhMsg('✓ 미제출 인원 추가됨'); await reload() } else setPhMsg('오류: ' + (j.error || ''))
-    setTimeout(() => setPhMsg(''), 3000)
+    opLock.current = true; setPhMsg('추가 중…')
+    try {
+      const deptLabel = ph.dept ? DEPTS.find((d) => d.name === ph.dept)?.label : ''
+      const j = await post({ action: 'addPlaceholder', pin, name: ph.name.trim(), deptLabel })
+      if (j.ok) { setPh({ name: '', dept: '' }); setPhMsg('✓ 미제출 인원 추가됨'); await reload() } else setPhMsg('오류: ' + (j.error || ''))
+    } finally { opLock.current = false; setTimeout(() => setPhMsg(''), 3000) }
   }
 
   // 요청조합 확정: 같은 방 라벨(배정방)만 부여 — 비용은 그대로(그룹 합치기 아님)
@@ -4197,7 +4211,7 @@ function ContactModal({ onClose }) {
             <div className="space-y-2 mb-3">
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름"
                 className="w-full px-3 py-2.5 rounded-xl border border-[#e5e8eb] text-[14px]" />
-              <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (회신 받으실 번호)"
+              <input value={contact} onChange={(e) => setContact(fmtPhone(e.target.value))} placeholder="연락처 (회신 받으실 번호)" inputMode="tel"
                 className="w-full px-3 py-2.5 rounded-xl border border-[#e5e8eb] text-[14px]" />
               <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} placeholder="문의 내용 (예: 가족 4명 추가 등록 원합니다)"
                 className="w-full px-3 py-2.5 rounded-xl border border-[#e5e8eb] text-[14px] resize-none" />
@@ -4258,7 +4272,7 @@ export default function App() {
 
   if (typeof window !== 'undefined' && window.location.hash.replace(/^#\/?/, '') === 'admin') return <AdminApp />
 
-  const canRegister = gate.loading || gate.open || gate.unlocked // 로딩 중엔 낙관적으로 표시(보통 열림)
+  const canRegister = gate.open || gate.unlocked // 마감 여부 확정 후 판단(로딩 중엔 아래에서 별도 처리)
 
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12 animate-fade-in">
@@ -4302,8 +4316,13 @@ export default function App() {
           </div>
         )}
 
-        {/* 등록 마감 시: 안내 카드(조회는 항상 가능) / 그 외: 정상 등록 폼 */}
-        {top === '등록' && !canRegister ? (
+        {/* 등록: 로딩 중엔 로딩표시(깜빡임 방지) → 마감이면 안내카드 → 열림이면 폼. 조회는 항상 가능 */}
+        {top === '등록' && gate.loading ? (
+          <div className="bg-white rounded-2xl border border-[#f2f4f6] p-8 flex flex-col items-center justify-center gap-3">
+            <span className="inline-block w-6 h-6 border-2 border-[#e5e8eb] border-t-[#3182f6] rounded-full animate-spin" />
+            <span className="text-[13px] text-[#8b95a1] font-bold">등록 정보를 불러오는 중…</span>
+          </div>
+        ) : top === '등록' && !canRegister ? (
           <ClosedNotice onInquire={() => setInquire(true)} />
         ) : (
           <>
@@ -4320,7 +4339,7 @@ export default function App() {
                 ))}
               </div>
             )}
-            {top === '조회' ? <LookupMode /> : reg === '개인' ? <IndividualMode /> : <GroupMode />}
+            {top === '조회' ? <LookupMode canEdit={canRegister} onInquire={() => setInquire(true)} /> : reg === '개인' ? <IndividualMode /> : <GroupMode />}
           </>
         )}
 

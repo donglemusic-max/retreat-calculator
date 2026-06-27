@@ -104,6 +104,12 @@ const SUBMIT_URL =
   (import.meta.env && import.meta.env.VITE_SUBMIT_URL) ||
   'https://script.google.com/macros/s/AKfycbxSeDKQOKld3t4L6mAxS5beVV9XhWyQvHDr0PGo-ohx34CK1E1obvSC6Sz8XzDcCOgDUg/exec'
 
+// 마감 후 임시 1회성 링크(?pass=코드)로 들어온 사람의 접근 토큰. 등록·수정 요청에 자동 첨부.
+const accessToken = () => { try { return localStorage.getItem('rt_token') || '' } catch (e) { return '' } }
+// payload의 명시적 token이 우선(checkToken 검증용), 없으면 저장된 토큰을 붙임
+const apiPost = (payload) =>
+  fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ token: accessToken(), ...payload }) }).then((r) => r.json())
+
 // ── 도움말 콘텐츠 (구글폼 안내문) ──────────────────────────────
 const HELP = {
   general: `[일정]
@@ -602,7 +608,7 @@ function IndividualMode() {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ ...submission, guideText: depositGuideText(calc, '※ ' + subtitle) }),
+        body: JSON.stringify({ ...submission, guideText: depositGuideText(calc, '※ ' + subtitle), token: accessToken() }),
       })
       const j = await res.json()
       if (j.ok) { setSubmitDone(j); setConfirmOpen(false) }
@@ -849,7 +855,7 @@ function GroupMode() {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ ...submission, guideText: depositGuideText(calc, '※ ' + subtitle) }),
+        body: JSON.stringify({ ...submission, guideText: depositGuideText(calc, '※ ' + subtitle), token: accessToken() }),
       })
       const j = await res.json()
       if (j.ok) { setSubmitDone(j); setConfirmOpen(false) }
@@ -1419,7 +1425,7 @@ function SubmitSection({ payload, valid, missing }) {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, token: accessToken() }),
       })
       const j = await res.json()
       if (j.ok) { setResult(j); setStatus('done') } // 성공 시 완료화면으로 전환(재제출 불가) → 락 유지
@@ -1498,7 +1504,7 @@ function EditCard({ data, onDelete, hideSeorak }) {
       const res = await fetch(SUBMIT_URL, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          action: 'update', row: data.row, name: data.name, email: data.email,
+          action: 'update', row: data.row, name: data.name, email: data.email, token: accessToken(),
           fields: { gender, contact, email, campus, deptLabel, bus, seorak, inquiry },
         }),
       })
@@ -1619,7 +1625,7 @@ function GroupEditor({ members, auth, onRefresh, title }) {
   const [repPick, setRepPick] = useState('') // #29 대표자 삭제 시 새 대표자
 
   const occLabelFor = (n) => (OCCUPANCY.find((o) => o.people === n || (n >= 7 && o.people === 8)) || OCCUPANCY[0]).label
-  const post = (p) => fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...p, ...auth }) }).then((r) => r.json())
+  const post = (p) => fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ token: accessToken(), ...p, ...auth }) }).then((r) => r.json())
   const saveGroup = async () => {
     setBusy('group'); setMsg('')
     const roomLabel = ROOMS.find((r) => r.name === roomName).label
@@ -2579,6 +2585,30 @@ function AdminApp() {
     const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || [])
   }
 
+  // ── 접수 마감 토글 + 임시 1회성 링크 ──
+  const [regOpen, setRegOpen] = useState(null) // null=로딩중
+  const [tokens, setTokens] = useState([])
+  const [gateMsg, setGateMsg] = useState('')
+  const [newLink, setNewLink] = useState('')
+  const [memo, setMemo] = useState('')
+  const linkOf = (code) => window.location.origin + window.location.pathname + '?pass=' + code
+  const loadGate = async () => { const j = await post({ action: 'listTokens', pin }); if (j.ok) { setRegOpen(j.regOpen); setTokens(j.tokens || []) } }
+  useEffect(() => { if (auth) loadGate() }, [auth]) // 로그인되면 접수상태·토큰 로드
+  const toggleReg = () => {
+    const next = !regOpen
+    ask(next ? '등록을 다시 열까요?' : '정말 마감하시겠어요?',
+      next ? '일반 방문자도 다시 등록·수정할 수 있게 됩니다.'
+           : '마감하면 일반 방문자는 "조회"만 가능합니다.\n추가 등록·수정은 임시 링크를 받은 분만 할 수 있어요.',
+      async () => { const j = await post({ action: 'setRegOpen', pin, open: next }); if (j.ok) { setRegOpen(j.regOpen); setGateMsg(next ? '등록을 다시 열었습니다.' : '등록을 마감했습니다. (조회만 가능)') } })
+  }
+  const issueLink = async () => {
+    setGateMsg('발급 중…'); setNewLink('')
+    const j = await post({ action: 'issueToken', pin, memo })
+    if (j.ok) { const link = linkOf(j.token); setNewLink(link); setGateMsg(''); setMemo(''); loadGate(); try { await navigator.clipboard.writeText(link) } catch (e) {} }
+    else setGateMsg('오류: ' + (j.error || ''))
+  }
+  const revokeLink = (code) => ask('이 링크를 즉시 만료할까요?', '해당 임시 링크는 더 이상 사용할 수 없게 됩니다.', async () => { const j = await post({ action: 'revokeToken', pin, code }); if (j.ok) loadGate() })
+
   // 실행 취소: 작업 전 해당 컬럼 값을 스냅샷 → 되돌릴 때 그대로 복원
   const pushUndo = (label, field, rowNums) => {
     const updates = [...new Set(rowNums)].map((r) => { const row = rows.find((x) => x.row === r); return { row: r, value: (row && row[field]) || '' } })
@@ -3039,6 +3069,56 @@ function AdminApp() {
         </div>
 
         <StatusLegend />
+
+        {/* 접수 마감 토글 + 임시 1회성 링크 */}
+        <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[14px] font-extrabold text-[#191f28]">접수 상태</div>
+              <div className="text-[12px] text-[#5f6b7a] mt-0.5">
+                {regOpen == null ? '확인 중…' : regOpen ? '🟢 등록·수정 받는 중 (일반 공개)' : '🔒 마감됨 — 일반 방문자는 조회만 / 임시 링크만 등록·수정 가능'}
+              </div>
+            </div>
+            <button onClick={toggleReg} disabled={regOpen == null}
+              className={`px-4 py-2 rounded-xl text-[13px] font-bold whitespace-nowrap ${regOpen == null ? 'bg-[#f2f4f6] text-[#b0b8c1]' : regOpen ? 'bg-[#fde7ea] text-[#dc2626]' : 'bg-[#191f28] text-white'}`}>
+              {regOpen ? '등록 마감하기' : '등록 다시 열기'}
+            </button>
+          </div>
+          {gateMsg && <p className="text-[12px] text-[#1b64da] font-semibold mt-2">{gateMsg}</p>}
+
+          {regOpen === false && (
+            <div className="mt-3 pt-3 border-t border-[#f2f4f6]">
+              <div className="text-[13px] font-bold text-[#191f28] mb-2">임시 등록 링크 발급 <span className="text-[11px] font-normal text-[#5f6b7a]">(제출 1회 · 발급 후 48시간 유효)</span></div>
+              <div className="flex gap-2">
+                <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="누구용인지 메모 (예: 김OO 성도)"
+                  className="flex-1 px-3 py-2 rounded-xl border border-[#e5e8eb] text-[13px]" />
+                <button onClick={issueLink} className="px-4 py-2 rounded-xl bg-[#3182f6] text-white font-bold text-[13px] whitespace-nowrap">링크 발급</button>
+              </div>
+              {newLink && (
+                <div className="mt-2 bg-[#eef5ff] rounded-xl p-3 text-[12px] break-all">
+                  <div className="font-bold text-[#1b64da] mb-1">✅ 링크 생성됨 — 자동 복사되었습니다. 카톡으로 보내주세요.</div>
+                  <div className="text-[#1b64da]">{newLink}</div>
+                </div>
+              )}
+              {tokens.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {tokens.slice().reverse().map((t) => (
+                    <div key={t.code} className="flex items-center justify-between text-[12px] bg-[#f9fafb] rounded-lg px-3 py-2 gap-2">
+                      <div className="min-w-0">
+                        <span className="font-bold">{t.memo || '(메모없음)'}</span>
+                        <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${t.status === '유효' ? 'bg-[#e6f4ea] text-[#1e7e34]' : 'bg-[#f2f4f6] text-[#8b95a1]'}`}>{t.status}</span>
+                      </div>
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <button onClick={() => { try { navigator.clipboard.writeText(linkOf(t.code)) } catch (e) {} setGateMsg('링크를 복사했습니다.') }} className="text-[#3182f6] font-bold">링크복사</button>
+                        {t.status === '유효' && <button onClick={() => revokeLink(t.code)} className="text-[#dc2626] font-bold">만료</button>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {tab === '요약' && (
           <div>
@@ -4005,11 +4085,86 @@ function AdminApp() {
   )
 }
 
+// ── 마감 안내 + 문의 모달 ───────────────────────────────────────
+function ClosedNotice({ onInquire }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#f2f4f6] p-6 shadow-sm text-center">
+      <div className="text-[40px] mb-3">🔒</div>
+      <div className="text-[17px] font-extrabold text-[#191f28] mb-2">등록이 마감되었습니다</div>
+      <p className="text-[13px] text-[#5f6b7a] leading-relaxed mb-5">
+        2026 전교인 리트릿 신규 등록·수정 접수가 마감되었습니다.<br />
+        이미 신청하신 분은 위 <b>조회·수정</b>에서 내용을 확인하실 수 있습니다.<br />
+        추가 등록이나 수정이 필요하시면 아래로 문의해 주세요.
+      </p>
+      <button onClick={onInquire} className="w-full py-3.5 rounded-2xl bg-[#191f28] text-white font-bold text-[15px] hover:bg-black transition-all">
+        추가 등록·수정 문의하기
+      </button>
+    </div>
+  )
+}
+function ContactModal({ onClose }) {
+  const TEL = '01095847575'
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl p-6 w-full max-w-[400px]" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[18px] font-extrabold text-[#191f28] mb-1">추가 등록·수정 문의</div>
+        <p className="text-[13px] text-[#5f6b7a] leading-relaxed mb-4">
+          등록이 마감되었지만, 사정이 있으신 분은 문의해 주세요.<br />
+          확인 후 <b>임시 등록 링크</b>를 보내드립니다. (링크로 들어오시면 등록·수정 가능)
+        </p>
+        <div className="bg-[#f9fafb] rounded-2xl p-4 mb-4 text-[14px] text-[#333d4b] leading-relaxed">
+          <div className="font-bold mb-1">이흥배 목사</div>
+          <div className="text-[#3182f6] font-extrabold text-[16px]">010-9584-7575</div>
+        </div>
+        <div className="flex gap-2">
+          <a href={`tel:${TEL}`} className="flex-1 py-3 rounded-2xl bg-[#191f28] text-white font-bold text-[14px] text-center">전화하기</a>
+          <a href={`sms:${TEL}`} className="flex-1 py-3 rounded-2xl bg-[#3182f6] text-white font-bold text-[14px] text-center">문자하기</a>
+        </div>
+        <button onClick={onClose} className="w-full mt-3 py-2.5 text-[13px] font-bold text-[#5f6b7a]">닫기</button>
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 ───────────────────────────────────────────────────────
 export default function App() {
   const [top, setTop] = useState('등록')  // '등록' | '조회' (#9)
   const [reg, setReg] = useState('개인')   // '개인' | '그룹'
+  const [gate, setGate] = useState({ loading: true, open: true, unlocked: false }) // 접수 마감 게이트
+  const [inquire, setInquire] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      let cand = ''
+      try {
+        const sp = new URLSearchParams(window.location.search)
+        cand = sp.get('pass') || localStorage.getItem('rt_token') || '' // 임시링크 ?pass= 우선
+      } catch (e) {}
+      try {
+        const cfg = await apiPost({ action: 'config' })
+        const open = !cfg || cfg.regOpen !== false
+        let unlocked = false
+        if (cand) {
+          const tk = await apiPost({ action: 'checkToken', token: cand })
+          if (tk && tk.valid) { unlocked = true; try { localStorage.setItem('rt_token', cand) } catch (e) {} }
+          else { try { if (localStorage.getItem('rt_token') === cand) localStorage.removeItem('rt_token') } catch (e) {} }
+        }
+        try { // URL에서 pass 파라미터 제거(공유 흔적 최소화)
+          const u = new URL(window.location.href)
+          if (u.searchParams.has('pass')) { u.searchParams.delete('pass'); window.history.replaceState({}, '', u.pathname + u.search + u.hash) }
+        } catch (e) {}
+        if (!cancelled) setGate({ loading: false, open, unlocked })
+      } catch (e) {
+        if (!cancelled) setGate({ loading: false, open: true, unlocked: false }) // 서버 오류 시 기존처럼 열어둠
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   if (typeof window !== 'undefined' && window.location.hash.replace(/^#\/?/, '') === 'admin') return <AdminApp />
+
+  const canRegister = gate.loading || gate.open || gate.unlocked // 로딩 중엔 낙관적으로 표시(보통 열림)
 
   return (
     <div className="min-h-screen bg-[#f2f4f6] text-[#333d4b] pb-12 animate-fade-in">
@@ -4045,22 +4200,35 @@ export default function App() {
           </button>
         </div>
 
-        {/* 등록 하위: 개인 / 가족·그룹 */}
-        {top === '등록' && (
-          <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4">
-            {[{ k: '개인', t: '개인' }, { k: '그룹', t: '가족·그룹' }].map(({ k, t }) => (
-              <button
-                key={k}
-                onClick={() => setReg(k)}
-                className={`flex-1 py-3 text-[14px] font-bold rounded-[11px] transition-all min-h-[44px] ${reg === k ? 'bg-white text-[#3182f6] shadow-sm' : 'text-[#5f6b7a]'}`}
-              >
-                {t}
-              </button>
-            ))}
+        {/* 임시 링크 접속 안내 (마감됐지만 토큰으로 들어온 경우) */}
+        {top === '등록' && gate.unlocked && !gate.open && (
+          <div className="mb-3 bg-[#fff7ed] border border-[#fed7aa] rounded-2xl p-3 text-[13px] text-[#b45309] leading-relaxed">
+            🔑 <b>임시 등록 링크</b>로 접속 중입니다. 유효시간(발급 후 48시간) 내에 등록·수정하실 수 있어요.<br />
+            <span className="text-[12px]">※ 등록을 1회 제출하면 이 링크는 자동 만료됩니다.</span>
           </div>
         )}
 
-        {top === '조회' ? <LookupMode /> : reg === '개인' ? <IndividualMode /> : <GroupMode />}
+        {/* 등록 마감 시: 안내 카드(조회는 항상 가능) / 그 외: 정상 등록 폼 */}
+        {top === '등록' && !canRegister ? (
+          <ClosedNotice onInquire={() => setInquire(true)} />
+        ) : (
+          <>
+            {top === '등록' && (
+              <div className="flex gap-1.5 bg-[#e9ecef] p-1.5 rounded-[14px] mb-4">
+                {[{ k: '개인', t: '개인' }, { k: '그룹', t: '가족·그룹' }].map(({ k, t }) => (
+                  <button
+                    key={k}
+                    onClick={() => setReg(k)}
+                    className={`flex-1 py-3 text-[14px] font-bold rounded-[11px] transition-all min-h-[44px] ${reg === k ? 'bg-white text-[#3182f6] shadow-sm' : 'text-[#5f6b7a]'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
+            {top === '조회' ? <LookupMode /> : reg === '개인' ? <IndividualMode /> : <GroupMode />}
+          </>
+        )}
 
         <p className="text-[13px] text-[#5f6b7a] text-center mt-6 leading-relaxed">
           제출 후 <b>입금까지 완료</b>해야 등록이 확정됩니다.<br />
@@ -4068,6 +4236,7 @@ export default function App() {
           가족·그룹은 대표자가 구성원을 모두 입력해 한 번에 제출합니다.
         </p>
       </div>
+      {inquire && <ContactModal onClose={() => setInquire(false)} />}
     </div>
   )
 }

@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv27-partialroom'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv28-gate-token'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -115,6 +115,8 @@ function _mailTo_(to, subject, body) {
   } catch (e) {}
 }
 var MAIL_FOOT = '\n\n신청 내용은 등록 사이트 "내 신청 조회·수정"에서 언제든 확인·수정하실 수 있습니다.\n궁금하신 점은 편하게 문의해 주세요. 늘 함께해 주셔서 감사합니다. 🙏\n\n주님의교회 드림';
+// 부분그룹 안내: 방(객실) 그룹 추가비용은 최종 인원 확정 후 추후 결정·별도 공지 (모든 메일 기본 삽입)
+var PARTIAL_NOTE = '\n\n※ 부분 그룹은 현재 개인 기준(1인 객실비)으로 안내됩니다.\n방(객실) 그룹 추가비용은 최종 방배정·인원 확정 후 추후 결정되어 별도 공지될 예정입니다.';
 // 그룹의 '최종 정리 한판' — 변경 후 현재 시트 값으로 항목별 내역·총액 생성 (수정·추가·삭제·그룹변경 메일용)
 function _groupSummary_(sheet, col, width, gid) {
   var n = sheet.getLastRow(); var vals = sheet.getRange(1, 1, n, width).getValues();
@@ -133,8 +135,11 @@ function _groupSummary_(sheet, col, width, gid) {
   if (groupFee > 0) L.push('▸ 그룹비         ' + won(groupFee));
   if (bus > 0) L.push('▸ 버스비         ' + won(bus));
   if (seo > 0) L.push('▸ 설악산뷰       ' + won(seo));
+  // 부분그룹이면 추후공지 멘트 기본 삽입 (그룹 내 한 행이라도 '부분'이면)
+  var isPartialGrp = rows.some(function (rw) { return _gv_(rw, col.type) === '부분'; });
   return '[최종 등록 내역]\n· 인원 ' + names.length + '명: ' + names.join(', ') + '\n· 객실: ' + (room || '교회 배정')
-    + '\n\n' + L.join('\n') + '\n─────────────────\n총 합계: ' + won(total) + '\n입금 계좌: 우리은행 1005803168121 주님의 교회';
+    + '\n\n' + L.join('\n') + '\n─────────────────\n총 합계: ' + won(total)
+    + (isPartialGrp ? PARTIAL_NOTE : '') + '\n입금 계좌: 우리은행 1005803168121 주님의 교회';
 }
 // ── 메일 템플릿(관리자 편집 가능, #26/#30) ───────────────────────────────
 // Script Properties 'MAIL_TPL'(JSON)로 덮어쓰기. 비어있으면 아래 기본값 사용.
@@ -181,6 +186,66 @@ function _mailTplSet_(body) {
   var t = body.tpl || {}, clean = {};
   for (var k in MAIL_TPL_DEFAULT) if (t[k] != null) clean[k] = String(t[k]);
   PropertiesService.getScriptProperties().setProperty('MAIL_TPL', JSON.stringify(clean));
+  return _json_({ ok: true });
+}
+// ── 접수 마감 토글 + 임시 1회성 토큰 ─────────────────────────────
+// 마감 후에도 '제출 1회 + 48시간' 짜리 임시 링크(?pass=코드)로 등록·수정 가능.
+// 상태는 Script Properties에 저장 → 모든 방문자에게 동일 적용. (관리자 PIN은 항상 우회)
+var TOKEN_TTL_MS = 48 * 60 * 60 * 1000; // 48시간
+function _regOpen_() {
+  var v = PropertiesService.getScriptProperties().getProperty('REG_OPEN');
+  return v == null ? true : (v === 'true'); // 미설정=열림(기존 동작 유지)
+}
+function _setRegOpen_(body) {
+  PropertiesService.getScriptProperties().setProperty('REG_OPEN', body.open ? 'true' : 'false');
+  return _json_({ ok: true, regOpen: !!body.open });
+}
+function _tokensRaw_() {
+  try { var s = PropertiesService.getScriptProperties().getProperty('ACCESS_TOKENS'); return s ? JSON.parse(s) : []; } catch (e) { return []; }
+}
+function _tokensSave_(arr) { PropertiesService.getScriptProperties().setProperty('ACCESS_TOKENS', JSON.stringify(arr)); }
+function _tokenFind_(arr, code) { for (var i = 0; i < arr.length; i++) if (arr[i].code === code) return arr[i]; return null; }
+function _tokenValid_(code) {
+  if (!code) return false;
+  var t = _tokenFind_(_tokensRaw_(), String(code));
+  if (!t) return false;
+  return !t.used && (new Date()).getTime() < t.expires;
+}
+function _consumeToken_(code) { // 제출 1회 시 소비
+  var arr = _tokensRaw_(), t = _tokenFind_(arr, String(code));
+  if (t && !t.used) { t.used = (new Date()).getTime(); _tokensSave_(arr); }
+}
+function _randCode_() {
+  var s = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = ''; // 혼동되는 0/O/1/I 제외
+  for (var i = 0; i < 10; i++) r += s.charAt(Math.floor(Math.random() * s.length));
+  return r;
+}
+function _checkTokenRes_(body) {
+  var code = String(body.token || ''), t = _tokenFind_(_tokensRaw_(), code), now = (new Date()).getTime();
+  if (!t) return _json_({ ok: true, valid: false, reason: '유효하지 않은 링크입니다.' });
+  if (t.used) return _json_({ ok: true, valid: false, reason: '이미 사용된 링크입니다.' });
+  if (now >= t.expires) return _json_({ ok: true, valid: false, reason: '만료된 링크입니다.' });
+  return _json_({ ok: true, valid: true, memo: t.memo || '', expires: t.expires });
+}
+function _issueToken_(body) {
+  var arr = _tokensRaw_(), now = (new Date()).getTime(), code = _randCode_();
+  while (_tokenFind_(arr, code)) code = _randCode_();
+  arr.push({ code: code, memo: String(body.memo || ''), issued: now, expires: now + TOKEN_TTL_MS, used: null });
+  arr = arr.filter(function (x) { return now - x.expires < 7 * 24 * 60 * 60 * 1000; }); // 만료+7일 지난 것 정리
+  _tokensSave_(arr);
+  return _json_({ ok: true, token: code, expires: now + TOKEN_TTL_MS });
+}
+function _listTokens_() {
+  var arr = _tokensRaw_(), now = (new Date()).getTime();
+  var out = arr.map(function (t) {
+    return { code: t.code, memo: t.memo, issued: t.issued, expires: t.expires, used: t.used,
+      status: t.used ? '사용완료' : (now >= t.expires ? '만료' : '유효') };
+  });
+  return _json_({ ok: true, tokens: out, regOpen: _regOpen_() });
+}
+function _revokeToken_(body) {
+  var arr = _tokensRaw_(), t = _tokenFind_(arr, String(body.code || ''));
+  if (t && !t.used) { t.used = (new Date()).getTime(); _tokensSave_(arr); }
   return _json_({ ok: true });
 }
 // 🤖 AI 정리안: 시트를 읽어 Claude에 분석 요청 → 구조화된 정리안 JSON 반환 (관리자 전용)
@@ -314,9 +379,16 @@ function doPost(e) {
     var width = sheet.getLastColumn();
     var H = sheet.getRange(1, 1, 1, width).getValues()[0];
     var action = body.action || 'submit';
+    // 공개 상태 조회: 접수 열림 여부 / 임시 링크 유효성 (PIN·col 불필요)
+    if (action === 'config') return _json_({ ok: true, regOpen: _regOpen_() });
+    if (action === 'checkToken') return _checkTokenRes_(body);
     // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신 (PIN 필요)
-    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet' || action === 'aiSort' || action === 'aiSortGet' || action === 'issueScan' || action === 'issueGet' || action === 'issueSet') {
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet' || action === 'aiSort' || action === 'aiSortGet' || action === 'issueScan' || action === 'issueGet' || action === 'issueSet' || action === 'setRegOpen' || action === 'issueToken' || action === 'listTokens' || action === 'revokeToken') {
       if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
+      if (action === 'setRegOpen') return _setRegOpen_(body);
+      if (action === 'issueToken') return _issueToken_(body);
+      if (action === 'listTokens') return _listTokens_();
+      if (action === 'revokeToken') return _revokeToken_(body);
       if (action === 'mailTplGet') return _mailTplGet_();
       if (action === 'mailTplSet') return _mailTplSet_(body);
       if (action === 'aiSort') return _aiSort_(body);
@@ -335,12 +407,19 @@ function doPost(e) {
       if (action === 'moveMember') return _moveMember_(body, sheet, acol, width);
     }
     var col = _colMap_(H);
-    if (action === 'lookup') return _lookup_(body, sheet, H, col, width);
+    if (action === 'lookup') return _lookup_(body, sheet, H, col, width); // 조회는 마감과 무관하게 항상 허용
+    // 마감 게이트: 닫혀 있으면 등록·수정 차단. 단, 관리자 PIN 또는 유효한 임시 토큰은 우회.
+    if (!_regOpen_() && body.pin !== ADMIN_PIN && !_tokenValid_(body.token)) {
+      return _json_({ ok: false, closed: true, error: '등록·수정이 마감되었습니다. 추가 등록이나 수정이 필요하시면 문의해 주세요.' });
+    }
     if (action === 'update') return _update_(body, sheet, H, col, width);
     if (action === 'memberAdd') return _memberAdd_(body, sheet, H, col, width);
     if (action === 'memberDelete') return _memberDelete_(body, sheet, H, col, width);
     if (action === 'groupSet') return _groupSet_(body, sheet, H, col, width);
-    return _submit_(body, sheet, col, width);
+    var subRes = _submit_(body, sheet, col, width);
+    // 제출 성공 + 임시 토큰 사용 시 → 토큰 1회 소비(소멸)
+    if (body.token) { try { var jr = JSON.parse(subRes.getContent()); if (jr && jr.ok) _consumeToken_(body.token); } catch (e3) {} }
+    return subRes;
   } catch (err) {
     return _json_({ ok: false, error: String(err) });
   } finally {
@@ -398,6 +477,7 @@ function _submit_(body, sheet, col, width) {
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, width).setValues(rows);
   // #18 신청 결과 확인 이메일 — 프론트가 보낸 '입금 안내 문구'(복사 버튼과 동일 항목별 형식) 사용.
   var guide = body.guideText || ('총 등록 금액: ' + groupTotal.toLocaleString() + '원\n입금 계좌: 우리은행 1005803168121 주님의 교회');
+  if (isPartial && guide.indexOf('추후 결정') < 0) guide += PARTIAL_NOTE; // 부분그룹 추후공지 멘트 기본 삽입(프론트 누락 대비)
   _mailTplSend_(body.email, 'submit', { name: (leader || (members[0] && members[0].name) || ''), gid: gid, guide: guide });
   return _json_({ ok: true, groupId: gid, rows: rows.length, total: groupTotal });
 }

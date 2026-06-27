@@ -38,7 +38,7 @@ function _findResponseSheet_() {
 var BUS_YES = '버스 신청합니다. (1인 버스 비용 38,000원)';
 var BUS_NO = '자차를 이용합니다';
 var SEORAK_YES = '설악산 뷰 원합니다.';
-var SUBMIT_VERSION = 'sv28-gate-token'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
+var SUBMIT_VERSION = 'sv29-inquiry'; // 배포 확인용 (웹앱 URL을 브라우저로 열면 보임)
 var ADMIN_PIN = '2026';        // ← 관리자 PIN (원하는 번호로 바꾸세요)
 var ADMIN_COLS = ['입금확인', '배정방', '관리자메모']; // 관리자 전용 컬럼 (없으면 자동 생성)
 
@@ -248,6 +248,48 @@ function _revokeToken_(body) {
   if (t && !t.used) { t.used = (new Date()).getTime(); _tokensSave_(arr); }
   return _json_({ ok: true });
 }
+// ── 문의함 (마감 후 추가등록·수정 문의) + 텔레그램 즉시 알림 ───────
+var INQUIRY_SHEET = '문의함';
+function _inquirySheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(INQUIRY_SHEET);
+  if (!sh) { sh = ss.insertSheet(INQUIRY_SHEET); sh.appendRow(['시각', '이름', '연락처', '내용', '상태', '비고']); }
+  return sh;
+}
+function _inquiryAdd_(body) { // 공개: 마감 여부와 무관하게 항상 접수
+  var name = String(body.name || '').trim(), contact = String(body.contact || '').trim(), content = String(body.content || '').trim();
+  if (!name && !contact && !content) return _json_({ ok: false, error: '내용을 입력해 주세요.' });
+  var now = new Date();
+  _inquirySheet_().appendRow([now, name, contact, content, '미처리', '']);
+  _notify_('🔔 [리트릿 문의 도착]\n· 이름: ' + (name || '-') + '\n· 연락처: ' + (contact || '-') + '\n· 내용: ' + (content || '-') + '\n· 시각: ' + Utilities.formatDate(now, 'Asia/Seoul', 'MM/dd HH:mm') + '\n\n관리자 페이지 "문의함"에서 확인하세요.');
+  return _json_({ ok: true });
+}
+function _inquiryList_() {
+  var sh = _inquirySheet_(), n = sh.getLastRow();
+  if (n < 2) return _json_({ ok: true, inquiries: [] });
+  var vals = sh.getRange(2, 1, n - 1, 6).getValues(), out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var v = vals[i];
+    out.push({ row: i + 2, at: v[0] ? (new Date(v[0])).getTime() : 0, name: String(v[1] || ''), contact: String(v[2] || ''), content: String(v[3] || ''), status: String(v[4] || '미처리'), note: String(v[5] || '') });
+  }
+  out.reverse(); // 최신 먼저
+  return _json_({ ok: true, inquiries: out });
+}
+function _inquirySet_(body) {
+  var sh = _inquirySheet_(), r = Number(body.row || 0);
+  if (r >= 2) sh.getRange(r, 5).setValue(body.status || '처리완료');
+  return _json_({ ok: true });
+}
+// 텔레그램 즉시 알림 (Script Properties: TG_TOKEN, TG_CHAT 설정 시 동작. 미설정이면 조용히 패스)
+function _notify_(msg) {
+  try {
+    var p = PropertiesService.getScriptProperties(), token = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');
+    if (!token || !chat) return;
+    UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      payload: JSON.stringify({ chat_id: chat, text: msg }),
+    });
+  } catch (e) {}
+}
 // 🤖 AI 정리안: 시트를 읽어 Claude에 분석 요청 → 구조화된 정리안 JSON 반환 (관리자 전용)
 function _aiSort_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
@@ -382,13 +424,16 @@ function doPost(e) {
     // 공개 상태 조회: 접수 열림 여부 / 임시 링크 유효성 (PIN·col 불필요)
     if (action === 'config') return _json_({ ok: true, regOpen: _regOpen_() });
     if (action === 'checkToken') return _checkTokenRes_(body);
+    if (action === 'inquiry') return _inquiryAdd_(body); // 문의 접수(공개·마감 무관)
     // 관리자 액션: 컬럼 보강 후 폭/헤더 갱신 (PIN 필요)
-    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet' || action === 'aiSort' || action === 'aiSortGet' || action === 'issueScan' || action === 'issueGet' || action === 'issueSet' || action === 'setRegOpen' || action === 'issueToken' || action === 'listTokens' || action === 'revokeToken') {
+    if (action === 'admin' || action === 'adminSet' || action === 'adminBatch' || action === 'mergeGroups' || action === 'addPlaceholder' || action === 'moveMember' || action === 'mailTplGet' || action === 'mailTplSet' || action === 'aiSort' || action === 'aiSortGet' || action === 'issueScan' || action === 'issueGet' || action === 'issueSet' || action === 'setRegOpen' || action === 'issueToken' || action === 'listTokens' || action === 'revokeToken' || action === 'inquiryList' || action === 'inquirySet') {
       if (body.pin !== ADMIN_PIN) return _json_({ ok: false, error: 'PIN이 올바르지 않습니다.' });
       if (action === 'setRegOpen') return _setRegOpen_(body);
       if (action === 'issueToken') return _issueToken_(body);
       if (action === 'listTokens') return _listTokens_();
       if (action === 'revokeToken') return _revokeToken_(body);
+      if (action === 'inquiryList') return _inquiryList_();
+      if (action === 'inquirySet') return _inquirySet_(body);
       if (action === 'mailTplGet') return _mailTplGet_();
       if (action === 'mailTplSet') return _mailTplSet_(body);
       if (action === 'aiSort') return _aiSort_(body);

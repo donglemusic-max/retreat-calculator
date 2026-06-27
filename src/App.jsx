@@ -2593,7 +2593,12 @@ function AdminApp() {
   const [memo, setMemo] = useState('')
   const linkOf = (code) => window.location.origin + window.location.pathname + '?pass=' + code
   const loadGate = async () => { const j = await post({ action: 'listTokens', pin }); if (j.ok) { setRegOpen(j.regOpen); setTokens(j.tokens || []) } }
-  useEffect(() => { if (auth) loadGate() }, [auth]) // 로그인되면 접수상태·토큰 로드
+  // 문의함
+  const [inquiries, setInquiries] = useState([])
+  const loadInquiries = async () => { const j = await post({ action: 'inquiryList', pin }); if (j.ok) setInquiries(j.inquiries || []) }
+  const inquiryDone = (row) => ask('이 문의를 처리완료로 표시할까요?', '목록에서 회색으로 바뀝니다.', async () => { const j = await post({ action: 'inquirySet', pin, row, status: '처리완료' }); if (j.ok) loadInquiries() })
+  const unreadInq = inquiries.filter((q) => q.status !== '처리완료').length
+  useEffect(() => { if (auth) { loadGate(); loadInquiries() } }, [auth]) // 로그인되면 접수상태·토큰·문의 로드
   const toggleReg = () => {
     const next = !regOpen
     ask(next ? '등록을 다시 열까요?' : '정말 마감하시겠어요?',
@@ -3117,6 +3122,43 @@ function AdminApp() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* 문의함 (마감 후 추가등록·수정 문의 — 시트 적재 + 텔레그램 알림) */}
+        <div className="bg-white rounded-2xl border border-[#f2f4f6] p-4 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="text-[14px] font-extrabold text-[#191f28]">
+              📩 문의함
+              {unreadInq > 0 && <span className="ml-2 text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-[#dc2626] text-white">{unreadInq} 미처리</span>}
+            </div>
+            <button onClick={loadInquiries} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
+          </div>
+          {inquiries.length === 0 ? (
+            <p className="text-[12px] text-[#8b95a1]">접수된 문의가 없습니다.</p>
+          ) : (
+            <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
+              {inquiries.map((q) => {
+                const done = q.status === '처리완료'
+                const dt = q.at ? new Date(q.at) : null
+                const when = dt ? `${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}` : ''
+                return (
+                  <div key={q.row} className={`rounded-xl px-3 py-2.5 text-[12px] border ${done ? 'bg-[#f9fafb] border-[#f2f4f6] text-[#8b95a1]' : 'bg-[#fff7ed] border-[#fed7aa]'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-bold text-[13px] text-[#191f28]">
+                        {q.name || '(이름없음)'}
+                        {q.contact && <a href={`tel:${q.contact.replace(/[^0-9]/g, '')}`} className="ml-2 text-[#3182f6] font-bold">{q.contact}</a>}
+                      </div>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="text-[11px] text-[#8b95a1]">{when}</span>
+                        {!done ? <button onClick={() => inquiryDone(q.row)} className="text-[11px] font-bold text-[#1e7e34]">처리완료</button> : <span className="text-[11px] font-bold">✓ 완료</span>}
+                      </div>
+                    </div>
+                    {q.content && <div className="mt-1 whitespace-pre-wrap leading-relaxed">{q.content}</div>}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -4105,23 +4147,60 @@ function ClosedNotice({ onInquire }) {
 }
 function ContactModal({ onClose }) {
   const TEL = '01095847575'
+  const [name, setName] = useState('')
+  const [contact, setContact] = useState('')
+  const [content, setContent] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [err, setErr] = useState('')
+  const send = async () => {
+    if (!content.trim() && !name.trim() && !contact.trim()) { setErr('문의 내용을 입력해 주세요.'); return }
+    setSending(true); setErr('')
+    try {
+      const j = await apiPost({ action: 'inquiry', name: name.trim(), contact: contact.trim(), content: content.trim() })
+      if (j.ok) setSent(true); else setErr(j.error || '전송에 실패했습니다.')
+    } catch (e) { setErr('전송 오류: ' + String(e)) } finally { setSending(false) }
+  }
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl p-6 w-full max-w-[400px]" onClick={(e) => e.stopPropagation()}>
-        <div className="text-[18px] font-extrabold text-[#191f28] mb-1">추가 등록·수정 문의</div>
-        <p className="text-[13px] text-[#5f6b7a] leading-relaxed mb-4">
-          등록이 마감되었지만, 사정이 있으신 분은 문의해 주세요.<br />
-          확인 후 <b>임시 등록 링크</b>를 보내드립니다. (링크로 들어오시면 등록·수정 가능)
-        </p>
-        <div className="bg-[#f9fafb] rounded-2xl p-4 mb-4 text-[14px] text-[#333d4b] leading-relaxed">
-          <div className="font-bold mb-1">이흥배 목사</div>
-          <div className="text-[#3182f6] font-extrabold text-[16px]">010-9584-7575</div>
-        </div>
-        <div className="flex gap-2">
-          <a href={`tel:${TEL}`} className="flex-1 py-3 rounded-2xl bg-[#191f28] text-white font-bold text-[14px] text-center">전화하기</a>
-          <a href={`sms:${TEL}`} className="flex-1 py-3 rounded-2xl bg-[#3182f6] text-white font-bold text-[14px] text-center">문자하기</a>
-        </div>
-        <button onClick={onClose} className="w-full mt-3 py-2.5 text-[13px] font-bold text-[#5f6b7a]">닫기</button>
+      <div className="bg-white rounded-3xl p-6 w-full max-w-[400px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        {sent ? (
+          <div className="text-center py-4">
+            <div className="text-[40px] mb-3">✅</div>
+            <div className="text-[17px] font-extrabold text-[#191f28] mb-2">문의가 접수되었습니다</div>
+            <p className="text-[13px] text-[#5f6b7a] leading-relaxed mb-5">
+              담당자가 확인 후 연락드리겠습니다.<br />추가 등록·수정이 필요하신 경우 <b>임시 등록 링크</b>를 보내드립니다.
+            </p>
+            <button onClick={onClose} className="w-full py-3 rounded-2xl bg-[#191f28] text-white font-bold text-[14px]">확인</button>
+          </div>
+        ) : (
+          <>
+            <div className="text-[18px] font-extrabold text-[#191f28] mb-1">추가 등록·수정 문의</div>
+            <p className="text-[13px] text-[#5f6b7a] leading-relaxed mb-4">
+              등록이 마감되었지만, 사정이 있으신 분은 아래에 남겨주세요.<br />
+              확인 후 <b>임시 등록 링크</b>를 보내드립니다.
+            </p>
+            <div className="space-y-2 mb-3">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e5e8eb] text-[14px]" />
+              <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="연락처 (회신 받으실 번호)"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e5e8eb] text-[14px]" />
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} placeholder="문의 내용 (예: 가족 4명 추가 등록 원합니다)"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e5e8eb] text-[14px] resize-none" />
+            </div>
+            {err && <p className="text-[12px] text-[#f04452] font-semibold mb-2">{err}</p>}
+            <button onClick={send} disabled={sending}
+              className={`w-full py-3.5 rounded-2xl font-bold text-[15px] ${sending ? 'bg-[#e5e8eb] text-[#b0b8c1]' : 'bg-[#191f28] text-white hover:bg-black'}`}>
+              {sending ? '보내는 중…' : '문의 보내기'}
+            </button>
+            <div className="flex gap-2 mt-2">
+              <a href={`tel:${TEL}`} className="flex-1 py-2.5 rounded-2xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px] text-center">전화하기</a>
+              <a href={`sms:${TEL}`} className="flex-1 py-2.5 rounded-2xl bg-[#f2f4f6] text-[#4e5968] font-bold text-[13px] text-center">문자하기</a>
+            </div>
+            <p className="text-[11px] text-[#8b95a1] text-center mt-3">이흥배 목사 010-9584-7575</p>
+            <button onClick={onClose} className="w-full mt-1 py-2 text-[13px] font-bold text-[#5f6b7a]">닫기</button>
+          </>
+        )}
       </div>
     </div>
   )

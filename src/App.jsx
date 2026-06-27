@@ -2581,9 +2581,10 @@ function AdminApp() {
       if (j.ok) { setRows(j.rows || []); setAuth(true) } else setErr(j.error || '실패')
     } catch (e) { setErr(String(e)) } finally { setLoading(false) }
   }
-  const reload = async () => {
-    const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || [])
-  }
+  // 전역 로딩 표시: 진행 중인 네트워크 작업 수(>0이면 상단에 '동기화 중' 표시). track(fn)으로 어떤 async든 감쌈.
+  const [busy, setBusy] = useState(0)
+  const track = async (fn) => { setBusy((b) => b + 1); try { return await fn() } finally { setBusy((b) => Math.max(0, b - 1)) } }
+  const reload = () => track(async () => { const j = await post({ action: 'admin', pin }); if (j.ok) setRows(j.rows || []) })
 
   // ── 접수 마감 토글 + 임시 1회성 링크 ──
   const [regOpen, setRegOpen] = useState(null) // null=로딩중
@@ -2592,10 +2593,11 @@ function AdminApp() {
   const [newLink, setNewLink] = useState('')
   const [memo, setMemo] = useState('')
   const linkOf = (code) => window.location.origin + window.location.pathname + '?pass=' + code
-  const loadGate = async () => { const j = await post({ action: 'listTokens', pin }); if (j.ok) { setRegOpen(j.regOpen); setTokens(j.tokens || []) } }
+  const loadGate = () => track(async () => { const j = await post({ action: 'listTokens', pin }); if (j.ok) { setRegOpen(j.regOpen); setTokens(j.tokens || []) } })
   // 문의함
   const [inquiries, setInquiries] = useState([])
-  const loadInquiries = async () => { const j = await post({ action: 'inquiryList', pin }); if (j.ok) setInquiries(j.inquiries || []) }
+  const [inqLoaded, setInqLoaded] = useState(false)
+  const loadInquiries = () => track(async () => { const j = await post({ action: 'inquiryList', pin }); if (j.ok) setInquiries(j.inquiries || []); setInqLoaded(true) })
   const inquiryDone = (row) => ask('이 문의를 처리완료로 표시할까요?', '목록에서 회색으로 바뀝니다.', async () => { const j = await post({ action: 'inquirySet', pin, row, status: '처리완료' }); if (j.ok) loadInquiries() })
   const unreadInq = inquiries.filter((q) => q.status !== '처리완료').length
   useEffect(() => { if (auth) { loadGate(); loadInquiries() } }, [auth]) // 로그인되면 접수상태·토큰·문의 로드
@@ -3030,6 +3032,15 @@ function AdminApp() {
           </div>
         </div>
       )}
+      {/* 전역 로딩 표시 — 어떤 작업이든 네트워크가 도는 동안 상단에 떠서 '멈춘 듯한' 느낌 제거 */}
+      {busy > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-[70] flex justify-center pointer-events-none">
+          <div className="mt-2 bg-[#191f28] text-white text-[12px] font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+            <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            동기화 중…
+          </div>
+        </div>
+      )}
       <div className="max-w-[720px] mx-auto px-4 pt-6">
         <header className="mb-3">
           <div className="flex items-center justify-between">
@@ -3037,7 +3048,10 @@ function AdminApp() {
             <div className="flex gap-1.5">
               {undoStack.length > 0 && <button onClick={undoLast} className="text-[12px] bg-[#fff4e5] text-[#b45309] px-3 py-1.5 rounded-xl font-bold whitespace-nowrap">↩ 되돌리기</button>}
               <button onClick={() => setShowGuide(true)} className="text-[12px] bg-[#eef5ff] text-[#1b64da] px-3 py-1.5 rounded-xl font-bold whitespace-nowrap">📖 사용법</button>
-              <button onClick={reload} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968] whitespace-nowrap">새로고침</button>
+              <button onClick={reload} disabled={busy > 0} className={`text-[12px] border px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1 ${busy > 0 ? 'bg-[#f2f4f6] border-[#f2f4f6] text-[#8b95a1]' : 'bg-white border-[#f2f4f6] text-[#4e5968]'}`}>
+                {busy > 0 && <span className="inline-block w-3 h-3 border-2 border-[#b0b8c1]/40 border-t-[#8b95a1] rounded-full animate-spin" />}
+                {busy > 0 ? '불러오는 중…' : '새로고침'}
+              </button>
             </div>
           </div>
           <p className="text-[12px] text-[#5f6b7a] mt-1">신청을 <b className="text-[#4e5968]">① 그룹 정리 → ② 같은 방 요청 → ③ 방배정 → ④ 입금·연락</b> 순으로 진행하면 됩니다.</p>
@@ -3136,7 +3150,7 @@ function AdminApp() {
             <button onClick={loadInquiries} className="text-[12px] bg-white border border-[#f2f4f6] px-3 py-1.5 rounded-xl font-bold text-[#4e5968]">새로고침</button>
           </div>
           {inquiries.length === 0 ? (
-            <p className="text-[12px] text-[#8b95a1]">접수된 문의가 없습니다.</p>
+            <p className="text-[12px] text-[#8b95a1]">{inqLoaded ? '접수된 문의가 없습니다.' : '불러오는 중…'}</p>
           ) : (
             <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
               {inquiries.map((q) => {

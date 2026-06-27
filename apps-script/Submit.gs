@@ -280,6 +280,20 @@ function _inquirySet_(body) {
   return _json_({ ok: true });
 }
 // 텔레그램 즉시 알림 (Script Properties: TG_TOKEN, TG_CHAT 설정 시 동작. 미설정이면 조용히 패스)
+// 진단용: 에디터에서 직접 실행(▶). 권한 동의창을 띄우고, 텔레그램 응답을 그대로 보여줌(에러 안 삼킴).
+function testTelegram() {
+  var p = PropertiesService.getScriptProperties(), token = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');
+  if (!token) throw new Error('TG_TOKEN 속성이 비어있습니다. (프로젝트 설정 → 스크립트 속성)');
+  if (!chat) throw new Error('TG_CHAT 속성이 비어있습니다.');
+  var first = String(chat).split(/[,\s;]+/)[0].trim();
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    payload: JSON.stringify({ chat_id: first, text: '✅ 텔레그램 연결 테스트 (에디터 실행)' }),
+  });
+  var out = 'HTTP ' + res.getResponseCode() + ' / TG_CHAT=' + chat + '\n' + res.getContentText();
+  Logger.log(out);
+  return out; // 실행 후 '실행 로그'에서 확인
+}
 function _notify_(msg) {
   try {
     var p = PropertiesService.getScriptProperties(), token = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');

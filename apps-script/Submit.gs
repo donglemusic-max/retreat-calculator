@@ -313,6 +313,22 @@ function showTgChats() {
   Logger.log(txt);
   return txt; // '실행 로그'에서 확인
 }
+// 진단용: 에디터에서 ▶ 실행 → 메일 발송 가능 여부 확정. 권한 미승인이면 동의창이 뜸(승인하면 해결).
+function mailDiag() {
+  var out = [];
+  try { out.push('남은 일일 메일 발송량: ' + MailApp.getRemainingDailyQuota() + ' 통'); } catch (e) { out.push('할당량 조회 실패: ' + e); }
+  var me = '';
+  try { me = Session.getEffectiveUser().getEmail(); } catch (e) {}
+  out.push('발송 계정(=테스트 수신지): ' + (me || '(알 수 없음)'));
+  try {
+    MailApp.sendEmail(me, '[리트릿] 메일 발송 진단', '이 메일이 도착하면 발송은 정상입니다.\n' + new Date());
+    out.push('✅ sendEmail 호출 성공 — 위 주소 수신함을 확인하세요.');
+  } catch (e) {
+    out.push('❌ sendEmail 실패: ' + e);
+  }
+  Logger.log(out.join('\n'));
+  return out.join('\n'); // '실행 로그'에서 확인
+}
 function _notify_(msg) {
   try {
     var p = PropertiesService.getScriptProperties(), token = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');

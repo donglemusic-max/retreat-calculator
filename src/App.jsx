@@ -2605,6 +2605,8 @@ function AdminApp() {
   const [newLink, setNewLink] = useState('')
   const [memo, setMemo] = useState('')
   const linkOf = (code) => window.location.origin + window.location.pathname + '?pass=' + code
+  const LINK_NOTE = '48시간 유효한 임시 개별 링크입니다.'
+  const copyText = (code) => LINK_NOTE + '\n' + linkOf(code) // 클립보드용: 안내문구 + 링크
   const loadGate = () => track(async () => { const j = await post({ action: 'listTokens', pin }); if (j.ok) { setRegOpen(j.regOpen); setTokens(j.tokens || []) } })
   // 문의함
   const [inquiries, setInquiries] = useState([])
@@ -2623,7 +2625,7 @@ function AdminApp() {
   const issueLink = async () => {
     setGateMsg('발급 중…'); setNewLink('')
     const j = await post({ action: 'issueToken', pin, memo })
-    if (j.ok) { const link = linkOf(j.token); setNewLink(link); setGateMsg(''); setMemo(''); loadGate(); try { await navigator.clipboard.writeText(link) } catch (e) {} }
+    if (j.ok) { const link = linkOf(j.token); setNewLink(link); setGateMsg(''); setMemo(''); loadGate(); try { await navigator.clipboard.writeText(copyText(j.token)) } catch (e) {} }
     else setGateMsg('오류: ' + (j.error || ''))
   }
   const revokeLink = (code) => ask('이 링크를 즉시 만료할까요?', '해당 임시 링크는 더 이상 사용할 수 없게 됩니다.', async () => { const j = await post({ action: 'revokeToken', pin, code }); if (j.ok) loadGate() })
@@ -3130,8 +3132,8 @@ function AdminApp() {
               </div>
               {newLink && (
                 <div className="mt-2 bg-[#eef5ff] rounded-xl p-3 text-[12px] break-all">
-                  <div className="font-bold text-[#1b64da] mb-1">✅ 링크 생성됨 — 자동 복사되었습니다. 카톡으로 보내주세요.</div>
-                  <div className="text-[#1b64da]">{newLink}</div>
+                  <div className="font-bold text-[#1b64da] mb-1">✅ 링크 생성됨 — 아래 내용이 그대로 복사되었습니다. 카톡으로 붙여넣으세요.</div>
+                  <div className="text-[#1b64da] whitespace-pre-wrap">{LINK_NOTE + '\n' + newLink}</div>
                 </div>
               )}
               {tokens.length > 0 && (
@@ -3143,7 +3145,7 @@ function AdminApp() {
                         <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${t.status === '유효' ? 'bg-[#e6f4ea] text-[#1e7e34]' : 'bg-[#f2f4f6] text-[#8b95a1]'}`}>{t.status}</span>
                       </div>
                       <div className="flex items-center gap-3 whitespace-nowrap">
-                        <button onClick={() => { try { navigator.clipboard.writeText(linkOf(t.code)) } catch (e) {} setGateMsg('링크를 복사했습니다.') }} className="text-[#3182f6] font-bold">링크복사</button>
+                        <button onClick={() => { try { navigator.clipboard.writeText(copyText(t.code)) } catch (e) {} setGateMsg('안내문구+링크를 복사했습니다.') }} className="text-[#3182f6] font-bold">링크복사</button>
                         {t.status === '유효' && <button onClick={() => revokeLink(t.code)} className="text-[#dc2626] font-bold">만료</button>}
                       </div>
                     </div>
